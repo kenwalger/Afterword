@@ -1,0 +1,7 @@
+fixtures/corpus/v*/
+fixtures/labels/
+
+friction-delight-logs/
+
+.idea/
+.env
