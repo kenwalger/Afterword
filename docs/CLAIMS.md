@@ -31,6 +31,7 @@ When evidence changes a claim, append the result and date. Do not rewrite the or
 **Status:** UNTESTED
 
 - 2026-10-02: Priority is now policy-computed (ADR-007). Measured on `test-natural` for reduction and `test-enriched` for recall. No evidence yet.
+- 2026-10-02 (later): ADR-010 amended. `test-natural` and `test-enriched` are replaced by one prospective `test` set (comments on posts published after preregistration), which measures both reduction and recall. No evidence yet.
 
 ## C-003: Explanations improve oversight
 
@@ -99,6 +100,8 @@ Claims below were added on 2026-10-02 during scoping v2.
 **Would weaken/falsify:** B1 matches B2 within one or two consequential comments on the test sets.
 
 **Status:** UNTESTED
+
+- 2026-10-02: Measured on the prospective `test` set (ADR-010 amended), where B1 and B2 run in shadow mode with sealed outputs. No evidence yet.
 
 ## C-009: The problem exists at this author's volume
 

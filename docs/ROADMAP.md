@@ -16,10 +16,10 @@ Goal: define the question before implementation changes it.
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
 - [x] Measure volume baseline: comments per post and per week across the author's DEV history (C-009; 2026-10-02)
-- [ ] Time one chronological review of a typical week's comments (C-009)
+- [ ] Time chronological reviews of two weeks, a typical week and a busy week (C-009; `afterword label --mode chronological`)
 - [ ] Define fixture format and corpus manifest
-- [ ] Select and split corpus by post into `dev`, `test-natural`, `test-enriched`
-- [ ] Label all sets per the labeling guide, test sets first
+- [x] Decide corpus targets (2026-10-02: historical `dev`, prospective `test`; ADR-010 amended, `docs/proposals/accepted/2026-10-02-corpus-targets.md`)
+- [ ] Label the `dev` corpus (every historical comment from others) per the labeling guide
 - [ ] Build the adversarial set, including injection cases
 
 **Gate:** if C-009 shows trivial volume, decide explicitly whether to continue as a methodology study. Otherwise continue.
@@ -66,12 +66,14 @@ Goal: determine whether assisted triage is useful before building a large UI.
 ### 3b: Preregistration
 
 - Freeze all versions.
-- Write registered thresholds into `EVALUATION.md`.
-- Commit.
+- Recompute the accrual estimate from the observed `dev` consequential share and record it in `EVALUATION.md`.
+- Write registered thresholds into `EVALUATION.md`, with the accrual procedure and stopping rule.
+- Commit. The commit time starts accrual (ADR-010).
 
-### 3c: Measurement
+### 3c: Accrual and measurement
 
-- Run B1 and B2 once on sealed test sets.
+- Weekly, until the stopping rule (both 20 consequential and 100 total test comments, or 16 weeks): sync, run B1 and B2 in shadow mode with outputs hashed and hidden, and label new test comments blind.
+- When accrual stops, verify the sealed outputs against their hashes, reveal them, and score B1 and B2 once.
 - Consequential miss review.
 - Labeler self-agreement check (if 14 days have passed).
 - Write the evaluation report.

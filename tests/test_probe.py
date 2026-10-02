@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from afterword import cli
+from afterword.adapters.dev import records
 from afterword.adapters.dev.client import DevClient
 from afterword.adapters.dev.probe import FINDINGS_FILE, INDEX_FILE, Probe
 from tests.conftest import FAKE_KEY
@@ -22,7 +24,7 @@ COMMENT_TEXT_AND_NAMES = (
 )
 
 
-def run_probe(tmp_path: Path, run_id: str, **kwargs) -> dict:
+def run_probe(tmp_path: Path, run_id: str, **kwargs: Any) -> dict[str, Any]:
     client = DevClient(FAKE_KEY, min_interval=0.0, sleep=lambda s: None)
     probe = Probe(
         client, tmp_path / "raw" / run_id, tmp_path / "reports" / run_id, run_id=run_id, page_size=2
@@ -233,3 +235,35 @@ def test_deletion_placeholder_reconciles_and_shows_in_lifecycle(tmp_path, fake_d
     assert f["comments"]["by_content_author"] == 1
     (changed,) = f["lifecycle"]["changed"]
     assert changed["values_changed"] == ["body_html", "user"]
+
+
+def test_subtree_ignores_nodes_without_an_id():
+    # Regression (found by mypy --strict): a descendant with no ID used to put None
+    # into the subtree, which then pulled in every later top-level comment.
+    nodes = [
+        records.CommentNode("r", None, 0, {}),
+        records.CommentNode(None, "r", 1, {}),
+        records.CommentNode("t", None, 0, {}),
+    ]
+    assert Probe._subtree_ids(nodes, "r") == {"r"}
+
+
+def test_identity_terms_split_author_from_others(tmp_path, fake_dev):
+    run_probe(tmp_path, "r1")
+    terms = records.identity_terms(tmp_path / "raw")
+    assert terms.runs_read == 1
+    assert "synthetic_author" in terms.author
+    assert "synthetic_reader_1" in terms.others
+    assert "synthetic_author" not in terms.others
+    assert terms.author_emails == frozenset()  # the probe saves only the user ID
+
+
+def test_full_probe_fetches_every_article(tmp_path, fake_dev):
+    f = run_probe(tmp_path, "r1")
+    fetch = f["article_fetch"]
+    assert fetch["articles_requested"] == fetch["articles_fetched"] == 3
+    assert fetch["statuses"] == {"200": 3}
+    for article_id in (9000001, 9000002, 9000003):
+        assert (tmp_path / "raw" / "r1" / records.article_file(article_id)).exists()
+    shapes = json.loads((tmp_path / "reports" / "r1" / "shapes.json").read_text())
+    assert shapes["article"]["samples"] == 3

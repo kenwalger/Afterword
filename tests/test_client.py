@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import httpx
 import pytest
@@ -9,7 +10,7 @@ from afterword.adapters.dev.client import ACCEPT, DevClient, MissingCredentialEr
 from tests.conftest import FAKE_KEY, load
 
 
-def make_client(**kwargs) -> tuple[DevClient, list[float]]:
+def make_client(**kwargs: Any) -> tuple[DevClient, list[float]]:
     waits: list[float] = []
     kwargs.setdefault("min_interval", 0.0)
     return DevClient(FAKE_KEY, sleep=waits.append, **kwargs), waits

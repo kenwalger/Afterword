@@ -16,12 +16,32 @@ from typing import Any
 
 from afterword.observations import RunObservations
 
-HISTOGRAM_BUCKETS = ((0, 0), (1, 1), (2, 5), (6, 10), (11, 20), (21, 50), (51, None))
-TRAILING_WEEKS = 52
-RECENT_WEEKS = 13
+HISTOGRAM_BUCKETS: tuple[tuple[int, int | None], ...] = (
+    (0, 0),
+    (1, 1),
+    (2, 5),
+    (6, 10),
+    (11, 20),
+    (21, 50),
+    (51, None),
+)
+TRAILING_WEEKS: int = 52
+RECENT_WEEKS: int = 13
+POST_AGE_BUCKETS: tuple[tuple[int, int | None], ...] = (
+    (0, 7),
+    (8, 30),
+    (31, 90),
+    (91, 365),
+    (366, None),
+)
 
 
 def describe(values: list[int]) -> dict[str, Any]:
+    """Summarize a list of counts.
+
+    :param values: Counts, in any order.
+    :returns: ``n``, min, median, mean, nearest-rank p90, max, and total; only ``n`` when empty.
+    """
     if not values:
         return {"n": 0}
     ordered = sorted(values)
@@ -37,10 +57,21 @@ def describe(values: list[int]) -> dict[str, Any]:
 
 
 def nearest_rank(ordered: list[int], q: float) -> int:
+    """Return the nearest-rank percentile.
+
+    :param ordered: Values sorted ascending, not empty.
+    :param q: Quantile between 0 and 1.
+    :returns: The value at that rank.
+    """
     return ordered[max(math.ceil(q * len(ordered)) - 1, 0)]
 
 
 def week_start(moment: datetime | date) -> date:
+    """Return the Monday that starts the ISO week containing ``moment`` (UTC).
+
+    :param moment: A timezone-aware datetime, or a date.
+    :returns: The week's Monday.
+    """
     day = moment.astimezone(UTC).date() if isinstance(moment, datetime) else moment
     return day - timedelta(days=day.weekday())
 
@@ -52,6 +83,11 @@ def _bucket_label(lo: int, hi: int | None) -> str:
 
 
 def histogram(values: list[int]) -> dict[str, int]:
+    """Count values into the fixed per-article buckets.
+
+    :param values: Counts per article.
+    :returns: Number of articles per bucket label.
+    """
     out = {}
     for lo, hi in HISTOGRAM_BUCKETS:
         out[_bucket_label(lo, hi)] = sum(1 for v in values if v >= lo and (hi is None or v <= hi))
@@ -59,7 +95,12 @@ def histogram(values: list[int]) -> dict[str, int]:
 
 
 def pick_week(weeks: list[tuple[date, int]], target: float) -> dict[str, Any] | None:
-    """The week whose count is closest to `target`; ties go to the most recent."""
+    """Find the week whose count is closest to ``target``; ties go to the most recent.
+
+    :param weeks: Week starts with their counts, oldest first.
+    :param target: Count to approach, such as the median.
+    :returns: The chosen week's start, end, and count, or ``None`` if there are no weeks.
+    """
     if not weeks:
         return None
     start, count = min(reversed(weeks), key=lambda w: abs(w[1] - target))
@@ -70,8 +111,56 @@ def pick_week(weeks: list[tuple[date, int]], target: float) -> dict[str, Any] | 
     }
 
 
+def calendar_months(
+    others: list[datetime], mine: list[datetime], as_of: date
+) -> list[dict[str, Any]]:
+    """Count comments per calendar month (UTC), from the first comment's month to ``as_of``.
+
+    :param others: Creation times of comments from others.
+    :param mine: Creation times of the author's comments.
+    :param as_of: Date the run finished; its month is marked partial.
+    :returns: One row per month, including empty months.
+    """
+    if not others and not mine:
+        return []
+    by_others = Counter(t.astimezone(UTC).strftime("%Y-%m") for t in others)
+    by_mine = Counter(t.astimezone(UTC).strftime("%Y-%m") for t in mine)
+    first = min(others + mine).astimezone(UTC).date().replace(day=1)
+    last = as_of.replace(day=1)
+    months = []
+    current = first
+    while current <= last:
+        key = current.strftime("%Y-%m")
+        months.append(
+            {
+                "month": key,
+                "others": by_others.get(key, 0),
+                "mine": by_mine.get(key, 0),
+                "complete": (current.replace(day=28) + timedelta(days=4)).replace(day=1) <= as_of,
+            }
+        )
+        current = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return months
+
+
+def post_age_at_comment(ages_days: list[int]) -> dict[str, int]:
+    """Bucket how old the post was when each comment arrived, in whole days.
+
+    :param ages_days: Post age at each comment.
+    :returns: Number of comments per age bucket.
+    """
+    return {
+        _bucket_label(lo, hi): sum(1 for a in ages_days if a >= lo and (hi is None or a <= hi))
+        for lo, hi in POST_AGE_BUCKETS
+    }
+
+
 def concentration(per_article_counts: list[int]) -> dict[str, Any]:
-    """How comments from others are spread across articles. Counts only, no IDs."""
+    """Describe how comments from others are spread across articles. Counts only, no IDs.
+
+    :param per_article_counts: Comments from others per article, zeros included.
+    :returns: Top-k shares, articles needed for 50% and 80%, and threshold counts.
+    """
     ordered = sorted(per_article_counts, reverse=True)
     total = sum(ordered)
 
@@ -103,6 +192,12 @@ def concentration(per_article_counts: list[int]) -> dict[str, Any]:
 
 
 def build(obs: RunObservations, *, as_of: date) -> dict[str, Any]:
+    """Compute the C-009 volume baseline.
+
+    :param obs: Observations from one full-scope run.
+    :param as_of: Date the run finished. Weeks and months that contain it are partial.
+    :returns: The report as JSON-ready data. Aggregates only.
+    """
     # Deletion placeholders hold a thread position but are no one's comment.
     placeholders = [c for c in obs.comments if c.is_deletion_placeholder]
     live = [c for c in obs.comments if not c.is_deletion_placeholder]
@@ -113,6 +208,21 @@ def build(obs: RunObservations, *, as_of: date) -> dict[str, Any]:
     per_article_counts = [per_article.get(c.content_ref, 0) for c in obs.contents]
     reported_total = sum(c.reported_comment_count or 0 for c in obs.contents)
 
+    published = {c.content_ref: c.published_at for c in obs.contents}
+    recent_start = week_start(as_of) - timedelta(weeks=RECENT_WEEKS)
+
+    def ages(comments: list[Any]) -> list[int]:
+        return [
+            max((c.created_at - published[c.content_ref]).days, 0)
+            for c in comments
+            if c.created_at and published.get(c.content_ref)
+        ]
+
+    recent_others = [
+        c
+        for c in others
+        if c.created_at and recent_start <= week_start(c.created_at) < week_start(as_of)
+    ]
     dated_others = [c.created_at for c in others if c.created_at]
     dated_mine = [c.created_at for c in mine if c.created_at]
     anchors = [c.published_at for c in obs.contents if c.published_at] + dated_others + dated_mine
@@ -180,6 +290,11 @@ def build(obs: RunObservations, *, as_of: date) -> dict[str, Any]:
             for window, desc in ((trailing, trailing_desc), (recent, recent_desc))
         ],
         "weekly": [{**w, "week_start": w["week_start"].isoformat()} for w in weekly],
+        "monthly": calendar_months(dated_others, dated_mine, as_of),
+        "post_age_at_comment_from_others": {
+            "all": post_age_at_comment(ages(others)),
+            f"trailing_{RECENT_WEEKS}_weeks": post_age_at_comment(ages(recent_others)),
+        },
     }
 
 
@@ -192,21 +307,17 @@ def _stats_row(label: str, d: dict[str, Any]) -> str:
     )
 
 
-def _monthly(weekly: list[dict[str, Any]]) -> list[tuple[str, int, int]]:
-    months: dict[str, list[int]] = {}
-    for w in weekly:
-        key = w["week_start"][:7]
-        months.setdefault(key, [0, 0])
-        months[key][0] += w["others"]
-        months[key][1] += w["mine"]
-    return [(k, v[0], v[1]) for k, v in months.items()]
-
-
 def render_markdown(report: dict[str, Any]) -> str:
+    """Render the baseline report as Markdown.
+
+    :param report: Output of :func:`build`.
+    :returns: Markdown text, aggregates only.
+    """
     t = report["totals"]
     pa = report["per_article_from_others"]
     pw = report["per_week_from_others"]
     wt = report["weeks_to_time"]
+    age_recent = report["post_age_at_comment_from_others"][f"trailing_{RECENT_WEEKS}_weeks"]
     lines = [
         "# Volume baseline (C-009)",
         "",
@@ -284,11 +395,25 @@ def render_markdown(report: dict[str, Any]) -> str:
                 lines.append(f"- **{name}:** none (no complete weeks).")
     lines += [
         "",
-        "## Per month",
+        "## Per calendar month",
+        "",
+        "Bucketed by each comment's own `created_at` month (UTC).",
         "",
         "| Month | From others | By author |",
         "| --- | --- | --- |",
-        *[f"| {m} | {o} | {a} |" for m, o, a in _monthly(report["weekly"])],
+        *[
+            f"| {m['month']}{'' if m['complete'] else ' (partial)'} | {m['others']} | {m['mine']} |"
+            for m in report["monthly"]
+        ],
+        "",
+        "## Post age when comments from others arrived (days)",
+        "",
+        "| Post age | All history | Trailing 13 complete weeks |",
+        "| --- | --- | --- |",
+        *[
+            f"| {k} | {v} | {age_recent[k]} |"
+            for k, v in report["post_age_at_comment_from_others"]["all"].items()
+        ],
         "",
         "## Per week",
         "",

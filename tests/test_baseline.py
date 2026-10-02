@@ -125,3 +125,29 @@ def test_markdown_has_no_identifiers_beyond_refs():
     assert "Median week" in md
     assert "p90 week" in md
     assert chr(0x2014) not in md  # no em-dashes in generated prose
+
+
+def test_calendar_months_bucket_by_comment_month():
+    report = baseline.build(observations(), as_of=date(2026, 9, 10))
+    assert report["monthly"] == [
+        {"month": "2026-08", "others": 4, "mine": 1, "complete": True},
+        {"month": "2026-09", "others": 0, "mine": 0, "complete": False},
+    ]
+
+
+def test_calendar_months_split_a_week_that_crosses_months():
+    # The week of 2026-08-31 starts in August but this comment is in September.
+    obs = observations()
+    obs.comments.append(comment("b", "7", "2026-09-02"))
+    months = {
+        m["month"]: m["others"] for m in baseline.build(obs, as_of=date(2026, 9, 10))["monthly"]
+    }
+    assert months == {"2026-08": 4, "2026-09": 1}
+
+
+def test_post_age_at_comment():
+    ages = baseline.build(observations(), as_of=date(2026, 9, 10))[
+        "post_age_at_comment_from_others"
+    ]
+    # a published 08-03: comments on 08-03, 08-12, 08-05 -> 0, 9, 2 days; b published 08-17: 1 day.
+    assert ages["all"] == {"0-7": 3, "8-30": 1, "31-90": 0, "91-365": 0, "366+": 0}

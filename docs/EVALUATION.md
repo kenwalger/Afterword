@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 2 (2026-10-02)
+**Version:** 3 (2026-10-02)
+
+v3 replaces the historical post-level split (`test-natural`, `test-enriched`) with a prospective test set (ADR-010, amended 2026-10-02; `docs/proposals/accepted/2026-10-02-corpus-targets.md`).
 
 ## Evaluation question
 
@@ -16,16 +18,46 @@ All corpus material is versioned (`corpus-vN`) and described in a manifest with 
 
 | Set | Purpose | Selection | Sealed? |
 | --- | --- | --- | --- |
-| `dev` | Prompt, policy, and heuristic iteration | Random sample from posts not used in test sets | No |
-| `test-natural` | Review reduction and recall at real base rates | Random sample at natural rates, disjoint posts from `dev` | Yes |
-| `test-enriched` | Recall and miss analysis with enough consequential cases | Stratified sample oversampling likely-consequential comments, disjoint from all others | Yes |
+| `dev` | Prompt, policy, and heuristic iteration | Every historical comment from others, frozen at preregistration | No |
+| `test` | Review reduction, consequential recall, and miss analysis | Every comment from others on posts published after the preregistration commit, accrued until the stopping rule | Yes: labeled blind, classifier outputs hashed and hidden until accrual stops |
 | `adversarial` | Robustness, including prompt injection | Synthetic and hand-picked hard cases | No, reported separately |
 
-Splitting by post rather than by comment prevents thread context leaking between development and test.
+The test set is disjoint from `dev` by post and by time. Comments that arrive after preregistration on posts published before it belong to neither set; their count is reported.
 
-**Targets:** `test-natural` 100 to 150 comments. `test-enriched` sized so that it contains at least 20 comments graded consequential. If the author's corpus cannot supply that many, report the actual count and treat the recall result as indicative only.
+The test set is at natural base rates by construction, so review reduction and recall are measured on the same set. No enriched sample is drawn: recall uses every consequential comment the test set accrues.
 
-Review reduction is only reported from `test-natural`, because oversampling distorts base rates.
+### Accrual procedure
+
+1. Preregistration (below) is committed. Its commit time is the start of accrual; posts published after it are test posts.
+2. Each week: sync; run B1 and B2 in shadow mode on new test comments; write their outputs to a git-ignored file and commit its SHA-256. Nothing is shown.
+3. Each week: the author labels the new test comments per `LABELING-GUIDE.md`, at first read where possible and before replying where possible. The label records `replied_before_labeling`.
+4. Accrual continues until the stopping rule is met.
+
+### Stopping rule
+
+Stop accrual when **both** targets are reached:
+
+- at least **20 test comments graded consequential** (prospective grade 2 or 3), and
+- at least **100 test comments** in total.
+
+Stop at **16 weeks after the preregistration commit** if that comes first.
+
+If the 16-week cap ends accrual, report which targets were met, with counts. Recall resting on fewer than 20 consequential comments is indicative; review reduction resting on fewer than 100 comments is indicative. Report the total number of test comments and the number graded consequential in every case.
+
+### Accrual estimate (recompute before preregistration)
+
+The proposal estimated accrual time from the trailing 13 weeks of volume (mean 17 comments from others per week) and an **assumed** consequential share of 15% (plausible range 10% to 20%). For both targets together: about 6 to 7 weeks when the share is 20% or more (the 100-comment target binds), about 8 to 10 weeks at 15%, about 12 at 10%, and beyond the 16-week cap below about 8%.
+
+Once `dev` labeling is complete, recompute this estimate with the observed consequential share and record it here, dated, before the preregistration commit.
+
+*Not yet recomputed.*
+
+### Risks to accrual
+
+- **Publishing cadence.** About 91% of comments arrive within a week of a post. Accrual therefore depends on the author's DEV publishing cadence during the test period. A quiet stretch (July 2026: 11 posts, 7 comments from others) can end accrual at the 16-week cap with one or both targets unmet.
+- **Spiky volume.** Weekly counts in the trailing 13 weeks ranged from 0 to 60.
+- **Labeling cadence.** A missed week delays labels but does not unblind them; outputs stay sealed until accrual stops.
+- **Replying before labeling.** A reply written before labeling can bring hindsight into the prospective grade. `replied_before_labeling` makes this visible in the analysis.
 
 ## Conditions compared
 
@@ -45,13 +77,13 @@ The marginal value of the model is B2 minus B1. If B1 is close to B2, that is a 
 
 ### Consequential recall
 
-Of comments prospectively graded 2 or 3, how many are surfaced (`SURFACE` or `QUEUE`)?
+Of test comments prospectively graded 2 or 3, how many are surfaced (`SURFACE` or `QUEUE`)?
 
 Reported as a count first: "19 of 20 surfaced; the miss is described below." A percentage may follow, with a Wilson interval when n is small. One miss in a small set is a large percentage change; the count is the honest unit.
 
 ### Review reduction
 
-Share of non-author comments in `test-natural` assigned `COLLAPSED`, reported alongside recall at that operating point.
+Share of non-author test comments assigned `COLLAPSED`, reported alongside recall at that operating point.
 
 ### Consequential miss review
 
@@ -80,7 +112,8 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 - Count of `UNCERTAIN` assignments.
 - Count of comments requiring thread context.
 - Stability across model or prompt versions on `dev`.
-- Prospective versus retrospective agreement (C-010).
+- Prospective versus retrospective agreement (C-010), separately for `dev` (hindsight available when labeled) and `test` (labeled at first read).
+- Grades given after replying versus before (`replied_before_labeling`).
 - Labeler self-agreement (see `LABELING-GUIDE.md`).
 
 ## Adversarial set
@@ -103,17 +136,20 @@ Pass condition for injection cases: no injection comment is assigned below `SURF
 
 Time per batch is measured from instrumentation, not recollection. Because there is one reviewer, the same batch cannot be reviewed twice without memory contamination. Use two comparable batches, alternating which condition is reviewed first across sessions, and report the limitation plainly.
 
+Chronological timing of historical weeks (C-009) is a re-read and therefore a lower bound on first-read cost. Test-period weeks can be timed at first read.
+
 Collapsed-group behavior (C-004) is measured by logging every expansion of a collapsed group and every disposition recorded on a collapsed comment.
 
-## Preregistration and the sealed test sets
+## Preregistration and the sealed test set
 
-Before the test sets are opened (ADR-010):
+Before accrual begins (ADR-010):
 
 1. Finalize taxonomy, priority policy, heuristic rules, prompt, and model version on `dev`.
-2. Write the numeric success thresholds into this document under "Registered thresholds," dated.
-3. Commit.
+2. Record the recomputed accrual estimate above.
+3. Write the numeric success thresholds into this document under "Registered thresholds," dated, together with the accrual procedure and stopping rule as they stand.
+4. Commit. The commit time starts accrual.
 
-Then run B1 and B2 once on the test sets. Any change afterward creates new versions and requires a new sealed set for a clean measurement.
+During accrual nothing registered may change. After the stopping rule is met, check each week's sealed outputs against their committed hashes, reveal them, and score B1 and B2 once. Any change afterward creates new versions and requires a new accrual period for a clean measurement.
 
 ## Registered thresholds
 

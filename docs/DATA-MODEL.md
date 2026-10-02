@@ -1,6 +1,6 @@
 # Data Model
 
-**Version:** 3 (2026-10-02)
+**Version:** 4 (2026-10-02)
 
 ## Principle
 
@@ -166,7 +166,7 @@ Ground truth for the corpus. Separate from operational overrides.
 - `label_id`
 - `comment_id`
 - `corpus_version`
-- `corpus_set` (`dev`, `test-natural`, `test-enriched`, `adversarial`)
+- `corpus_set` (`dev`, `test`, `adversarial`; `test` is prospective, ADR-010)
 - `label_guide_version`
 - `taxonomy_version`
 - `primary_class`
@@ -174,8 +174,12 @@ Ground truth for the corpus. Separate from operational overrides.
 - `consequential_prospective` (0 to 3)
 - `consequential_retrospective` (0 to 3, value state)
 - `context_reconstructed` (boolean)
+- `replied_before_labeling` (boolean; the author's direct reply to the comment existed in the snapshot when it was labeled)
 - `reason`
 - `pass` (`initial`, `self_agreement`)
+- `snapshot_run_id` (the sync or probe run the comment and its context were read from; provenance, not identity)
+- `batch_id` (labeling batch; batch start and end times are recorded with the batch)
+- `duration_seconds` (time from the comment being shown to the label being saved)
 - `labeled_at`
 
 ### HumanOverride

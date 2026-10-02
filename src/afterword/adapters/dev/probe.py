@@ -24,17 +24,24 @@ from afterword.adapters.dev import records
 from afterword.adapters.dev.client import AuthMode, DevClient, Exchange, is_rate_limit_header
 from afterword.adapters.dev.shapes import summarize
 
-ADAPTER_VERSION = "dev-probe-0.1"
-ARTICLES_ENDPOINT = "/api/articles/me/published"
-COMMENTS_ENDPOINT = "/api/comments"
-LARGE_PAGE_SIZE = 1000
-MAX_PAGES = 200
+ADAPTER_VERSION: str = "dev-probe-0.2"
+ARTICLES_ENDPOINT: str = "/api/articles/me/published"
+COMMENTS_ENDPOINT: str = "/api/comments"
+LARGE_PAGE_SIZE: int = 1000
+MAX_PAGES: int = 200
 
-FINDINGS_FILE = "probe-findings.json"
-SHAPES_FILE = "shapes.json"
-INDEX_FILE = "comment-index.json"
+FINDINGS_FILE: str = "probe-findings.json"
+SHAPES_FILE: str = "shapes.json"
+INDEX_FILE: str = "comment-index.json"
 
-CONTENT_ITEM_FIELDS = ("id", "title", "url", "canonical_url", "published_at", "user")
+CONTENT_ITEM_FIELDS: tuple[str, ...] = (
+    "id",
+    "title",
+    "url",
+    "canonical_url",
+    "published_at",
+    "user",
+)
 
 
 def _write_json(path: Path, data: Any) -> None:
@@ -49,8 +56,8 @@ def _type_counts(values: list[Any]) -> dict[str, int]:
 # Endpoints whose payload is reduced to an allowlist before anything is saved.
 # The account endpoint returns personal fields (including email) the experiment
 # does not need; only the user ID is kept, to identify the content author.
-_KEEP_ONLY = {"/api/users/me": ("id",)}
-_CACHE_HEADERS = ("cache-control", "x-cache", "via", "warning")
+_KEEP_ONLY: dict[str, tuple[str, ...]] = {"/api/users/me": ("id",)}
+_CACHE_HEADERS: tuple[str, ...] = ("cache-control", "x-cache", "via", "warning")
 
 
 def _redact(path: str, body: Any) -> list[str]:
@@ -65,12 +72,18 @@ def _redact(path: str, body: Any) -> list[str]:
 
 
 class ProbeLockedError(RuntimeError):
+    """Raised when another probe holds the lock file."""
+
     pass
 
 
 @contextmanager
 def probe_lock(path: Path) -> Iterator[None]:
-    """Exclusive lock so two probes never run at once and double the request rate."""
+    """Hold an exclusive lock so two probes never run at once and double the request rate.
+
+    :param path: Lock file path. It is created exclusively and removed on exit.
+    :raises ProbeLockedError: If the lock file already exists.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -96,6 +109,8 @@ def _endpoint_template(path: str) -> str:
 
 
 class Probe:
+    """Read-only capability probe over one DEV account."""
+
     def __init__(
         self,
         client: DevClient,
@@ -106,6 +121,15 @@ class Probe:
         page_size: int = 10,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        """Create a probe for one run.
+
+        :param client: DEV client to send requests with.
+        :param raw_dir: Git-ignored directory for raw responses.
+        :param report_dir: Git-ignored directory for findings, shapes, and the comment index.
+        :param run_id: Run identifier, normally a UTC timestamp.
+        :param page_size: Small page size used to walk the article listing.
+        :param now: Clock for run timestamps, injectable for tests.
+        """
         self.client = client
         self.raw_dir = raw_dir
         self.report_dir = report_dir
@@ -229,17 +253,31 @@ class Probe:
                 unique.append(a)
         return unique
 
-    def _fetch_article(self, article_id: int) -> Exchange:
-        ex = self._get(records.article_file(article_id), f"/api/articles/{article_id}")
-        body = ex.body if ex.ok and isinstance(ex.body, dict) else {}
+    def _fetch_articles(self, article_ids: list[int]) -> list[dict[str, Any]]:
+        # Every post is fetched singly: only the detail payload carries `edited_at`,
+        # which labeling needs to know whether a post changed after a comment.
+        bodies: list[dict[str, Any]] = []
+        statuses: Counter[int] = Counter()
+        for article_id in article_ids:
+            ex = self._get(records.article_file(article_id), f"/api/articles/{article_id}")
+            statuses[ex.status] += 1
+            if ex.ok and isinstance(ex.body, dict):
+                bodies.append(ex.body)
+            else:
+                self.limitations.append(f"article {article_id} detail returned {ex.status}")
+        keys = set().union(*(set(b) for b in bodies)) if bodies else set()
         self.findings["article_fetch"] = {
             "endpoint": "/api/articles/{id}",
-            "article_id": article_id,
-            "status": ex.status,
-            "content_item_fields_present": {f: f in body for f in CONTENT_ITEM_FIELDS},
-            "edit_key_candidates": records.edit_key_candidates(set(body)),
+            "articles_requested": len(article_ids),
+            "articles_fetched": len(bodies),
+            "statuses": {str(k): v for k, v in sorted(statuses.items())},
+            "content_item_fields_present": {
+                f: bool(bodies) and all(f in b for b in bodies) for f in CONTENT_ITEM_FIELDS
+            },
+            "edit_key_candidates": records.edit_key_candidates(keys),
+            "edited_at_present": sum(1 for b in bodies if b.get("edited_at")),
         }
-        return ex
+        return bodies
 
     def _fetch_comments(
         self, articles: list[dict[str, Any]]
@@ -388,10 +426,12 @@ class Probe:
         return single.body if single.ok else None
 
     @staticmethod
-    def _subtree_ids(nodes: list[records.CommentNode], root: str) -> set[str | None]:
+    def _subtree_ids(nodes: list[records.CommentNode], root: str) -> set[str]:
         ids = {root}
         for n in nodes:  # depth-first order: parents precede children
-            if n.parent_id_code in ids:
+            # A node without an ID cannot be anyone's parent. Adding None would make
+            # every later top-level node (parent None) look like part of the subtree.
+            if n.parent_id_code is not None and n.parent_id_code in ids and n.id_code:
                 ids.add(n.id_code)
         return ids
 
@@ -407,11 +447,21 @@ class Probe:
             return None
         ex = self._get("article-by-path.json", f"/api/articles/{parts[0]}/{parts[1]}")
         if ex.ok and isinstance(ex.body, dict) and isinstance(ex.body.get("id"), int):
-            return ex.body["id"]
+            resolved: int = ex.body["id"]
+            return resolved
         self.limitations.append(f"article path lookup returned {ex.status}")
         return None
 
-    def run(self, *, article: int | str | None = None, compare_to: Path | None = None) -> dict:
+    def run(
+        self, *, article: int | str | None = None, compare_to: Path | None = None
+    ) -> dict[str, Any]:
+        """Run the probe and write its outputs.
+
+        :param article: Limit the run to one article, by numeric ID or URL. ``None``
+            probes everything.
+        :param compare_to: Report directory of an earlier run to diff against.
+        :returns: The findings, as also written to ``probe-findings.json``.
+        """
         started = self.now()
         self.findings.update(
             run_id=self.run_id,
@@ -439,9 +489,10 @@ class Probe:
             invalid = self._get("auth-invalid-key.json", "/api/users/me", auth="invalid")
             self.findings["auth"]["invalid_key_status"] = invalid.status
             articles = self._list_articles()
+            details = self._fetch_articles([a["id"] for a in articles])
         else:
-            ex = self._fetch_article(article_id)
-            articles = [ex.body] if ex.ok and isinstance(ex.body, dict) else []
+            details = self._fetch_articles([article_id])
+            articles = details
 
         trees = self._fetch_comments(articles)
         self._comment_findings(articles, trees)
@@ -455,12 +506,10 @@ class Probe:
 
         single_body = None
         if article_id is None and trees:
-            most = max(trees, key=lambda aid: len(trees[aid]))
-            self._fetch_article(most)
             single_body = self._probe_largest_thread(trees)
 
         outcome = "COMPLETE" if not self.limitations else "PARTIAL"
-        self._write_shapes(me_ex.body, articles, trees, single_body)
+        self._write_shapes(me_ex.body, articles, details, trees, single_body)
         index = self._comment_index(articles, trees, authors)
         return self._finish(outcome, articles, index, me_ex.body, compare_to)
 
@@ -470,6 +519,7 @@ class Probe:
         self,
         me_body: Any,
         articles: list[dict[str, Any]],
+        details: list[dict[str, Any]],
         trees: dict[int, list[records.CommentNode]],
         single_body: Any,
     ) -> None:
@@ -481,13 +531,8 @@ class Probe:
                 [n.node for ns in trees.values() for n in ns], opaque_keys=children
             ),
         }
-        article_path = (
-            self.raw_dir / records.article_file(self.findings["article_fetch"]["article_id"])
-            if "article_fetch" in self.findings
-            else None
-        )
-        if article_path and article_path.exists():
-            shapes["article"] = summarize([records.read_body(article_path)])
+        if details:
+            shapes["article"] = summarize(details)
         if single_body is not None:
             shapes["comment_single"] = summarize([single_body], opaque_keys=children)
         for status, bodies in sorted(self.error_bodies.items()):
@@ -533,7 +578,7 @@ class Probe:
         index: dict[str, Any],
         me_body: Any,
         compare_to: Path | None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         finished = self.now()
         if index and compare_to is not None:
             previous = json.loads((compare_to / INDEX_FILE).read_text(encoding="utf-8"))
@@ -575,7 +620,12 @@ class Probe:
 
 
 def compare_indexes(previous: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
-    """Describe lifecycle changes between two runs by ID, key name, and hash only."""
+    """Describe lifecycle changes between two runs by ID, key name, and hash only.
+
+    :param previous: Comment index of the earlier run.
+    :param current: Comment index of the later run.
+    :returns: Added, removed, and changed comments, plus reported counts per article.
+    """
     shared = set(previous["article_ids"]) & set(current["article_ids"])
     before = {c["id_code"]: c for c in previous["comments"] if c["article_id"] in shared}
     after = {c["id_code"]: c for c in current["comments"] if c["article_id"] in shared}

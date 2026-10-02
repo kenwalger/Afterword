@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit checks (CLAUDE.md): forbidden characters in staged files, the
+# identity scan, then the static checks.
+# Install once per clone: git config core.hooksPath scripts/hooks
+# pytest (3.14 and 3.12) is not run here because it is slow; run it before committing.
+set -e
+uv run --quiet python scripts/check_text.py staged
+uv run --quiet python scripts/check_committable.py
+uv run --quiet ruff check .
+uv run --quiet ruff format --check .
+uv run --quiet mypy
+uv run --quiet pydoclint --quiet src scripts

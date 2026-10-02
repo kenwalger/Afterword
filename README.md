@@ -8,7 +8,36 @@ Afterword asks whether AI can reduce the part of a comment stream that needs imm
 
 ## Status
 
-Stage 0: scoping. No implementation yet. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
+Stage 0 of `docs/ROADMAP.md`, in progress. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
+
+Done:
+
+- Experiment design (docs and ADRs), committed before any code.
+- A read-only DEV probe (`afterword probe`) that verified the capability matrix, including edit and deletion behavior.
+- The C-009 volume baseline (`afterword baseline --run <run>`): 432 comments from others across 138 posts, recent and spiky. Review time is not yet measured.
+- A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
+
+Open: the corpus targets decision (`docs/proposals/`), timed chronological reviews, labeling, and the adversarial set. No classifier exists yet.
+
+## Development
+
+After cloning, install the pre-commit hook. Git does not carry hook settings in a clone, so every fresh clone needs this once:
+
+```text
+git config core.hooksPath scripts/hooks
+```
+
+The `pre-commit` hook rejects staged files containing em-dashes or bidi control characters, then runs the identity scan (`scripts/check_committable.py`), ruff, ruff format, mypy, and pydoclint. The `commit-msg` hook rejects em-dashes and bidi control characters in the commit message. The full check list, including tests on both supported Pythons, is in `CLAUDE.md`:
+
+```text
+uv sync
+uv run ruff check . && uv run ruff format --check .
+uv run mypy && uv run pydoclint src scripts
+uv run pytest
+uv run --isolated --python 3.12 pytest
+```
+
+Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --env-file .env afterword probe`). Real payloads, reports, and labels are written only to git-ignored paths.
 
 ## Reading order
 
@@ -24,7 +53,8 @@ Stage 0: scoping. No implementation yet. V1 is DEV-only; other platforms are def
 10. `docs/API-CAPABILITY-MATRIX.md`
 11. `docs/ROADMAP.md`
 12. `docs/adr/`
-13. `docs/FRICTION-LOG.md`
+13. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
+14. `docs/FRICTION-LOG.md`
 
 ## Public deliverable
 
@@ -33,3 +63,7 @@ The primary public artifact is the evaluation write-up: what was claimed, how it
 ## Name
 
 An afterword is what comes after the text is finished. Comments are the afterword readers write. The project is about what the author does with it.
+
+## License
+
+Apache License 2.0 (`Apache-2.0`). See `LICENSE` and `NOTICE`.

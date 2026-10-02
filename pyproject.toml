@@ -5,6 +5,8 @@ description = "Assisted comment triage for technical publishing. A scoped experi
 authors = [
     { name = "Ken W. Alger", email = "kenalger@comcast.net" }
 ]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1",
@@ -19,6 +21,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.0",
+    "pydoclint>=0.11.0",
     "pytest>=9.1.1",
     "respx>=0.23.1",
     "ruff>=0.16.10",
@@ -29,7 +33,32 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ANN", "D"]
+# Parsed JSON payloads are `Any` at the boundary where they enter.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests need neither docstrings nor annotations (CLAUDE.md, Code standards).
+"tests/**" = ["D", "ANN"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "scripts"]
+
+[tool.pydoclint]
+style = "sphinx"
+exclude = "tests"
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-yield-types = false
+skip-checking-short-docstrings = false
+skip-checking-private-functions = true
+allow-init-docstring = true
+check-class-attributes = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

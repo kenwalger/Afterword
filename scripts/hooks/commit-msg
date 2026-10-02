@@ -1,0 +1,4 @@
+#!/bin/sh
+# Reject em-dashes and bidi control characters in the commit message (CLAUDE.md).
+# Install once per clone: git config core.hooksPath scripts/hooks
+exec uv run --quiet python scripts/check_text.py message "$1"

@@ -58,7 +58,7 @@ V1 exists to test whether assisted comment triage can preserve consequential con
 ### Evaluation
 
 - Ground truth produced per `LABELING-GUIDE.md`.
-- Development set for iteration; sealed test sets for measurement (ADR-010).
+- Development set (the historical corpus) for iteration; a prospective test set, sealed until measurement, for results (ADR-010).
 - Three conditions: chronological baseline, heuristic baseline, LLM-assisted.
 - Consequential recall, review reduction, qualitative analysis of every consequential miss.
 - Separate adversarial set, including prompt-injection attempts.

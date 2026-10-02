@@ -45,7 +45,10 @@ A user can connect DEV, ingest a bounded set of their own posts and comment thre
 V1 is successful if:
 
 1. Real DEV comments can be ingested reproducibly with source provenance intact.
-2. A hand-labeled, versioned corpus exists, split into development and sealed test sets, before classifier tuning.
+2. A hand-labeled, versioned development corpus exists before classifier tuning, and the test set is drawn only from comments arriving after preregistration, labeled before classifier output is revealed.
+
+   Revised 2026-10-02 before any evidence existed: corpus design changed to a prospective test set (ADR-010).
+
 3. The system reduces the number of comments requiring immediate review without removing any comment from inspection.
 4. Recall is high for comments the author labels consequential, reported as counts with every miss explained.
 5. LLM-assisted triage is compared against a heuristic baseline, and its marginal value is stated honestly.

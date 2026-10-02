@@ -69,11 +69,17 @@ class _Entry:
         return out
 
 
-def summarize(objects: Iterable[Any], *, opaque_keys: frozenset[str] = frozenset()) -> dict:
+def summarize(
+    objects: Iterable[Any], *, opaque_keys: frozenset[str] = frozenset()
+) -> dict[str, Any]:
     """Summarize many samples of one response shape.
 
-    Keys in `opaque_keys` are summarized by type and length but not entered,
-    which keeps recursive structures such as comment `children` flat.
+    Keys in ``opaque_keys`` are summarized by type and length but not entered,
+    which keeps recursive structures such as comment ``children`` flat.
+
+    :param objects: Samples of the same payload shape.
+    :param opaque_keys: Keys whose values are not descended into.
+    :returns: Sample count and, per key path, presence, types, string formats, and lengths.
     """
     entries: dict[str, _Entry] = {}
     samples = 0

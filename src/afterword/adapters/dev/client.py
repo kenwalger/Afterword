@@ -19,17 +19,17 @@ from typing import Any, Literal
 
 import httpx
 
-BASE_URL = "https://dev.to"
-ACCEPT = "application/vnd.forem.api-v1+json"
-USER_AGENT = "afterword-probe/0.1 (read-only)"
-ENV_VAR = "DEV_API_KEY"
+BASE_URL: str = "https://dev.to"
+ACCEPT: str = "application/vnd.forem.api-v1+json"
+USER_AGENT: str = "afterword-probe/0.1 (read-only)"
+ENV_VAR: str = "DEV_API_KEY"
 
 # A deliberately wrong key, used once to confirm the API rejects bad credentials.
-INVALID_KEY = "afterword-deliberately-invalid-key"
+INVALID_KEY: str = "afterword-deliberately-invalid-key"
 
-AuthMode = Literal["key", "none", "invalid"]
+type AuthMode = Literal["key", "none", "invalid"]
 
-_KEPT_HEADERS = frozenset(
+_KEPT_HEADERS: frozenset[str] = frozenset(
     {
         "age",
         "cache-control",
@@ -47,8 +47,8 @@ _KEPT_HEADERS = frozenset(
         "x-total-count",
     }
 )
-_KEPT_HEADER_PREFIXES = ("x-ratelimit", "ratelimit", "x-rate-limit")
-_RETRY_STATUSES = frozenset({429, 503})
+_KEPT_HEADER_PREFIXES: tuple[str, ...] = ("x-ratelimit", "ratelimit", "x-rate-limit")
+_RETRY_STATUSES: frozenset[int] = frozenset({429, 503})
 
 # Keep httpx and httpcore quiet: at DEBUG they can emit request details.
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -56,10 +56,17 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 class MissingCredentialError(RuntimeError):
+    """Raised when ``DEV_API_KEY`` is needed but not set."""
+
     pass
 
 
 def is_rate_limit_header(name: str) -> bool:
+    """Report whether a response header carries rate-limit information.
+
+    :param name: Header name, any case.
+    :returns: ``True`` for ``Retry-After`` and the common rate-limit header families.
+    """
     return name.lower().startswith(_KEPT_HEADER_PREFIXES) or name.lower() == "retry-after"
 
 
@@ -91,9 +98,17 @@ class Exchange:
 
     @property
     def ok(self) -> bool:
+        """Report whether the request succeeded with a JSON body.
+
+        :returns: ``True`` for status 200 with a parsed JSON body.
+        """
         return self.status == 200 and self.body_is_json
 
     def to_record(self) -> dict[str, Any]:
+        """Serialize the exchange for saving. Contains no request headers.
+
+        :returns: A JSON-ready record of the request, response, and retries.
+        """
         return {
             "request": {
                 "method": "GET",
@@ -116,6 +131,11 @@ class Exchange:
 
 
 class DevClient:
+    """Read-only DEV client with request spacing and 429 backoff.
+
+    The API key is held privately and attached only to outgoing request headers.
+    """
+
     def __init__(
         self,
         api_key: str | None,
@@ -128,6 +148,17 @@ class DevClient:
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
+        """Create a client.
+
+        :param api_key: DEV API key, or ``None`` for unauthenticated use only.
+        :param base_url: API host.
+        :param min_interval: Minimum seconds between requests.
+        :param max_retries: Retries for status 429 or 503 before giving up.
+        :param backoff_base: First backoff delay in seconds when no ``Retry-After`` is sent.
+        :param backoff_cap: Maximum backoff delay in seconds.
+        :param sleep: Sleep function, injectable for tests.
+        :param clock: Monotonic clock, injectable for tests.
+        """
         self.__api_key = api_key
         self._base_url = base_url
         self._min_interval = min_interval
@@ -141,26 +172,56 @@ class DevClient:
 
     @classmethod
     def from_env(cls, **kwargs: Any) -> DevClient:
+        """Create a client with the key from ``DEV_API_KEY``.
+
+        :param **kwargs: Passed to the constructor.
+        :returns: A configured client.
+        :raises MissingCredentialError: If ``DEV_API_KEY`` is not set.
+        """
         key = os.environ.get(ENV_VAR)
         if not key:
             raise MissingCredentialError(f"{ENV_VAR} is not set")
         return cls(key, **kwargs)
 
     def __repr__(self) -> str:
+        """Describe the client without revealing the key.
+
+        :returns: The base URL and whether a key is present.
+        """
         return f"DevClient(base_url={self._base_url!r}, has_key={self.__api_key is not None})"
 
     def close(self) -> None:
+        """Close the underlying HTTP connection pool."""
         self._http.close()
 
     def __enter__(self) -> DevClient:
+        """Enter a ``with`` block.
+
+        :returns: This client.
+        """
         return self
 
     def __exit__(self, *exc: object) -> None:
+        """Close the client on leaving a ``with`` block.
+
+        :param *exc: Exception information, ignored.
+        """
         self.close()
 
     def get(
         self, path: str, params: dict[str, Any] | None = None, *, auth: AuthMode = "key"
     ) -> Exchange:
+        """Send one GET, retrying on 429 and 503 within the retry limit.
+
+        Transport errors are returned as an exchange with status 0 and the
+        exception type name only, never its message.
+
+        :param path: Request path, such as ``/api/comments``.
+        :param params: Query parameters.
+        :param auth: ``key`` to send the API key, ``none`` for an anonymous request,
+            ``invalid`` for a deliberately wrong key.
+        :returns: The final exchange, including any retries.
+        """
         params = dict(params or {})
         retries: list[dict[str, Any]] = []
         attempt = 0
@@ -234,7 +295,7 @@ class DevClient:
                     return min(max(delta, 0.0), self._backoff_cap)
                 except (TypeError, ValueError):
                     pass
-        return min(self._backoff_base * (2**attempt), self._backoff_cap)
+        return min(self._backoff_base * 2.0**attempt, self._backoff_cap)
 
     @staticmethod
     def _exchange(
