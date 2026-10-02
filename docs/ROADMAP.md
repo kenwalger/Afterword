@@ -14,8 +14,8 @@ Goal: define the question before implementation changes it.
 - [x] Labeling guide (`lg-v0.1`)
 - [x] ADR-001 to ADR-011
 - [x] Friction log started
-- [ ] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix
-- [ ] Measure volume baseline: comments per post and per week across the author's DEV history (C-009)
+- [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
+- [x] Measure volume baseline: comments per post and per week across the author's DEV history (C-009; 2026-10-02)
 - [ ] Time one chronological review of a typical week's comments (C-009)
 - [ ] Define fixture format and corpus manifest
 - [ ] Select and split corpus by post into `dev`, `test-natural`, `test-enriched`

@@ -1,6 +1,6 @@
 # Data Model
 
-**Version:** 2 (2026-10-02)
+**Version:** 3 (2026-10-02)
 
 ## Principle
 
@@ -36,7 +36,7 @@ One execution of the source adapter.
 - `scope` (which posts were requested)
 - `adapter_version`
 - `outcome` (`COMPLETE`, `PARTIAL`, `FAILED`)
-- `limitations_observed` (rate limits, truncation, errors)
+- `limitations_observed` (rate limits, truncation, errors, count mismatches, unexpected node shapes)
 
 ### SourceRecord
 
@@ -49,12 +49,14 @@ Append-only representation of what a source returned.
 - `source_object_id`
 - `observed_at`
 - `source_created_at`
-- `source_updated_at` (with value state; DEV comment edit timestamps are `UNKNOWN` until tested)
-- `raw_payload` (secrets removed)
+- `source_updated_at` (with value state; DEV comments have no edit timestamp, so `NOT_EXPOSED`, verified 2026-10-02)
+- `raw_payload` (secrets and unneeded personal fields removed)
 - `payload_hash`
 - `ingestion_version`
 
 A new SourceRecord is written when the payload hash for an object changes. Unchanged payloads update only `last_observed_at` on the normalized record.
+
+A deletion placeholder's payload is a new SourceRecord because its hash differs. It contains no commenter content and is exempt from the purge; earlier SourceRecords for the same comment are purged (ADR-009).
 
 ## Normalized records
 
@@ -73,12 +75,12 @@ A new SourceRecord is written when the payload hash for an object changes. Uncha
 
 - `comment_id`
 - `platform`
-- `source_object_id` (DEV `id_code`)
+- `source_object_id` (DEV `id_code`; always a string, some are all digits)
 - `content_id`
-- `parent_comment_id` (value state; null with `SOURCE_EMPTY` for top-level)
+- `parent_comment_id` (value state; null with `SOURCE_EMPTY` for top-level; DEV supplies it only through nesting)
 - `thread_root_comment_id`
-- `author_platform_identity_id`
-- `is_content_author` (true when written by the post's author; ADR-011)
+- `author_platform_identity_id` (value state; carried from the last pre-deletion observation for deleted comments; `UNKNOWN` for a comment first observed as a placeholder)
+- `is_content_author` (value state; true when written by the post's author, ADR-011; carried from the last pre-deletion observation; `UNKNOWN` for a comment first observed as a placeholder)
 - `body_source` (as supplied; HTML for DEV)
 - `body_source_format` (`HTML`, `MARKDOWN`, `TEXT`)
 - `body_text` (normalized for classification)
@@ -88,14 +90,26 @@ A new SourceRecord is written when the payload hash for an object changes. Uncha
 - `first_observed_at`
 - `last_observed_at`
 - `lifecycle_state` (`ACTIVE`, `EDITED`, `MISSING_FROM_SOURCE`, `DELETED_UPSTREAM`, `PURGED`)
+- `deletion_evidence` (value state: `ABSENT_TWICE`, `SOURCE_PLACEHOLDER`, or `NOT_YET_INTERPRETED` while not deleted)
 - `current_source_record_id`
 
 #### Lifecycle rules
 
 - **Edited:** payload hash changes for a known comment. State becomes `EDITED`, a new SourceRecord is stored, classification is rerun, and the priority policy raises the comment to at least `QUEUE`.
 - **Missing:** a comment previously observed is absent from a complete sync of its post. State becomes `MISSING_FROM_SOURCE`. One absence is not proof of deletion.
-- **Deleted upstream:** absent from two consecutive complete syncs, or explicitly marked deleted by the source. State becomes `DELETED_UPSTREAM` and the purge rule in `PRIVACY-AND-BOUNDARIES.md` applies (ADR-009).
+- **Deleted upstream (absence):** absent from two consecutive complete syncs. State becomes `DELETED_UPSTREAM` with `deletion_evidence = ABSENT_TWICE`, and the purge rule in `PRIVACY-AND-BOUNDARIES.md` applies (ADR-009).
+- **Deleted upstream (placeholder):** the source returns a known comment in the exact known placeholder shape (DEV: the observed key set with `user` equal to an empty object). State becomes `DELETED_UPSTREAM` at once, with `deletion_evidence = SOURCE_PLACEHOLDER`. The node stays in the thread so replies keep their parent, and the purge rule applies.
+- **Placeholder without prior observation:** create the Comment directly in `DELETED_UPSTREAM` with `deletion_evidence = SOURCE_PLACEHOLDER`, no body stored, and authorship `UNKNOWN`.
+- **Unexpected shape:** a node that is authorless in any other way, or has unknown keys, is not classified as a placeholder. The sync records a limitation, a friction entry is written, and the comment's lifecycle state is left unchanged until the shape is understood.
 - **Purged:** body text and raw payloads removed; identifiers, lifecycle history, and non-content judgments remain.
+
+#### Placeholders are structure only
+
+A `DELETED_UPSTREAM` comment with `deletion_evidence = SOURCE_PLACEHOLDER` exists only as thread structure. It is excluded from classification, priority assignment, review queues, evaluation sets, and every count or metric.
+
+#### Count reconciliation
+
+When a sync compares observed comments with a source-reported count, it compares live comments only. DEV's `comments_count` excludes placeholders. Any remaining difference is recorded as a SyncRun limitation.
 
 ### PlatformIdentity
 

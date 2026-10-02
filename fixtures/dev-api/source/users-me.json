@@ -1,0 +1,16 @@
+{
+  "type_of": "user",
+  "id": 1001,
+  "username": "synthetic_author",
+  "name": "Synthetic Author",
+  "twitter_username": null,
+  "github_username": "synthetic-author",
+  "email": "author@example.invalid",
+  "summary": "Synthetic profile for tests.",
+  "location": "Nowhere",
+  "website_url": "https://example.invalid/",
+  "joined_at": "Jan 1, 2020",
+  "profile_image": "https://example.invalid/profile/synthetic_author.png",
+  "badge_ids": [1, 2, 3],
+  "followers_count": 0
+}

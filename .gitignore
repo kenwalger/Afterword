@@ -1,7 +1,27 @@
+# Secrets
+.env
+.env.*
+
+# Real data: never committed (PRIVACY-AND-BOUNDARIES.md, fixtures/README.md)
 fixtures/corpus/v*/
 fixtures/labels/
+fixtures/dev-api/source/real/
 
+# Local probe and baseline outputs
+reports/
+
+# Personal session notes
 friction-delight-logs/
+commit-message.txt
 
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# IDE
 .idea/
-.env

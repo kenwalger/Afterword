@@ -1,0 +1,74 @@
+[
+  {
+    "type_of": "comment",
+    "id_code": "s1a1",
+    "created_at": "2026-08-03T14:00:00Z",
+    "body_html": "<p>Synthetic question about step two?</p>\n",
+    "user": {
+      "name": "Synthetic Reader One",
+      "username": "synthetic_reader_1",
+      "twitter_username": null,
+      "github_username": null,
+      "user_id": 2001,
+      "website_url": null,
+      "profile_image": "https://example.invalid/profile/synthetic_reader_1.png",
+      "profile_image_90": "https://example.invalid/profile/synthetic_reader_1_90.png"
+    },
+    "children": [
+      {
+        "type_of": "comment",
+        "id_code": "s1a2",
+        "created_at": "2026-08-04T08:30:00Z",
+        "body_html": "<p>Synthetic reply from the author.</p>\n",
+        "user": {
+          "name": "Synthetic Author",
+          "username": "synthetic_author",
+          "twitter_username": null,
+          "github_username": "synthetic-author",
+          "user_id": 1001,
+          "website_url": null,
+          "profile_image": "https://example.invalid/profile/synthetic_author.png",
+          "profile_image_90": "https://example.invalid/profile/synthetic_author_90.png"
+        },
+        "children": [
+          {
+            "type_of": "comment",
+            "id_code": "s1a3",
+            "created_at": "2026-08-12T10:00:00Z",
+            "body_html": "<p>Synthetic follow-up with <code>inline code</code>.</p>\n",
+            "user": {
+              "name": "Synthetic Reader One",
+              "username": "synthetic_reader_1",
+              "twitter_username": null,
+              "github_username": null,
+              "user_id": 2001,
+              "website_url": null,
+              "profile_image": "https://example.invalid/profile/synthetic_reader_1.png",
+              "profile_image_90": "https://example.invalid/profile/synthetic_reader_1_90.png"
+            },
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "type_of": "comment",
+    "id_code": "s1b1",
+    "created_at": "2026-08-05T19:15:00Z",
+    "body_html": "<p>Synthetic acknowledgment.</p>\n",
+    "ai_disclosure_label": "synthetic_val",
+    "ai_disclosure_level": "synthetic_val",
+    "user": {
+      "name": "Synthetic Reader Two",
+      "username": "synthetic_reader_2",
+      "twitter_username": null,
+      "github_username": null,
+      "user_id": 2002,
+      "website_url": null,
+      "profile_image": "https://example.invalid/profile/synthetic_reader_2.png",
+      "profile_image_90": "https://example.invalid/profile/synthetic_reader_2_90.png"
+    },
+    "children": []
+  }
+]

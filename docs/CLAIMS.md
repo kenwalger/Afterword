@@ -108,7 +108,17 @@ Claims below were added on 2026-10-02 during scoping v2.
 
 **Would weaken/falsify:** Chronological review of a typical week takes only a few minutes. In that case the project continues as a methodology study and is described that way.
 
-**Status:** UNTESTED. Measured first, in Stage 0.
+**Status:** PARTIALLY MEASURED. Volume measured; chronological review time not yet measured.
+
+- 2026-10-02: Volume measured from probe run `20261002T171152Z` (all 138 published DEV articles; report `baseline-20261002T171152Z`, git-ignored). The run contains no deletion placeholders and none of the hand-test comments.
+  - **Totals:** 707 comments returned: 432 from others and 275 by the author (39% of all comments, excluded under ADR-011).
+  - **Per article (comments from others):** 74 of 138 articles have none. Median 0, mean 3.1, p90 7, max 62. The top article holds 14.4%, the top 3 hold 34.0%, the top 10 hold 53.9%, and 9 articles cover half of all comments from others.
+  - **Per week (comments from others, complete weeks only):** there was almost no volume before March 2026.
+    - Trailing 52 weeks: median 0.5, mean 7.4, p90 22, max 60.
+    - Trailing 13 weeks: median 7, mean 17.0, p90 44, max 60.
+  - **Reading:** the volume is recent and spiky, not steady. Several weeks in the last 13 reached 39 to 60 comments from others, which is enough for chronological review to plausibly cost real attention, but this has not been measured yet.
+  - **Weeks chosen for timing:** typical week 2026-09-21 to 2026-09-27 (7 comments from others); busy week 2026-09-07 to 2026-09-13 (44).
+  - **Not yet established:** the attention cost itself, which needs a timed chronological review of both weeks. The claim is neither supported nor weakened until then.
 
 ## C-010: Prospective and retrospective judgment largely agree
 
