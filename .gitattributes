@@ -1,0 +1,4 @@
+# Hashed fixtures must be byte-identical on every platform (fixtures/corpus/MANIFEST.md).
+# Without this, core.autocrlf=true checks them out with CRLF and the hashes change.
+fixtures/corpus/*.jsonl text eol=lf
+fixtures/dev-api/expected/*.json text eol=lf

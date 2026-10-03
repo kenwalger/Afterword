@@ -1,6 +1,8 @@
 # Privacy and Boundaries
 
-**Version:** 2 (2026-10-02)
+**Version:** 3 (2026-10-03)
+
+v3 adds the model-boundary records for the two classifier paths: local (Ollama) and remote (Anthropic). Neither has yet processed real comment data.
 
 ## Purpose
 
@@ -49,6 +51,51 @@ Before sending comment data to any external model, record in the repository:
 - redaction rules
 
 Default context: the comment's normalized text, its parent comment's text when `NEEDS_THREAD_CONTEXT` is plausible, and the post title. Not the full article unless the evaluation shows it is needed.
+
+Because whether context is needed cannot be known before classification, the classifier sends the parent's text for every reply and none for a top-level comment.
+
+### Model-boundary records
+
+Drafted 2026-10-03. Real comment data may go through a path only after its record is complete, the author has signed it off (recorded below, dated), and the roadmap stage permits it (Stage 3a, after `dev` labels exist). Until then both paths run on synthetic fixtures only.
+
+#### What the classifier input contains (both paths)
+
+Built by the application from the store, never by the adapter. The same fields go to every provider, so the comparison is fair and the input hash is provider-independent.
+
+| Field | Sent | Notes |
+| --- | --- | --- |
+| Comment text, normalized (`norm-v0.1`) | Yes | As the commenter wrote it, including any handles, names, or links that appear in the text itself. Not redacted: redaction would change meaning (a mention can be the point of a comment), and the comparison with labels needs the same text the author saw. |
+| Post title | Yes | The author's own published text. |
+| Parent comment text, normalized | Only for replies | Truncated to 600 characters. May be the author's own reply. |
+| Whether the comment replies to the post's author | Yes, as yes or no | Structural, from the store. |
+| Commenter name, handle, platform user ID, profile data | No | |
+| Comment and post IDs, URLs, timestamps | No | The store keeps the mapping from request to comment. |
+| The full post body | No | |
+| Other comments in the thread, beyond the parent | No | |
+| Labels, prior classifications, dispositions | No | |
+| Any credential | No | ADR-006. |
+
+`input_fields_sent` on each Classification records the field names actually sent.
+
+#### Path A: local model (Ollama), primary
+
+- **Provider and models:** Ollama on the author's machine, at `http://localhost:11434`. Candidate models, pinned by content digest: `qwen3:4b-instruct-2507-q4_K_M` and `llama3.1:8b-instruct-q4_K_M` (digests recorded in `docs/FRICTION-LOG.md` when pulled and verified by the application before each run).
+- **What leaves the machine:** nothing. Requests go to the loopback interface only. The application refuses a non-loopback Ollama host unless configuration names it explicitly, and a non-loopback host is a different boundary that needs its own record.
+- **Retention:** whatever the local Ollama server keeps. Ollama does not store prompts by default; its server log may record request metadata. The store keeps each response locally (`raw_output`), purged with the comment's body (ADR-009).
+- **Training:** none. Local inference does not change the model.
+- **Redaction:** none beyond the field list above.
+- **Model download:** pulling a model contacts the Ollama registry. No comment data is involved.
+- **Author sign-off:** not yet recorded.
+
+#### Path B: remote model (Anthropic), secondary comparison
+
+- **Provider and model:** Anthropic Messages API, `claude-haiku-4-5-20251001` (pinned by its dated ID), called directly over HTTPS with the author's own API key.
+- **What is transmitted:** the fields in the table above, plus the fixed prompt (instructions and taxonomy definitions) and the output schema. Nothing else. The API key goes in a request header, never in the prompt.
+- **Retention (as published by Anthropic, checked 2026-10-03):** API inputs and outputs are deleted from Anthropic's backend within 30 days of receipt or generation, unless a different agreement applies (such as zero data retention), the input is flagged for violating Anthropic's Usage Policy (then retained up to 2 years), or retention is required by law. Source: Anthropic's privacy center article "How long do you store my organization's data?" (dated 2026-07-01).
+- **Training (as published, checked 2026-10-03):** by default, inputs and outputs from Anthropic's commercial products, including the API, are not used to train models, unless the customer explicitly shares them (for example, as feedback). Source: "Is my data used for model training?" (dated 2026-08-18).
+- **Redaction:** none beyond the field list above.
+- **Consequence:** this path sends other people's comment text to a third party, which keeps it for up to 30 days. It is a secondary comparison only (`EVALUATION.md`), and nothing in V1 depends on it.
+- **Author sign-off:** not yet recorded. The provider is exercised only against mocked HTTP in tests; no request has reached Anthropic.
 
 ## Identity
 

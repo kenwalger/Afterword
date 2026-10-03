@@ -12,7 +12,7 @@ Goal: define the question before implementation changes it.
 - [x] Provisional taxonomy (`tax-v0.1`)
 - [x] Provisional priority policy (`pp-v0.1`)
 - [x] Labeling guide (`lg-v0.1`)
-- [x] ADR-001 to ADR-011
+- [x] ADR-001 to ADR-011 (ADR-012 and ADR-013 added later: the service layer, and local-first with a hosted path preserved)
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
 - [x] Measure volume baseline: comments per post and per week across the author's DEV history (C-009; 2026-10-02)
@@ -20,7 +20,7 @@ Goal: define the question before implementation changes it.
 - [ ] Define fixture format and corpus manifest
 - [x] Decide corpus targets (2026-10-02: historical `dev`, prospective `test`; ADR-010 amended, `docs/proposals/accepted/2026-10-02-corpus-targets.md`)
 - [ ] Label the `dev` corpus (every historical comment from others) per the labeling guide
-- [ ] Build the adversarial set, including injection cases
+- [x] Build the adversarial set, including injection cases (2026-10-03: synthetic, 24 cases, `fixtures/corpus/adversarial.jsonl`; hand-picked hard cases from labeling notes may be added as a new version)
 
 **Gate:** if C-009 shows trivial volume, decide explicitly whether to continue as a methodology study. Otherwise continue.
 

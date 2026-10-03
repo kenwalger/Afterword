@@ -1,0 +1,11 @@
+{
+  "provenance": "synthetic",
+  "normalization_version": "norm-v0.1",
+  "source": "fixtures/dev-api/source/comments-by-article.json",
+  "texts": {
+    "s1a1": "Synthetic question about step two?",
+    "s1a2": "Synthetic reply from the author.",
+    "s1a3": "Synthetic follow-up with `inline code`.",
+    "s1b1": "Synthetic acknowledgment."
+  }
+}

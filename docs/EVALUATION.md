@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 3 (2026-10-02)
+**Version:** 4 (2026-10-03)
+
+v4 (2026-10-03, before any classifier ran) fixes exactly one model as B2 at preregistration, with every other model a secondary comparison; states that B1 and B2 share the same pre-check and structural flags; and adds the normalization version, pre-check version, and model digest to what every result records.
 
 v3 replaces the historical post-level split (`test-natural`, `test-enriched`) with a prospective test set (ADR-010, amended 2026-10-02; `docs/proposals/accepted/2026-10-02-corpus-targets.md`).
 
@@ -72,6 +74,16 @@ Once `dev` labeling is complete, recompute this estimate with the observed conse
 Candidate features: question mark present, code block present, link present, `REPLY_TO_AUTHOR`, length above a threshold, and a small lexicon of correction and challenge markers ("actually", "doesn't work", "wrong", "error", "outdated", "breaks"). Rules assign a primary class proxy that the priority policy consumes unchanged.
 
 The marginal value of the model is B2 minus B1. If B1 is close to B2, that is a reportable result, not a failure to hide.
+
+B1 and B2 receive the same normalized text (`norm-v0.1` or its successor), the same structural flags (`REPLY_TO_AUTHOR`), and the same deterministic `POSSIBLE_INSTRUCTION_TEXT` pre-check, and both feed the same priority policy. The comparison therefore isolates classification. `hb-v0.1` starts as a draft written before any labels existed; its thresholds and lexicon are tuned on `dev`, and each change is a new heuristic version.
+
+### Which model is B2
+
+Exactly one model is fixed as B2 at preregistration: provider, model ID, and, for a local model, its content digest. The registered results are B2's.
+
+Every other model (a second local model, a remote comparison model such as Anthropic's) is a **secondary comparison**. Secondary models may run in shadow mode under the same sealing, and are scored once after accrual stops, but they are reported separately, labeled as secondary, and never substituted for B2 after the test set is unsealed. Choosing B2 from among the secondary models after seeing test results would be tuning on the test set.
+
+During Stage 3a the candidate models are compared on `dev` and on the adversarial set. The choice of B2 is made there, recorded with its reasons, and frozen with the other versions.
 
 ## Primary measures
 
@@ -159,6 +171,6 @@ Design preference stands: tolerate extra false positives before accepting conseq
 
 ## Versioning
 
-Every result records: corpus version, label guide version, taxonomy version, policy version, heuristic version, model and provider, prompt version, application version, timestamp.
+Every result records: corpus version, label guide version, taxonomy version, normalization version, pre-check version, policy version, heuristic version, model provider, model ID, model digest (local models), prompt version, application version, timestamp.
 
 Historical results are never overwritten.

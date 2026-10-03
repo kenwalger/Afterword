@@ -10,9 +10,26 @@ Rules for any session working in this repository.
 
 ## Current stage
 
-**Stage 0** of `docs/ROADMAP.md`. Done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009). Corpus targets decided (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Remaining: timed chronological reviews (C-009), labeling the `dev` corpus with `afterword label`, and the adversarial set.
+**Stage 0** of `docs/ROADMAP.md` is finishing in parallel with **Stage 1 to 3a groundwork** (plan approved 2026-10-03, session 4).
 
-Out of scope until the roadmap says otherwise: classification, any LLM call, normalization beyond what the probe needs, the data model tables, any UI, and any write call to DEV.
+- Stage 0 done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Remaining, by the author: timed chronological reviews (C-009) and labeling the `dev` corpus with `afterword label`.
+- Groundwork in scope, all of it independent of labels and real comment data, all through the service layer (ADR-012):
+  1. Docs: `DATA-MODEL` v5, `PRIORITY-POLICY` clarifications, `EVALUATION` v4, model-boundary records in `PRIVACY-AND-BOUNDARIES` v3.
+  2. Normalization `norm-v0.1` (separate from the labeling tool's `display-v0.1`) and edit detection by normalized text.
+  3. Instruction pre-check `pc-v0.1` (ADR-008).
+  4. Priority policy `pp-v0.1`, pure, recording `rule_applied`.
+  5. Heuristic baseline B1 `hb-v0.1`.
+  6. Synthetic adversarial set `fixtures/corpus/adversarial.jsonl`, including injection cases.
+  7. SQLite store behind a repository interface (ADR-013), ingest from probe runs with lifecycle and purge (ADR-009).
+  8. Classifier wrapper with schema-constrained output and an incremental cache.
+  9. Providers: Ollama (primary, local) and Anthropic (secondary, `claude-haiku-4-5-20251001`).
+  10. Service functions and CLI commands for the above.
+  11. Benchmark of the two approved Ollama models on synthetic fixtures only.
+- Checkpoint: after items 1 to 6, stop for the author to commit before items 7 to 11.
+
+Model calls, local or remote, run only on synthetic data. No real comment data goes to any model, and no real data is ingested into the store by Claude, until the author says so and the model-boundary record for that path is signed off.
+
+Still out of scope: shadow mode and sealing (Stage 3b/3c), `--set test` selection, the dev subset selector (needs labels), review state, overrides, dispositions, any UI, and any write call to DEV.
 
 The volume baseline is computed from an explicit probe run ID, recorded in the report. Never compute it from a run that includes test comments.
 
@@ -27,7 +44,8 @@ The volume baseline is computed from an explicit probe run ID, recorded in the r
 ## Credentials (ADR-006)
 
 - The DEV key is read from the `DEV_API_KEY` environment variable only, and only in `src/afterword/adapters/dev/client.py`.
-- Never print, log, or persist the key, and never put it in a fixture, report, exception message, or prompt. Credentials never leave the adapter boundary.
+- The Anthropic key is read from the `ANTHROPIC_API_KEY` environment variable only, and only in `src/afterword/providers/anthropic.py`. It goes in a request header, never in a prompt.
+- Never print, log, or persist either key, and never put one in a fixture, report, exception message, or prompt. Credentials never leave the adapter or provider boundary.
 - Do not open `.env`.
 - The user runs any live command that needs the key, using `! uv run --env-file .env afterword <command>`. Never ask for the key or suggest passing it inline.
 
@@ -36,6 +54,12 @@ The volume baseline is computed from an explicit probe run ID, recorded in the r
 - Every DEV payload detail (`id_code`, `children`, `body_html`, `user`, endpoint paths) stays inside `src/afterword/adapters/dev/`.
 - Code outside the adapter consumes `afterword.observations` (or, later, the canonical model) and never refers to DEV field names.
 - CLI commands are thin transports over application service functions (ADR-012). Move existing commands behind service functions when they are next changed substantively; no standalone refactor.
+
+## Storage and identity (ADR-013)
+
+- Storage sits behind a repository interface that only `src/afterword/service.py` calls. SQLite-specific SQL stays inside the repository implementation.
+- Records use stable string IDs (source IDs, otherwise UUIDs), never auto-increment integers, and UTC RFC 3339 timestamps. Stored rows hold no filesystem paths, hostnames, or OS usernames.
+- The content author, credentials, and settings belong to a platform connection, never to a module-level constant.
 
 ## Code standards
 

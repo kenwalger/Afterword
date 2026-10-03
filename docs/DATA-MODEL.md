@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 4 (2026-10-02)
+**Version:** 5 (2026-10-03)
+
+v5 (2026-10-03, before any classification or stored record existed) adds `PlatformConnection` (ADR-013), edit detection by normalized text, the classification cache key, and the fields needed to trace a classification to its provider, model digest, pre-check, and normalization versions. Nothing earlier is removed.
 
 ## Principle
 
@@ -26,11 +28,23 @@ Implementations may store this as a value plus a state column. The distinction m
 
 ## Source and sync
 
+### PlatformConnection
+
+One configured connection to a source platform (ADR-013, rule 3). The content author, credentials, and settings belong to a connection, never to a module-level constant.
+
+- `connection_id` (UUID)
+- `platform`
+- `account_source_user_id` (the platform's ID for the connected account, read from the source; DEV: `/api/users/me`)
+- `created_at`
+
+Credentials are not stored here or anywhere in the store. For DEV the key is read from the environment by the adapter (ADR-006). Who wrote a post comes from the post itself; the connection's account is the fallback when a post does not say.
+
 ### SyncRun
 
 One execution of the source adapter.
 
 - `sync_run_id`
+- `connection_id`
 - `platform`
 - `started_at`, `finished_at`
 - `scope` (which posts were requested)
@@ -63,6 +77,7 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 ### ContentItem
 
 - `content_id`
+- `connection_id`
 - `platform`
 - `source_object_id`
 - `author_platform_identity_id`
@@ -85,6 +100,7 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 - `body_source_format` (`HTML`, `MARKDOWN`, `TEXT`)
 - `body_text` (normalized for classification)
 - `normalization_version`
+- `body_text_hash` (SHA-256 of `body_text`; compared only between texts of the same `normalization_version`)
 - `created_at`
 - `updated_at` (value state)
 - `first_observed_at`
@@ -95,7 +111,8 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 
 #### Lifecycle rules
 
-- **Edited:** payload hash changes for a known comment. State becomes `EDITED`, a new SourceRecord is stored, classification is rerun, and the priority policy raises the comment to at least `QUEUE`.
+- **Edited:** the normalized text of a known comment changes. Both texts are produced by the same `normalization_version` (the earlier one is renormalized from its stored source body if the version changed). State becomes `EDITED`, a new SourceRecord is stored, classification is rerun, and the priority policy raises the comment to at least `QUEUE`.
+- **Payload changed, text unchanged:** the payload hash changes but the normalized text does not (for example, a change in the source's HTML rendering). A new SourceRecord is stored for provenance; the lifecycle state does not change and nothing is reclassified.
 - **Missing:** a comment previously observed is absent from a complete sync of its post. State becomes `MISSING_FROM_SOURCE`. One absence is not proof of deletion.
 - **Deleted upstream (absence):** absent from two consecutive complete syncs. State becomes `DELETED_UPSTREAM` with `deletion_evidence = ABSENT_TWICE`, and the purge rule in `PRIVACY-AND-BOUNDARIES.md` applies (ADR-009).
 - **Deleted upstream (placeholder):** the source returns a known comment in the exact known placeholder shape (DEV: the observed key set with `user` equal to an empty object). State becomes `DELETED_UPSTREAM` at once, with `deletion_evidence = SOURCE_PLACEHOLDER`. The node stays in the thread so replies keep their parent, and the purge rule applies.
@@ -137,13 +154,27 @@ A model interpretation of a comment. Never part of the comment itself.
 - `taxonomy_version`
 - `primary_class`
 - `flags` (list)
-- `confidence` (value state)
+- `flags_by_source` (which flags came from the model, from structure such as `REPLY_TO_AUTHOR`, and from the deterministic pre-check)
+- `confidence` (value state; `LOW`, `MEDIUM`, or `HIGH` when `PRESENT`; `NOT_EXPOSED` for a heuristic)
 - `explanation`
-- `model_provider`, `model_id`
-- `prompt_version`
+- `classifier_kind` (`HEURISTIC` for B1, `MODEL` for B2 and secondary models)
+- `model_provider`, `model_id` (for a heuristic: `afterword` and the heuristic version, such as `hb-v0.1`)
+- `model_digest` (value state; the local model's content digest, which pins it; `NOT_EXPOSED` for a remote model, which is pinned by its dated ID)
+- `prompt_version` (null for a heuristic; `classifier_kind` says why)
+- `normalization_version`
+- `precheck_version`
 - `input_fields_sent` (for the model boundary record)
+- `input_hash` (SHA-256 of the canonical serialization of everything sent to the classifier)
+- `raw_output` (the provider's response text, kept locally for diagnosing malformed results; purged with the comment's body)
+- `latency_ms`
 - `classified_at`
 - `outcome` (`OK`, `MALFORMED`, `FAILED`)
+
+#### Cache and incremental classification
+
+A classification is identified by its **cache key**: `input_hash`, `model_provider`, `model_id`, `model_digest`, `prompt_version`, and `taxonomy_version`. The input hash covers the comment's normalized text and every context field sent with it (post title, parent comment text), so an edit to a parent changes the key.
+
+A comment is classified only when no `OK` or `MALFORMED` classification exists for its current key: new comments, edited comments (or edited context), and any version change. `MALFORMED` is kept rather than retried, because at temperature 0 the same input produces the same output. `FAILED` (transport error, timeout) is retried on the next run.
 
 ### PriorityAssignment
 
@@ -154,7 +185,8 @@ The policy's output. Separate from Classification so that policy can change with
 - `classification_id` (nullable when classification failed)
 - `policy_version`
 - `tier` (`SURFACE`, `QUEUE`, `COLLAPSED`)
-- `rule_applied` (class default or named override)
+- `rule_applied` (class default or named override; the rule that decided the tier, see `PRIORITY-POLICY.md`)
+- `rules_fired` (every rule whose condition held, in policy order)
 - `assigned_at`
 
 ## Human records

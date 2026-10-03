@@ -1,7 +1,8 @@
-"""Test harness. No test may reach the live DEV API.
+"""Test harness. No test may reach a live API (DEV, Ollama, or Anthropic).
 
-`no_live_api` is autouse: it removes DEV_API_KEY from the environment and
-installs a respx router that fails any request without a matching mock.
+`no_live_api` is autouse: it removes DEV_API_KEY and ANTHROPIC_API_KEY from the
+environment and installs a respx router that fails any request without a
+matching mock.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ def load(name: str) -> Any:
 @pytest.fixture(autouse=True)
 def no_live_api(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("DEV_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with respx.mock(assert_all_mocked=True, assert_all_called=False) as router:
         yield router
 

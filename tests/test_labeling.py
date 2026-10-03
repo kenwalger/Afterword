@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from afterword import cli, labeling, timing
+from afterword import cli, labeling, taxonomy, timing
 from afterword.adapters.dev import records
 from afterword.adapters.dev.client import DevClient
 from afterword.adapters.dev.probe import Probe
@@ -255,6 +255,22 @@ def test_redo_restarts_the_label(tmp_path, fake_dev):
     run(snap, tmp_path, script)
     (label,) = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")
     assert label["primary_class"] == "CORRECTION"
+
+
+def test_help_lists_every_class_and_flag_with_a_definition(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    script = Script(["h", "1", "h", "4", "2", "3", "needs an answer", "", ""])
+    run(snap, tmp_path, script)
+    helps = [o for o in script.out if o == taxonomy.help_text()]
+    assert len(helps) == 2  # once at the class prompt, once at the flags prompt
+    for name in (*taxonomy.CLASSES, *taxonomy.FLAGS):
+        assert name in helps[0]
+    assert taxonomy.CLASS_DEFINITIONS["CORRECTION"] in helps[0]
+    assert "h = help" in script.prompts[0]
+    (label,) = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")
+    assert label["primary_class"] == "CORRECTION"
+    assert label["flags"] == ["REFERENCES_SPECIFIC_CLAIM"]
+    assert "Not understood" not in script.text
 
 
 def test_toggle_shows_the_thread_again(tmp_path, fake_dev):

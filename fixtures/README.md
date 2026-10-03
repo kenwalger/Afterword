@@ -14,25 +14,30 @@ Fixtures support repeatable ingestion and classification tests without live API 
 
 ## Layout
 
-Planned layout. Entries marked *(planned)* do not exist yet: the corpus is not selected or frozen (see `docs/proposals/`), and normalized output arrives in Stage 2.
+Entries marked *(planned)* do not exist yet: the real corpus is not frozen until preregistration (ADR-010).
 
 ```text
 fixtures/
   dev-api/
     source/            # synthetic DEV payloads (MANIFEST.md); real/ is git-ignored
-    expected/          # normalized expected output (planned, Stage 2)
+    expected/          # normalized expected output for the synthetic payloads (norm-v0.1)
   corpus/
-    MANIFEST.md        # public: versions, selection method, counts, hashes (planned)
+    MANIFEST.md        # public: every corpus file, how it was made, its SHA-256
+    adversarial.jsonl  # synthetic, public: the adversarial set (EVALUATION.md)
+    synthetic-bench.jsonl  # synthetic, public: class-balanced set for model benchmarks only
     v1/                # git-ignored: real comment text (planned)
       dev.jsonl
       test.jsonl       # prospective, accrued after preregistration (ADR-010)
-    adversarial.jsonl  # synthetic, public (planned)
   labels/              # git-ignored, written by `afterword label`
     <corpus_version>/
       initial.jsonl
       self_agreement.jsonl
       batches.jsonl
 ```
+
+## Synthetic sets (`corpus/*.jsonl`)
+
+Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries source-shaped HTML, so it goes through the same normalization as a real comment. `.gitattributes` keeps hashed fixtures LF on every platform.
 
 ## Corpus record (`corpus/v1/*.jsonl`)
 

@@ -30,7 +30,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from afterword import timing
+from afterword import taxonomy, timing
 from afterword.baseline import week_start
 from afterword.display import DISPLAY_VERSION, html_to_display_text, strip_controls
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
@@ -39,7 +39,7 @@ LABEL_ROOT: Path = Path("fixtures/labels")
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
 LABEL_GUIDE_VERSION: str = "lg-v0.2"
-TAXONOMY_VERSION: str = "tax-v0.1"
+TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
 DEFAULT_CORPUS_SET: str = "dev"
@@ -48,28 +48,11 @@ MAX_BATCH: int = 40
 STALE_AFTER: timedelta = timedelta(days=7)
 
 # Precedence order from TAXONOMY.md, then UNCERTAIN.
-CLASSES: tuple[str, ...] = (
-    "CORRECTION",
-    "CHALLENGE_OR_COUNTEREXAMPLE",
-    "TECHNICAL_QUESTION",
-    "OPPORTUNITY",
-    "DIRECT_QUESTION",
-    "TECHNICAL_EXTENSION",
-    "CONVERSATIONAL",
-    "LIGHTWEIGHT_ACKNOWLEDGMENT",
-    "LIKELY_SPAM_OR_NOISE",
-    "UNCERTAIN",
-)
+CLASSES: tuple[str, ...] = taxonomy.CLASSES
 # REPLY_TO_AUTHOR is structural (TAXONOMY.md) and set by the tool, not chosen.
-REPLY_TO_AUTHOR: str = "REPLY_TO_AUTHOR"
-LABELER_FLAGS: tuple[str, ...] = (
-    "NEEDS_THREAD_CONTEXT",
-    "CONTAINS_CODE",
-    "CONTAINS_LINK",
-    "REFERENCES_SPECIFIC_CLAIM",
-    "ADDRESSED_TO_OTHER_COMMENTER",
-    "HOSTILE_TONE",
-    "POSSIBLE_INSTRUCTION_TEXT",
+REPLY_TO_AUTHOR: str = taxonomy.REPLY_TO_AUTHOR
+LABELER_FLAGS: tuple[str, ...] = tuple(
+    f for f in taxonomy.FLAGS if f not in taxonomy.STRUCTURAL_FLAGS
 )
 
 _SAFE_NAME: re.Pattern[str] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -423,9 +406,14 @@ def _flags(answer: str) -> list[str]:
     return [f for f in LABELER_FLAGS if f in picked]
 
 
-def _ask_valid[T](console: Console, prompt: str, parse: Callable[[str], T]) -> T:
+def _ask_valid[T](
+    console: Console, prompt: str, parse: Callable[[str], T], *, help_text: str | None = None
+) -> T:
     while True:
         answer = console.ask(prompt)
+        if help_text is not None and answer.lower() == "h":
+            console.say(help_text)
+            continue
         try:
             return parse(answer)
         except ValueError:
@@ -473,7 +461,12 @@ def label_one(
     while True:
         console.say("Primary class (TAXONOMY.md precedence order):\n" + _menu(CLASSES))
         while True:
-            answer = console.ask(f"Class [1-{len(CLASSES)}], t = toggle full thread, s = skip: ")
+            answer = console.ask(
+                f"Class [1-{len(CLASSES)}], h = help, t = toggle full thread, s = skip: "
+            )
+            if answer.lower() == "h":
+                console.say(taxonomy.help_text())
+                continue
             if answer.lower() == "t":
                 full = not full
                 console.say(render(snap, c, position=position, full_thread=full))
@@ -487,7 +480,12 @@ def label_one(
 
         auto = f"  ({REPLY_TO_AUTHOR} is set automatically: this replies to you.)"
         console.say("Flags:\n" + _menu(LABELER_FLAGS) + ("\n" + auto if reply_to_author else ""))
-        flags = _ask_valid(console, "Flags [numbers, comma-separated; Enter for none]: ", _flags)
+        flags = _ask_valid(
+            console,
+            "Flags [numbers, comma-separated; Enter for none; h = help]: ",
+            _flags,
+            help_text=taxonomy.help_text(),
+        )
         prospective = _ask_valid(
             console,
             "Prospective grade, as of when it was posted [0-3]: ",

@@ -18,7 +18,9 @@ Done:
 - A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
 - The corpus targets decision: the historical corpus is `dev`, and the test set is prospective (ADR-010, amended).
 
-Open: timed chronological reviews, labeling, and the adversarial set. No classifier exists yet.
+- Stage 1 to 3a groundwork, independent of labels and real data (session 4, in progress): classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The store, the classifier wrapper, and the model providers come next.
+
+Open: timed chronological reviews and labeling (the author). No model has classified anything yet.
 
 ## Quick start
 
