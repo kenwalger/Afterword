@@ -1,6 +1,8 @@
 # Scope
 
-**Version:** 3 (2026-10-02)
+**Version:** 4 (2026-10-03)
+
+v4 adds labeling at scale as a future candidate (`LABELING-AT-SCALE.md`), gated on the Stage 3 result.
 
 v3 adds the external interface direction (ADR-012): out of current scope, recorded as a future candidate with its limits.
 
@@ -122,6 +124,7 @@ If V1 produces useful evidence, later stages may investigate:
 - Lightweight acknowledgment workflows where APIs permit them.
 - Validation with a second, higher-volume author.
 - An external interface over the application service layer (ADR-012): first a local MCP server (stdio), possibly an HTTP API later. Gated on the Stage 3 result. Candidate first capabilities, in order: propagation queries ("which comments caused a change to one of my projects?"), then the attention queue as computed by the priority policy. Read-only first; writes need per-action human confirmation.
+- Labeling at scale: random collapsed-tier audits for miss-rate measurement, targeted and in-app labeling exercises for improvement, and judgment-drift handling. See `docs/LABELING-AT-SCALE.md`. Gated on the Stage 3 result.
 - Person-scoped queries ("what has this commenter said about X?") are explicitly not covered by the external interface above. They depend on C-005, require a reputation-bias evaluation, and need their own ADR. Topic queries implying semantic search also need their own ADR (a new model boundary).
 
 These must not justify V1 architectural complexity unless V1 demonstrably requires it.

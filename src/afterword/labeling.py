@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import string
 import time
@@ -43,9 +44,15 @@ TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
 DEFAULT_CORPUS_SET: str = "dev"
+# Who produced a label and how it was sampled. Every V1 label is the researcher's
+# own (EVALUATION.md); other sources are a future design (LABELING-AT-SCALE.md).
+SAMPLE_KIND: str = "researcher"
 PASSES: tuple[str, ...] = ("initial", "self_agreement")
 MAX_BATCH: int = 40
 STALE_AFTER: timedelta = timedelta(days=7)
+# Post order: by publication time, or shuffled by a recorded seed. Comments
+# within a post are always oldest first (LABELING-GUIDE.md).
+POST_ORDERS: tuple[str, ...] = ("published", "random")
 
 # Precedence order from TAXONOMY.md, then UNCERTAIN.
 CLASSES: tuple[str, ...] = taxonomy.CLASSES
@@ -146,6 +153,16 @@ def _labeled_ids(path: Path) -> set[str]:
     return ids
 
 
+def _batch_ids(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    return {
+        str(json.loads(line).get("batch_id"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+
+
 class Snapshot:
     """One run's comments arranged into threads, for display and labeling."""
 
@@ -181,22 +198,43 @@ class Snapshot:
             or c.created_at is None
         )
 
-    def subjects(self) -> list[ObservedComment]:
-        """List the comments to label, in post order and then in time order.
+    def subjects(
+        self, *, post_order: str = "published", seed: int | None = None
+    ) -> list[ObservedComment]:
+        """List the comments to label, post by post and oldest first within a post.
 
         Time order within a post means a comment is never labeled after a later
-        comment from the same post has been seen.
+        comment from the same post has been seen. Posts come in publication
+        order, or in a shuffled order that a seed makes reproducible, so a
+        resumed session continues the same order.
 
+        :param post_order: ``published`` or ``random``.
+        :param seed: Seed for ``random``; required for it, ignored otherwise.
         :returns: Labelable comments.
+        :raises ValueError: For an unknown order, or ``random`` without a seed.
         """
+        if post_order not in POST_ORDERS:
+            raise ValueError(f"unknown post order: {post_order}")
+        if post_order == "random" and seed is None:
+            raise ValueError("random post order needs a seed")
         floor = datetime.min.replace(tzinfo=UTC)
 
-        def key(c: ObservedComment) -> tuple[datetime, str, datetime, str]:
-            content = self.contents.get(c.content_ref)
-            published = content.published_at if content and content.published_at else floor
-            return (published, c.content_ref, c.created_at or floor, c.source_object_id)
+        def post_key(ref: str) -> tuple[datetime, str]:
+            content = self.contents.get(ref)
+            return (content.published_at if content and content.published_at else floor, ref)
 
-        return sorted((c for c in self.obs.comments if self.is_subject(c)), key=key)
+        by_post: dict[str, list[ObservedComment]] = defaultdict(list)
+        for c in self.obs.comments:
+            if self.is_subject(c):
+                by_post[c.content_ref].append(c)
+        posts = sorted(by_post, key=post_key)
+        if post_order == "random":
+            random.Random(seed).shuffle(posts)
+        return [
+            c
+            for ref in posts
+            for c in sorted(by_post[ref], key=lambda c: (c.created_at or floor, c.source_object_id))
+        ]
 
     def excluded_counts(self) -> dict[str, int]:
         """Count comments that are never labeled, by reason.
@@ -431,6 +469,288 @@ class LabelContext:
     batch_id: str
 
 
+def make_label(
+    snap: Snapshot,
+    c: ObservedComment,
+    ctx: LabelContext,
+    *,
+    primary: str,
+    flags: list[str],
+    prospective: int,
+    retrospective: int | None,
+    reason: str,
+    duration_seconds: float,
+    labeled_at: datetime,
+) -> dict[str, Any]:
+    """Build one label record, the same for every transport (terminal or browser).
+
+    ``REPLY_TO_AUTHOR`` is structural: it is added here when the comment replies
+    to the author, and refused if a labeler supplies it.
+
+    :param snap: The run being labeled.
+    :param c: The labeled comment.
+    :param ctx: Batch-wide label fields.
+    :param primary: Primary class.
+    :param flags: Labeler-chosen flags, any order.
+    :param prospective: Grade 0 to 3, as of when the comment was posted.
+    :param retrospective: Grade 0 to 3 with hindsight, or ``None`` when skipped.
+    :param reason: One line; required for a prospective grade of 2 or 3.
+    :param duration_seconds: Time from the comment being shown to the label being saved.
+    :param labeled_at: Wall-clock time of saving.
+    :returns: The record, per the schema in ``fixtures/README.md``.
+    :raises ValueError: For an unknown class or flag, a grade outside 0 to 3, or a
+        missing reason on a consequential grade.
+    """
+    if primary not in CLASSES:
+        raise ValueError(f"unknown class: {primary}")
+    unknown = set(flags) - set(LABELER_FLAGS)
+    if unknown:
+        raise ValueError(f"not a labeler flag: {sorted(unknown)}")
+    grades = (prospective,) if retrospective is None else (prospective, retrospective)
+    if any(isinstance(g, bool) or g not in (0, 1, 2, 3) for g in grades):
+        raise ValueError("grades are 0 to 3")
+    reason = reason.strip()
+    if prospective >= 2 and not reason:
+        raise ValueError("a reason is required for grade 2 or 3")
+    ordered = [f for f in LABELER_FLAGS if f in flags]
+    all_flags = ([REPLY_TO_AUTHOR] if snap.reply_to_author(c) else []) + ordered
+    return {
+        "label_id": f"l_{c.source_object_id}_{ctx.pass_name}",
+        "comment_id": c.source_object_id,
+        "snapshot_run_id": ctx.snapshot_run_id,
+        "corpus_version": ctx.corpus_version,
+        "corpus_set": ctx.corpus_set,
+        "sample_kind": SAMPLE_KIND,
+        "label_guide_version": LABEL_GUIDE_VERSION,
+        "taxonomy_version": TAXONOMY_VERSION,
+        "normalization_version": DISPLAY_VERSION,
+        "primary_class": primary,
+        "flags": all_flags,
+        "consequential_prospective": prospective,
+        "consequential_retrospective": retrospective,
+        "consequential_retrospective_state": "UNKNOWN" if retrospective is None else "PRESENT",
+        "context_reconstructed": snap.context_reconstructed(c),
+        "replied_before_labeling": snap.author_replied(c),
+        "reason": reason,
+        "pass": ctx.pass_name,
+        "batch_id": ctx.batch_id,
+        "duration_seconds": round(duration_seconds, 1),
+        "labeled_at": _utc(labeled_at),
+    }
+
+
+def comment_view(snap: Snapshot, c: ObservedComment) -> dict[str, Any]:
+    """Describe one comment and its as-of context as data, for a non-terminal transport.
+
+    The same context as :func:`render`: the post title, and the thread as of the
+    comment's time, with later comments hidden and commenters as pseudonyms.
+
+    :param snap: The run being labeled.
+    :param c: The comment to show.
+    :returns: JSON-ready fields. Contains no commenter names or handles.
+    """
+    content = snap.contents.get(c.content_ref)
+    names = snap.pseudonyms(c)
+    chain = {t.source_object_id for t in snap.ancestors(c)}
+    earlier = snap.as_of(c)
+    return {
+        "comment_id": c.source_object_id,
+        "post_title": strip_controls(content.title) if content and content.title else None,
+        "posted": _shown_time(c.created_at),
+        "earlier_shown": len(earlier) - 1,
+        "later_hidden": snap.hidden_later(c),
+        "context_gaps": snap.context_gaps(c),
+        "context_reconstructed": snap.context_reconstructed(c),
+        "replied_before_labeling": snap.author_replied(c),
+        "reply_to_author": snap.reply_to_author(c),
+        "thread": [
+            {
+                "who": names[t.source_object_id],
+                "posted": _shown_time(t.created_at),
+                "depth": t.depth,
+                "is_this": t is c,
+                "in_reply_chain": t.source_object_id in chain,
+                "deleted": t.is_deletion_placeholder,
+                "body": None
+                if t.is_deletion_placeholder
+                else (html_to_display_text(t.body_source) or "(empty)"),
+            }
+            for t in earlier
+        ],
+    }
+
+
+class LabelBatch:
+    """One labeling batch: what to label, and its records under ``fixtures/labels/``.
+
+    Shared by every transport, so the terminal and the browser write the same
+    labels, notes, and batch records. Labels are appended as they are saved, so
+    stopping at any point loses at most the comment on screen, and the next
+    batch resumes with the next unlabeled comment in the same order.
+    """
+
+    def __init__(
+        self,
+        snap: Snapshot,
+        *,
+        root: Path,
+        pass_name: str = "initial",
+        corpus_version: str = DEFAULT_CORPUS_VERSION,
+        corpus_set: str = DEFAULT_CORPUS_SET,
+        batch_size: int = MAX_BATCH,
+        only_ids: set[str] | None = None,
+        post_order: str = "published",
+        seed: int | None = None,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
+        """Choose the batch. Nothing is written until :meth:`start`.
+
+        :param snap: The run to label from.
+        :param root: Repository root; outputs go under ``fixtures/labels/``.
+        :param pass_name: ``initial`` or ``self_agreement``.
+        :param corpus_version: Output directory name and label field.
+        :param corpus_set: ``dev`` for historical comments, ``test`` for prospective ones.
+        :param batch_size: At most :data:`MAX_BATCH`.
+        :param only_ids: Restrict to these comment IDs, such as a self-agreement sample.
+        :param post_order: ``published`` or ``random`` (:meth:`Snapshot.subjects`).
+        :param seed: Seed for ``random``.
+        :param now: Wall clock.
+        :raises ValueError: For an unknown pass or order, an unsafe name, a batch
+            size out of range, or ``random`` without a seed.
+        """
+        if pass_name not in PASSES:
+            raise ValueError(f"unknown pass: {pass_name}")
+        if not 1 <= batch_size <= MAX_BATCH:
+            raise ValueError(f"batch size must be 1 to {MAX_BATCH}")
+        self.snap = snap
+        self.now = now
+        self.pass_name = pass_name
+        self.post_order = post_order
+        self.seed = seed if post_order == "random" else None
+        self.corpus_version = safe_name(corpus_version)
+        self.corpus_set = safe_name(corpus_set)
+        out_dir = root / LABEL_ROOT / self.corpus_version
+        self.labels_path = out_dir / f"{pass_name}.jsonl"
+        self.batches_path = out_dir / "batches.jsonl"
+        done = _labeled_ids(self.labels_path)
+        self.done_before = len(done)
+        self.queue = [
+            c
+            for c in snap.subjects(post_order=post_order, seed=seed)
+            if c.source_object_id not in done
+            and (only_ids is None or c.source_object_id in only_ids)
+        ]
+        self.items = self.queue[:batch_size]
+        self.ctx: LabelContext | None = None
+        self.saved = 0
+        self.skipped = 0
+        self.ended_by: str | None = None
+
+    def start(self) -> LabelContext:
+        """Write the batch start record.
+
+        :returns: The batch-wide label fields.
+        """
+        started = self.now()
+        # A batch started within the same second as an earlier one (the browser's
+        # "next batch") gets a suffix, so batch IDs stay unique.
+        used = _batch_ids(self.batches_path)
+        batch_id = base = f"b_{_stamp(started)}"
+        n = 1
+        while batch_id in used:
+            n += 1
+            batch_id = f"{base}_{n}"
+        self.ctx = LabelContext(
+            snapshot_run_id=self.snap.obs.run_id,
+            corpus_version=self.corpus_version,
+            corpus_set=self.corpus_set,
+            pass_name=self.pass_name,
+            batch_id=batch_id,
+        )
+        record: dict[str, Any] = {
+            "event": "batch_start",
+            "batch_id": self.ctx.batch_id,
+            "pass": self.pass_name,
+            "snapshot_run_id": self.ctx.snapshot_run_id,
+            "mode": "label",
+            "planned": len(self.items),
+            "post_order": self.post_order,
+            "started_at": _utc(started),
+        }
+        if self.seed is not None:
+            record["seed"] = self.seed
+        _append_jsonl(self.batches_path, record)
+        return self.ctx
+
+    def context(self) -> LabelContext:
+        """Return the batch-wide label fields of a started batch.
+
+        :returns: The context.
+        :raises RuntimeError: If the batch has not been started.
+        """
+        if self.ctx is None:
+            raise RuntimeError("batch not started")
+        return self.ctx
+
+    def save(self, record: dict[str, Any]) -> None:
+        """Append one label.
+
+        :param record: A record from :func:`make_label`.
+        """
+        self.context()
+        _append_jsonl(self.labels_path, record)
+        self.saved += 1
+
+    def skip(self) -> None:
+        """Count one comment passed over without a label."""
+        self.skipped += 1
+
+    def note(self, c: ObservedComment, note: str) -> None:
+        """Append a hard-to-label note to the batch record (never to the label).
+
+        :param c: The comment the note is about.
+        :param note: Free text; empty notes are ignored.
+        """
+        if note.strip():
+            _append_jsonl(
+                self.batches_path,
+                {
+                    "event": "note",
+                    "batch_id": self.context().batch_id,
+                    "comment_id": c.source_object_id,
+                    "note": note.strip(),
+                },
+            )
+
+    def end(self, ended_by: str) -> None:
+        """Write the batch end record, once.
+
+        :param ended_by: ``complete`` or ``quit``.
+        """
+        if self.ended_by is not None:
+            return
+        self.ended_by = ended_by
+        _append_jsonl(
+            self.batches_path,
+            {
+                "event": "batch_end",
+                "batch_id": self.context().batch_id,
+                "ended_at": _utc(self.now()),
+                "labeled": self.saved,
+                "skipped": self.skipped,
+                "ended_by": ended_by,
+            },
+        )
+
+    @property
+    def still_unlabeled(self) -> int:
+        """Comments in the queue not labeled in this batch.
+
+        :returns: A count.
+        """
+        return len(self.queue) - self.saved
+
+
 def label_one(
     console: Console,
     snap: Snapshot,
@@ -491,12 +811,13 @@ def label_one(
             "Prospective grade, as of when it was posted [0-3]: ",
             lambda a: _grade(a, optional=False),
         )
+        assert prospective is not None  # not optional
         retrospective = _ask_valid(
             console,
             "Retrospective grade, with hindsight [0-3; Enter to skip]: ",
             lambda a: _grade(a, optional=True),
         )
-        needs_reason = prospective is not None and prospective >= 2
+        needs_reason = prospective >= 2
         reason_prompt = "Reason (one line, required for grade 2 or 3): "
         reason = console.ask(reason_prompt if needs_reason else "Reason (optional): ")
         while needs_reason and not reason:
@@ -518,28 +839,18 @@ def label_one(
             return None, note
         break
 
-    record = {
-        "label_id": f"l_{c.source_object_id}_{ctx.pass_name}",
-        "comment_id": c.source_object_id,
-        "snapshot_run_id": ctx.snapshot_run_id,
-        "corpus_version": ctx.corpus_version,
-        "corpus_set": ctx.corpus_set,
-        "label_guide_version": LABEL_GUIDE_VERSION,
-        "taxonomy_version": TAXONOMY_VERSION,
-        "normalization_version": DISPLAY_VERSION,
-        "primary_class": primary,
-        "flags": all_flags,
-        "consequential_prospective": prospective,
-        "consequential_retrospective": retrospective,
-        "consequential_retrospective_state": "UNKNOWN" if retrospective is None else "PRESENT",
-        "context_reconstructed": snap.context_reconstructed(c),
-        "replied_before_labeling": snap.author_replied(c),
-        "reason": reason,
-        "pass": ctx.pass_name,
-        "batch_id": ctx.batch_id,
-        "duration_seconds": round(monotonic() - started, 1),
-        "labeled_at": _utc(now()),
-    }
+    record = make_label(
+        snap,
+        c,
+        ctx,
+        primary=primary,
+        flags=flags,
+        prospective=prospective,
+        retrospective=retrospective,
+        reason=reason,
+        duration_seconds=monotonic() - started,
+        labeled_at=now(),
+    )
     return record, note
 
 
@@ -553,14 +864,12 @@ def run_labeling(
     corpus_set: str = DEFAULT_CORPUS_SET,
     batch_size: int = MAX_BATCH,
     only_ids: set[str] | None = None,
+    post_order: str = "published",
+    seed: int | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     monotonic: Callable[[], float] = time.monotonic,
 ) -> int:
-    """Label one batch of comments not yet labeled in this pass, then stop.
-
-    Labels are appended as they are saved, so stopping at any point loses at
-    most the comment on screen. Running again resumes with the next unlabeled
-    comment.
+    """Label one batch of comments not yet labeled in this pass, in the terminal, then stop.
 
     :param snap: The run to label from.
     :param console: Terminal.
@@ -570,99 +879,59 @@ def run_labeling(
     :param corpus_set: Label field: ``dev`` for historical comments, ``test`` for prospective ones.
     :param batch_size: At most :data:`MAX_BATCH`.
     :param only_ids: Restrict to these comment IDs, such as a self-agreement sample.
+    :param post_order: ``published`` or ``random``.
+    :param seed: Seed for ``random``.
     :param now: Wall clock.
     :param monotonic: Clock for durations.
     :returns: Number of labels saved in this batch.
-    :raises ValueError: For an unknown pass, an unsafe name, or a batch size out of range.
     """
-    if pass_name not in PASSES:
-        raise ValueError(f"unknown pass: {pass_name}")
-    if not 1 <= batch_size <= MAX_BATCH:
-        raise ValueError(f"batch size must be 1 to {MAX_BATCH}")
-    out_dir = root / LABEL_ROOT / safe_name(corpus_version)
-    labels_path = out_dir / f"{pass_name}.jsonl"
-    batches_path = out_dir / "batches.jsonl"
-
-    done = _labeled_ids(labels_path)
-    queue = [
-        c
-        for c in snap.subjects()
-        if c.source_object_id not in done and (only_ids is None or c.source_object_id in only_ids)
-    ]
-    if not queue:
-        console.say(f"Nothing left to label in pass {pass_name} ({len(done)} already labeled).")
-        return 0
-    batch = queue[:batch_size]
-    started = now()
-    ctx = LabelContext(
-        snapshot_run_id=snap.obs.run_id,
-        corpus_version=corpus_version,
-        corpus_set=safe_name(corpus_set),
+    batch = LabelBatch(
+        snap,
+        root=root,
         pass_name=pass_name,
-        batch_id=f"b_{_stamp(started)}",
+        corpus_version=corpus_version,
+        corpus_set=corpus_set,
+        batch_size=batch_size,
+        only_ids=only_ids,
+        post_order=post_order,
+        seed=seed,
+        now=now,
     )
-    _append_jsonl(
-        batches_path,
-        {
-            "event": "batch_start",
-            "batch_id": ctx.batch_id,
-            "pass": pass_name,
-            "snapshot_run_id": ctx.snapshot_run_id,
-            "mode": "label",
-            "planned": len(batch),
-            "started_at": _utc(started),
-        },
-    )
+    if not batch.items:
+        console.say(
+            f"Nothing left to label in pass {pass_name} ({batch.done_before} already labeled)."
+        )
+        return 0
+    ctx = batch.start()
     console.say(
-        f"Batch {ctx.batch_id}: {len(batch)} comments ({len(queue)} unlabeled, "
-        f"{len(done)} done). q at any prompt stops; saved labels are kept."
+        f"Batch {ctx.batch_id}: {len(batch.items)} comments ({len(batch.queue)} unlabeled, "
+        f"{batch.done_before} done). q at any prompt stops; saved labels are kept."
     )
-    saved = skipped = 0
     ended_by = "complete"
     try:
-        for i, c in enumerate(batch, start=1):
+        for i, c in enumerate(batch.items, start=1):
             record, note = label_one(
                 console,
                 snap,
                 c,
                 ctx,
-                position=f"{i} of {len(batch)}",
+                position=f"{i} of {len(batch.items)}",
                 now=now,
                 monotonic=monotonic,
             )
-            if note:
-                _append_jsonl(
-                    batches_path,
-                    {
-                        "event": "note",
-                        "batch_id": ctx.batch_id,
-                        "comment_id": c.source_object_id,
-                        "note": note,
-                    },
-                )
+            batch.note(c, note)
             if record is None:
-                skipped += 1
+                batch.skip()
                 continue
-            _append_jsonl(labels_path, record)
-            saved += 1
+            batch.save(record)
     except (Quit, KeyboardInterrupt):
         ended_by = "quit"
-    _append_jsonl(
-        batches_path,
-        {
-            "event": "batch_end",
-            "batch_id": ctx.batch_id,
-            "ended_at": _utc(now()),
-            "labeled": saved,
-            "skipped": skipped,
-            "ended_by": ended_by,
-        },
-    )
+    batch.end(ended_by)
     console.say(
-        f"\nBatch {ctx.batch_id} ended ({ended_by}): {saved} labeled, {skipped} skipped, "
-        f"{len(queue) - saved} still unlabeled in pass {pass_name}."
+        f"\nBatch {ctx.batch_id} ended ({ended_by}): {batch.saved} labeled, {batch.skipped} "
+        f"skipped, {batch.still_unlabeled} still unlabeled in pass {pass_name}."
     )
-    return saved
+    return batch.saved
 
 
 def run_chronological(

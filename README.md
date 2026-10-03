@@ -1,4 +1,4 @@
-# Afterword
+![Afterword Logo](img/Afterword_logo_color.png)
 
 Assisted comment triage for technical publishing. A scoped experiment, not a product.
 
@@ -18,7 +18,8 @@ Done:
 - A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
 - The corpus targets decision: the historical corpus is `dev`, and the test set is prospective (ADR-010, amended).
 
-- Stage 1 to 3a groundwork, independent of labels and real data (session 4, in progress): classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The store, the classifier wrapper, and the model providers come next.
+- A local browser labeling interface (`afterword label-ui`, session 5), writing the same records as `label`.
+- Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper `pr-v0.1`; the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 
 Open: timed chronological reviews and labeling (the author). No model has classified anything yet.
 
@@ -46,15 +47,35 @@ Then, one example of each command (run IDs are UTC timestamps printed by the pro
 ```text
 uv run --env-file .env afterword probe
 uv run afterword label --run <run-id> --mode chronological --week 2026-09-07
+uv run afterword label-ui --run <run-id>
 uv run afterword label --run <run-id>
 ```
 
 - `probe` is read-only (GET only). It saves raw payloads under git-ignored `fixtures/dev-api/source/real/<run-id>/` and value-free findings under `reports/probe/<run-id>/`. Its console output is counts and IDs only, safe to share.
 - `--mode chronological` times a plain oldest-first read of one week (C-009) and asks at the end whether to record it as a valid timing.
-- `label` labels one batch of at most 40 comments and stops; run it again to continue.
+- `label-ui` is the faster way to label. It serves one page on 127.0.0.1 and opens it in your browser; if the browser does not open, use the `open: http://127.0.0.1:8765/?t=<token>` line it prints (the whole URL, token included; it changes on every launch). Keys: `1` to `9` and `0` choose the class, letters toggle flags, Shift+`0` to `3` sets the prospective grade, `g` then `0` to `3` the retrospective grade, `e` types the reason, Enter saves, `h` shows the definitions, `s` skips, `q` stops. Each Enter writes the label at once. Stop with `q` in the page or Ctrl+C in the terminal (closing the tab leaves the server running); run the command again to resume with the next unlabeled comment.
+- `label` labels the same batches in the terminal, one batch of at most 40 comments, then stops; run it again to continue. Use it for `--mode chronological` (timing exists only there) or without a browser. The two write the same records and can continue each other's work, but never run both at once.
+- Either tool takes `--posts random --seed N`, which shuffles the order of posts reproducibly; comments within a post stay oldest first. Keep the same seed for a whole pass.
+- The full labeling routine, including every shortcut, is in `docs/WORKFLOW.md` (section 3).
 - `uv run afterword baseline --run <run-id>` writes the C-009 volume report under `reports/`.
 
-`label` shows comment text in your terminal and needs no key. In what order to run these, and why, is in `docs/WORKFLOW.md`.
+The store and classifiers (Stage 1 to 3a groundwork; tested on synthetic fixtures only):
+
+```text
+uv run afterword ingest --run <run-id>
+uv run afterword connections
+uv run afterword forget --connection <connection-id> --yes
+uv run afterword classify --condition b1
+uv run afterword classify --condition b2 --model qwen3:4b-instruct-2507-q4_K_M
+uv run afterword models verify
+uv run afterword bench --synthetic --model <ollama-model>
+```
+
+- `ingest` reads a saved probe run into the local SQLite store (`data/`, git-ignored), oldest run first, applying the lifecycle rules and the ADR-009 purge. `forget` removes every record of one connection; without `--yes` it only counts.
+- `classify` runs B1 (heuristic) or B2 (a local model through Ollama, whose model-boundary path is signed off) over stored comments from others, incrementally, and applies the priority policy. It refuses a provider whose path is not signed off and a model whose digest differs from its pin.
+- `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.
+
+`label` and `label-ui` show comment text only on your own machine (terminal or local page) and need no key. In what order to run these, and why, is in `docs/WORKFLOW.md`.
 
 ## Development
 
@@ -84,9 +105,10 @@ Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --en
 10. `docs/API-CAPABILITY-MATRIX.md`
 11. `docs/ROADMAP.md`
 12. `docs/WORKFLOW.md`: the operating protocol: fresh probe, timing before labeling, labeling sessions, and the weekly routine of the test period
-13. `docs/adr/`
-14. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
-15. `docs/FRICTION-LOG.md`
+13. `docs/LABELING-AT-SCALE.md`: a future design note for labeling beyond V1 (not V1 scope)
+14. `docs/adr/`
+15. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
+16. `docs/FRICTION-LOG.md`
 
 ## Public deliverable
 

@@ -36,9 +36,9 @@ The volume baseline is computed from an explicit probe run ID, recorded in the r
 ## Privacy
 
 - No real comment text, commenter names, or handles in any committed file. Committed fixtures are synthetic and listed in a manifest with their provenance.
-- Real payloads live only in git-ignored paths: `fixtures/dev-api/source/real/`, `fixtures/corpus/v*/`, `fixtures/labels/`, and `reports/`.
-- Do not open anything under `fixtures/dev-api/source/real/`. Work only from `reports/probe/<run>/shapes.json`, `probe-findings.json`, and aggregate reports.
-- `afterword label` is for the author's terminal. Never run it on real data, and never open its outputs (`fixtures/labels/`, `reports/timing/`). Build and test it against synthetic fixtures only.
+- Real payloads live only in git-ignored paths: `fixtures/dev-api/source/real/`, `fixtures/corpus/v*/`, `fixtures/labels/`, `reports/`, and the store `data/`.
+- Do not open anything under `fixtures/dev-api/source/real/` or `data/`. Work only from `reports/probe/<run>/shapes.json`, `probe-findings.json`, and aggregate reports.
+- `afterword label` and `afterword label-ui` are for the author's own machine. Never run either on real data, and never open their outputs (`fixtures/labels/`, `reports/timing/`). Build and test them against synthetic fixtures only.
 - Sending real comment data to a model requires the model-boundary record in `docs/PRIVACY-AND-BOUNDARIES.md` first. That happens no earlier than Stage 3.
 
 ## Credentials (ADR-006)

@@ -1587,3 +1587,292 @@ Ollama 0.34.3, CPU only (13th Gen Intel Core i7-1355U, 10 cores, 12 threads, 32 
 - Commit this checkpoint (`commit-message.txt`).
 
 **Next:** steps 7 to 11, after the commit: store and ingest, the classifier wrapper, the providers, service functions and CLI, then the synthetic benchmark.
+
+## Session 5: label UI, store, classifier, providers (2026-10-03)
+
+### 2026-10-03 18:40 - The labeling UI became priority 0 mid-session
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Steps 7 to 11 (store, classifier, providers, service and CLI, benchmark).
+
+**Expectation:** Steps 7 to 11 in order.
+
+**Observation:** While the store was being designed, the author made a local browser labeling UI priority 0: labeling is the critical path, and the terminal tool is too slow for the full `dev` corpus.
+
+**Evidence:** The author's message in this session.
+
+**Workaround:** Steps 7 to 11 paused before any code was written. The terminal tool's record building and batch handling were moved into shared pieces (`make_label`, `LabelBatch`, `comment_view`) so both transports write identical records, then `afterword label-ui` was built over new service functions (ADR-012).
+
+**Consequence:** Steps 7 to 11 start after the UI.
+
+**Follow-up:** None.
+
+### 2026-10-03 19:00 - A browser smoke test caught a focus bug the unit tests could not
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Verify the label UI's keyboard flow.
+
+**Expectation:** Python tests of the controller and HTTP endpoints, plus a JavaScript syntax check, would be enough.
+
+**Observation:** Driving the page in headless Chrome over the DevTools protocol (synthetic run only) showed that after Enter saved a label, focus was restored to the reason field for the next comment, so the next shortcuts would have been typed as text.
+
+**Evidence:** Smoke script in the session scratchpad; `focusAfterSave` was `INPUT` before the fix and `BODY` after.
+
+**Workaround:** Typed text and focus now carry over only while the same comment is on screen.
+
+**Consequence:** One smoke run of the real page is worth keeping for UI changes. Not added to the test suite (it needs a browser).
+
+**Follow-up:** None.
+
+### 2026-10-03 19:15 - The LABELING-AT-SCALE text did not arrive with the message
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** PROJECT
+
+**Task:** Add `docs/LABELING-AT-SCALE.md` with the exact content the author provided.
+
+**Expectation:** The content attached to the message.
+
+**Observation:** The message said the content was attached, but no content came through.
+
+**Evidence:** The author's message in this session.
+
+**Workaround:** Every other part of that request was applied (SCOPE, EVALUATION, `sample_kind`, C-011, README). The file itself waits for the text, which was asked for.
+
+**Consequence:** Resolved the same session: the author placed `docs/LABELING-AT-SCALE.md` in the working tree. It is left exactly as written.
+
+**Follow-up:** None.
+
+### 2026-10-03 19:20 - A bash heredoc failed on a Python edit script
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** ENVIRONMENT
+
+**Task:** Splice a large replacement into `labeling.py` with an inline script.
+
+**Expectation:** A quoted heredoc passes its body literally.
+
+**Observation:** The shell reported an unexpected end of file while looking for a matching quote, and nothing was changed.
+
+**Evidence:** `unexpected EOF while looking for matching` from the Bash tool.
+
+**Workaround:** Large replacements are written to a scratchpad file and spliced in by a small script.
+
+**Consequence:** A few minutes.
+
+**Follow-up:** None.
+
+### 2026-10-03 19:40 - A purge test failed on a fixture copy, not a leak
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Prove that a purge removes a deleted comment's text from the SQLite file, not only from its rows.
+
+**Expectation:** After the absence-twice purge, the comment's text appears nowhere in the file.
+
+**Observation:** The text was still in the file. A row scan found it in comment `4821`, which the synthetic DEV fixture builds as a copy of the purged comment and which is still live. The purge itself was complete.
+
+**Evidence:** `tests/test_store.py`, `test_absence_twice_deletes_and_purges`.
+
+**Workaround:** The deleted comment gets unique text in that test. The store also runs with `secure_delete` on, so purged and forgotten values are overwritten in the file rather than left in free pages, and `forget` vacuums.
+
+**Consequence:** None in code. Byte-level checks of the file stay in the suite.
+
+**Follow-up:** None.
+
+### 2026-10-03 19:55 - One synthetic case per local model before handing over the benchmark
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** ENVIRONMENT
+
+**Task:** Make sure the author's benchmark run cannot fail on the request shape (JSON-schema `format`, `think: false` on a model without thinking, digest check).
+
+**Expectation:** Mocked tests cover the shape; a live call might still be refused.
+
+**Observation:** `afterword models verify` matched both pins. One synthetic case (`adv-001`) per model returned schema-valid output, classified `CORRECTION`, tier `SURFACE`. Cold, including model load: qwen3 4B 83.2 s (load 12.1 s, 645 input tokens, 77 output); llama3.1 8B 143.7 s (load 17.6 s, 645 input, 48 output). CPU only.
+
+**Evidence:** Console output in this session; synthetic input only, no store involved.
+
+**Workaround:** None needed.
+
+**Consequence:** The full benchmark (57 requests per model) is long on this machine; it is the author's to run.
+
+**Follow-up:** Warm timings from the benchmark.
+
+### 2026-10-03 20:05 - `git add -N` touched the author's index
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** PROJECT
+
+**Task:** Run the identity scan over new files, which reads staged and tracked files.
+
+**Expectation:** An intent-to-add entry is harmless.
+
+**Observation:** It added an intent-to-add entry (the empty blob) for `docs/LABELING-AT-SCALE.md`, which the author had placed in the working tree during the session, and stopped there with a line-ending warning. The other new files stayed untracked.
+
+**Evidence:** `git diff --cached --name-status` showed `A docs/LABELING-AT-SCALE.md` with blob `e69de29`.
+
+**Workaround:** `git reset -- docs/LABELING-AT-SCALE.md` removed the entry; the file on disk was not touched. The index is as the author left it.
+
+**Consequence:** None lasting. The author's text for that file arrived on disk, so it is present verbatim.
+
+**Follow-up:** Do not modify the index; scan working-tree files directly instead.
+
+### 2026-10-03 20:30 - A refused request reset the connection on Windows
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** ENVIRONMENT
+
+**Task:** Run the full suite before the checkpoint.
+
+**Expectation:** The label UI's HTTP tests are deterministic.
+
+**Observation:** One full run in five failed in `test_writes_need_json_and_the_token` with `ConnectionAbortedError` (WinError 10053). The server refused a POST (403 or 415) before reading its body; on Windows, closing a socket with unread data resets the connection, so the client got no answer. The browser page would have seen the same failure as "the server did not answer".
+
+**Evidence:** Reproduced by looping the UI tests (failed on the sixth loop).
+
+**Workaround:** The server reads the body (up to 64 KB) before any refusal, and closes the connection for an oversized or invalid length. Fifteen loops passed afterward.
+
+**Consequence:** A real bug in the transport, found only by repetition.
+
+**Follow-up:** None.
+
+### 2026-10-03 20:35 - Two batches in one second shared a batch ID
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Review the label UI's "next batch" path while fixing the reset above.
+
+**Expectation:** Every batch has its own `batch_id`.
+
+**Observation:** `batch_id` is the start time to the second. In the browser, pressing `b` within a second of the previous batch ending would reuse the earlier batch's ID, and two batches' records would merge. The terminal tool's resume test had even asserted the shared ID under a fixed clock.
+
+**Evidence:** `tests/test_labeling.py`, `test_resume_continues_with_the_next_unlabeled_comment`.
+
+**Workaround:** A batch that starts in the same second as an earlier one gets `_2`, `_3`, and so on. The format is otherwise unchanged and documented in `fixtures/README.md`. No real label existed yet.
+
+**Consequence:** Batch records stay separable for fatigue and timing analysis.
+
+**Follow-up:** None.
+
+### 2026-10-03 - Session summary, checkpoint 1 (session 5: label UI, steps 7 to 10, docs)
+
+**Goal:** Steps 7 to 11 of the session 4 plan (store and ingest, classifier wrapper, providers, service functions and CLI, synthetic benchmark). Added by the author mid-session: a local browser labeling UI as priority 0, and a set of documentation additions on labeling at scale. Step 11 (the benchmark) is the author's to run after this checkpoint is committed.
+
+**Completed:**
+- **Orientation.** The full check list passed at the start (408 tests on 3.14 and 3.12). Installed Ollama digests matched the session 4 pins.
+- **Author's decisions recorded:**
+  - The label UI comes first (priority 0).
+  - Path A of the model-boundary record (local Ollama) is signed off, dated 2026-10-03, in `PRIVACY-AND-BOUNDARIES.md` v4. Path B (Anthropic) stays unsigned and is tested under respx only.
+- **Label UI (`afterword label-ui`):**
+  - A second transport over the same service functions as `afterword label` (ADR-012).
+  - Record building, batches, and the comment view moved into shared pieces (`make_label`, `LabelBatch`, `comment_view`), so both tools write identical records.
+  - Served by stdlib `http.server` on 127.0.0.1 only. Requests need a per-session token and the local `Host`; writes accept JSON only; request logging is off.
+  - One self-contained page with no external assets, which inserts all text with `textContent`.
+  - Keyboard-first: digits for the class, letters for flags, Shift+0 to 3 for the prospective grade, `g` then 0 to 3 for the retrospective grade (shown only after the prospective one), Enter to save, and `h` for definitions.
+  - `--posts random --seed N` on both tools: posts shuffled reproducibly, comments within a post oldest first, the seed recorded in the batch record.
+- **Step 7, store:**
+  - `Repository` protocol; `SqliteRepository` (stdlib `sqlite3`, the only module with SQL, `secure_delete` on); the store in git-ignored `data/`.
+  - String IDs and UTC RFC 3339 timestamps, with a `connection_id` on every record (ADR-013).
+  - The DEV adapter reads a saved probe run as sync observations, with reduced payloads.
+  - The lifecycle rules as a pure planner (`afterword.lifecycle`): new, unchanged, payload-only change, edit by normalized text, missing, deleted by absence twice or by placeholder, placeholder first seen, unexpected shape.
+  - The ADR-009 purge removes body text, raw payloads, and model text derived from the comment.
+  - `afterword ingest --run`, `connections`, and `forget --connection [--yes]`.
+- **Step 8, classifier `pr-v0.1`:**
+  - Fixed instructions and taxonomy in the system text; title, parent, and comment last, each delimited, with marker sequences broken up.
+  - A JSON schema that both providers accept, plus a stdlib validator that names each malformed reason (unreadable or semantic).
+  - `MALFORMED` is cached and never retried; `FAILED` is retried.
+  - An input that may not fit the 2048-token context is not sent and is surfaced.
+- **Step 9, providers:**
+  - One `Provider` protocol over httpx.
+  - Ollama: loopback only, approved models with pinned digests verified before any run, `/api/chat` with a JSON-schema `format`, temperature 0, a fixed seed, `num_ctx` 2048, `num_predict` 200, and `think` false.
+  - Anthropic: `claude-haiku-4-5-20251001` with structured outputs (`output_config.format`, checked against current documentation). The key is read in a request header only, from that module only.
+- **Step 10, service and CLI:**
+  - `classify --condition b1|b2` is incremental by cache key. It refuses an unsigned boundary path or a digest mismatch before sending anything, and records priority assignments under `pp-v0.1`.
+  - `models verify`, and `bench --synthetic` (refuses any set not listed as synthetic in the manifest with a matching hash).
+- **Label UI documentation:** README Quick start; `docs/WORKFLOW.md` v2, section 3 (which tool to use, how to launch, the URL to open, the screen, a full shortcut table, resuming and stopping, rules for both tools); the usage section of `docs/LABELING-GUIDE.md`. A test keeps the shortcut table in step with the key map.
+- **Docs:**
+  - DATA-MODEL v6: `sample_kind`, LifecycleEvent, and the store's extra fields.
+  - EVALUATION v5: V1 measurement uses researcher labels only; random and targeted samples are never mixed.
+  - SCOPE v4: labeling at scale as a future candidate.
+  - CLAIMS C-011 (judgment drift).
+  - `sample_kind: researcher` in the label schema and in both labeling tools.
+  - README commands and reading order; WORKFLOW and LABELING-GUIDE for `label-ui`; CLAUDE.md privacy paths include `data/`.
+  - `docs/LABELING-AT-SCALE.md`, as written by the author.
+- **Checks:**
+  - ruff, ruff format, mypy, and pydoclint are clean.
+  - 492 tests pass on 3.14 and on 3.12 (isolated).
+  - The identity scan reports 0 disallowed matches.
+  - No em-dash or bidi character in any changed file.
+- **Live checks, synthetic only:**
+  - `models verify` matched both pins.
+  - One synthetic case per model went through the real request path and was schema-valid.
+  - A headless-browser run of the label UI used a synthetic run.
+
+**Friction discovered:**
+- The UI became priority 0 mid-session.
+- A browser smoke test caught a focus bug that the Python tests could not.
+- The LABELING-AT-SCALE text first seemed missing (resolved).
+- A bash heredoc failed on an edit script.
+- A purge test tripped on a fixture copy, not a leak.
+- `git add -N` touched the author's index (reverted).
+- A refused request reset the connection on Windows (fixed: the body is read first).
+- Two batches started in one second shared a batch ID (fixed: a suffix).
+
+**Delight discovered:** The real local models accepted the request shape on the first try. The lifecycle planner is pure, so every ADR-009 path is tested without a database.
+
+**Claims affected:** C-011 added (UNTESTED). No evidence on any claim: no model has classified a real comment.
+
+**ADRs affected:**
+- ADR-012 applied to `label-ui` and every new command.
+- ADR-013 implemented by the store.
+- ADR-009 implemented by ingest and purge.
+- ADR-008 by the delimited prompt, the validator, and the pre-check in `classify`.
+- ADR-007 by priority computed only by the policy.
+- No ADR changed.
+
+**Scope pressure:**
+- **The label UI:** in scope by the author's decision. It is a transport over existing labeling, with no new label fields.
+- **Labeling at scale:** recorded as a future candidate only (SCOPE v4, LABELING-AT-SCALE.md). V1 adds only `sample_kind: researcher`.
+- **A "next batch" button in the UI:** kept, as it is equivalent to running `label` again; the page reminds the labeler to stop between batches when attention drops.
+- **`connections` command:** added so `forget` has a way to find connection IDs.
+
+**Open for the author:**
+- Commit this checkpoint (`commit-message.txt`).
+- Run the two benchmark commands and paste the output.
+- Review the `intended` labels in the synthetic sets (still open from session 4).
+
+**Next:** the benchmark write-up and the session summary, in a second commit.

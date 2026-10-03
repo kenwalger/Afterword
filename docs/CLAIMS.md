@@ -133,3 +133,17 @@ Claims below were added on 2026-10-02 during scoping v2.
 **Would weaken/falsify:** Many comments become consequential only in hindsight, which would limit what any triage system can achieve and should change how the result is framed.
 
 **Status:** UNTESTED
+
+---
+
+Claims below were added on 2026-10-03 (session 5).
+
+## C-011: The author's judgment drifts over months
+
+**Claim:** The author's judgment of what is consequential drifts measurably over months, beyond short-term inconsistency.
+
+**Evidence needed:** Re-labeling a random `dev` sample at least 3 months after the original labels (naturally, at the end of the prospective test period), compared against the 14-day self-agreement baseline (`LABELING-GUIDE.md`).
+
+**Would weaken/falsify:** Long-term agreement matches 14-day agreement.
+
+**Status:** UNTESTED

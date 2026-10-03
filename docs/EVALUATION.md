@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 4 (2026-10-03)
+**Version:** 5 (2026-10-03)
+
+v5 (2026-10-03, before any label or classification existed) states that V1 measurement uses researcher labels only, and that random and targeted samples are never mixed (`LABELING-AT-SCALE.md`).
 
 v4 (2026-10-03, before any classifier ran) fixes exactly one model as B2 at preregistration, with every other model a secondary comparison; states that B1 and B2 share the same pre-check and structural flags; and adds the normalization version, pre-check version, and model digest to what every result records.
 
@@ -27,6 +29,12 @@ All corpus material is versioned (`corpus-vN`) and described in a manifest with 
 The test set is disjoint from `dev` by post and by time. Comments that arrive after preregistration on posts published before it belong to neither set; their count is reported.
 
 The test set is at natural base rates by construction, so review reduction and recall are measured on the same set. No enriched sample is drawn: recall uses every consequential comment the test set accrues.
+
+### Label sources
+
+V1 measurement uses researcher labels only: the author's own labels of `dev` and `test`, made per `LABELING-GUIDE.md` and recorded with `sample_kind: researcher`. Other label sources described in `LABELING-AT-SCALE.md` (random collapsed-tier audits, targeted or in-app exercises) are future work and play no part in any V1 result.
+
+Random and targeted samples must never be mixed in one measure. A random sample estimates a rate; a targeted sample is chosen for what it is likely to contain, so pooling it with a random one biases every rate computed from the pool. Each label's `sample_kind` keeps them apart.
 
 ### Accrual procedure
 

@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 5 (2026-10-03)
+**Version:** 6 (2026-10-03)
+
+v6 (2026-10-03, before any label or stored record existed) adds `sample_kind` to EvaluationLabel, so future label sources fit without migration (every V1 label is `researcher`); and, from the first implementation of the store, `LifecycleEvent`, `consecutive_absences` and `current_payload_hash` on Comment, `current_payload_hash` on ContentItem, and `error` on Classification.
 
 v5 (2026-10-03, before any classification or stored record existed) adds `PlatformConnection` (ADR-013), edit detection by normalized text, the classification cache key, and the fields needed to trace a classification to its provider, model digest, pre-check, and normalization versions. Nothing earlier is removed.
 
@@ -108,6 +110,8 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 - `lifecycle_state` (`ACTIVE`, `EDITED`, `MISSING_FROM_SOURCE`, `DELETED_UPSTREAM`, `PURGED`)
 - `deletion_evidence` (value state: `ABSENT_TWICE`, `SOURCE_PLACEHOLDER`, or `NOT_YET_INTERPRETED` while not deleted)
 - `current_source_record_id`
+- `current_payload_hash` (hash of the current SourceRecord's payload, so an unchanged payload needs no lookup)
+- `consecutive_absences` (complete syncs of its post in a row that did not return it; two means deleted)
 
 #### Lifecycle rules
 
@@ -119,6 +123,12 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 - **Placeholder without prior observation:** create the Comment directly in `DELETED_UPSTREAM` with `deletion_evidence = SOURCE_PLACEHOLDER`, no body stored, and authorship `UNKNOWN`.
 - **Unexpected shape:** a node that is authorless in any other way, or has unknown keys, is not classified as a placeholder. The sync records a limitation, a friction entry is written, and the comment's lifecycle state is left unchanged until the shape is understood.
 - **Purged:** body text and raw payloads removed; identifiers, lifecycle history, and non-content judgments remain.
+
+#### LifecycleEvent
+
+Every change of `lifecycle_state`, kept after any purge: `event_id`, `comment_id`, `sync_run_id`, `from_state`, `to_state`, `reason` (such as `first_observed`, `text_changed`, `absent`, `source_placeholder`, `purge`), `occurred_at`.
+
+The purge runs in the same ingest that detects the deletion, which is no later than ADR-009's "at the next sync". A comment deleted after it was observed ends `PURGED`; a placeholder first observed without content stays `DELETED_UPSTREAM`, since nothing was held to purge. Model text derived from the comment (`raw_output`, `explanation`) is purged with it; class, flags, and tiers remain as non-content judgments.
 
 #### Placeholders are structure only
 
@@ -169,6 +179,7 @@ A model interpretation of a comment. Never part of the comment itself.
 - `latency_ms`
 - `classified_at`
 - `outcome` (`OK`, `MALFORMED`, `FAILED`)
+- `error` (a category only, such as `malformed:not_json` or `failed:timeout`; never a message that could hold a host name or path)
 
 #### Cache and incremental classification
 
@@ -199,6 +210,7 @@ Ground truth for the corpus. Separate from operational overrides.
 - `comment_id`
 - `corpus_version`
 - `corpus_set` (`dev`, `test`, `adversarial`; `test` is prospective, ADR-010)
+- `sample_kind` (who produced the label and how the comment was sampled; `researcher` for every V1 label. Future sources are described in `LABELING-AT-SCALE.md` and get their own values; random and targeted samples are never mixed in one measure, see `EVALUATION.md`)
 - `label_guide_version`
 - `taxonomy_version`
 - `primary_class`

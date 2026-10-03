@@ -1,6 +1,8 @@
 # Workflow
 
-**Version:** 1 (2026-10-02)
+**Version:** 2 (2026-10-03)
+
+v2 adds the browser labeling tool (`afterword label-ui`) and the `--posts random --seed N` post order to section 3.
 
 The operating protocol: what to run, in what order, and what never to do, so that each measurement means what the other documents say it means. `LABELING-GUIDE.md` defines how to label; `EVALUATION.md` defines what is measured. This document is the routine that keeps both honest.
 
@@ -49,15 +51,83 @@ Do not read either week on DEV, in practice, or in a labeling batch before its v
 
 ## 3. Labeling sessions
 
+Two tools label the same batches and write the same records: `afterword label` in the terminal and `afterword label-ui` in a local browser page. Either can continue where the other stopped.
+
 ```text
+uv run afterword label-ui --run <run-id>
 uv run afterword label --run <run-id>
 ```
 
-- One batch is at most 40 comments (`LABELING-GUIDE.md`). The tool labels one batch and stops; run it again for the next. Saved labels survive `q`.
+### Which tool
+
+- **`label-ui`** for labeling. It is faster: one screen per comment, the thread beside the form, single keys for every choice, and nothing to retype.
+- **`label`** for chronological timing (`--mode chronological` exists only there), and for labeling when no browser is available or a session is run over SSH.
+- Never run both at the same time on the same pass. Each reads which comments are done when its batch starts, so two tools running at once could label the same comment twice.
+
+### Launching `label-ui`
+
+```text
+uv run afterword label-ui --run <run-id>
+uv run afterword label-ui --run <run-id> --posts random --seed 7
+uv run afterword label-ui --run <run-id> --port 8800 --no-browser
+```
+
+The terminal prints the run's counts (comments to label and those excluded), the batch, and one line:
+
+```text
+open: http://127.0.0.1:8765/?t=<token>
+```
+
+Your browser opens that URL. With `--no-browser`, or if it does not open, copy the whole URL, including `?t=` and the token, into the browser. The token is new for every launch, so an old URL stops working; the page refuses any request without it. The server listens on `127.0.0.1` only. The port is 8765 unless `--port` names another (`--port 0` picks a free one). The terminal never shows comment text.
+
+The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-version`, `--set`, `--ids`, `--posts`, and `--seed`.
+
+### The screen
+
+- **Left:** the post title, when the comment was posted, the context status, and the thread as it stood when the comment was posted (later comments hidden). The context status says whether any known gap exists (a deleted earlier comment, a post edited after the comment), whether the comment replies to you (`REPLY_TO_AUTHOR` is then set automatically), and whether your reply already exists in the snapshot (`replied_before_labeling`). By default only the reply chain is shown; `t` shows every earlier comment in the thread.
+- **Right:** the class (radio buttons), flags (checkboxes), the prospective grade, the retrospective grade (shown only after the prospective grade is set), the reason, a hard-to-label note, and the shortcut legend. Hovering a class or flag shows its definition; `h` shows all of them.
+- **Header:** pass, batch, position in the batch, labels saved this session, and comments still unlabeled in the pass.
+
+### Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `1` to `9`, `0` | Class, in TAXONOMY.md precedence order (`0` is `UNCERTAIN`) |
+| `n` | `NEEDS_THREAD_CONTEXT` |
+| `c` | `CONTAINS_CODE` |
+| `l` | `CONTAINS_LINK` |
+| `r` | `REFERENCES_SPECIFIC_CLAIM` |
+| `o` | `ADDRESSED_TO_OTHER_COMMENTER` |
+| `x` | `HOSTILE_TONE` |
+| `i` | `POSSIBLE_INSTRUCTION_TEXT` |
+| Shift+`0` to Shift+`3` | Prospective grade |
+| `g` then `0` to `3` | Retrospective grade (`g` then `-` clears it) |
+| `e` | Type the reason |
+| `w` | Type a hard-to-label note |
+| Esc | Leave a text field; close the definitions |
+| Enter | Save the label and show the next comment (also from inside a text field) |
+| `t` | Toggle the reply chain and the full thread as of the comment |
+| `h` or `?` | Show or hide every class and flag with its definition |
+| `s` | Skip this comment without a label (a typed note is kept) |
+| `q` | Stop the session (asks to confirm while a comment is open) |
+| `b` | After a batch: start the next batch |
+
+Flag keys toggle. Every key except Enter and Esc is ignored while typing in a text field. A label is saved only when it has a class and a prospective grade, plus a reason for a grade of 2 or 3; otherwise the page says what is missing.
+
+### Resuming and stopping
+
+- **Every Enter writes the label at once.** Nothing is lost when the session stops, the tab closes, or the process ends, except the comment on screen.
+- **Resuming** is running the same command again: the next batch starts with the first unlabeled comment. A skipped comment has no label, so it comes back in a later batch. With `--posts random`, use the same `--seed` for the whole pass to keep the same order; the seed is recorded in each batch record. Comments within a post are oldest first whatever the order.
+- **Between batches** the page shows a summary with "Start next batch (b)" and "Stop (q)". Starting the next batch is the same as running the command again, so the rule still holds: stop when attention drops.
+- **Stopping the server:** press `q` in the page (or the Stop button), or Ctrl+C in the terminal. Either closes an unfinished batch as `quit` and ends the process; the terminal prints how many labels were saved. Closing the tab does not stop the server. Reopening the same URL returns to the same comment, but the labeling time for that comment keeps running meanwhile, so stop rather than leave a comment open.
+
+### Rules that apply to both tools
+
+- One batch is at most 40 comments (`LABELING-GUIDE.md`). Saved labels survive stopping at any point.
 - Stop between batches when attention drops. Fatigue drift is the reason for the limit, so do not run batches back to back to beat it.
-- Comments come post by post, oldest first within a post. Do not skip ahead in the thread on DEV while labeling.
-- Do not look at earlier labels, the commenter's profile, or any classifier output (none exists yet).
-- Write hard-to-label notes at the prompt. They are candidates for the adversarial set and for taxonomy revision.
+- Comments come post by post, oldest first within a post. `--posts random --seed N` shuffles the order of posts, not of comments within a post. Do not skip ahead in the thread on DEV while labeling.
+- Do not look at earlier labels, the commenter's profile, or any classifier output.
+- Write hard-to-label notes when they come up (the note field, or the prompt in the terminal). They are candidates for the adversarial set and for taxonomy revision.
 - Self-agreement: at least 14 days after the initial pass, with `--pass self_agreement --ids <file>` (`LABELING-GUIDE.md`).
 
 ## 4. The prospective period

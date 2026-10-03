@@ -6,6 +6,8 @@
 fixtures/corpus/v*/
 fixtures/labels/
 fixtures/dev-api/source/real/
+# The local store (afterword ingest): real comment text once ingested
+data/
 
 # Local probe and baseline outputs
 reports/

@@ -84,11 +84,16 @@ Original labels are not changed after this check. If agreement is poor, the corp
 
 - Batches of no more than 40 comments, to limit fatigue drift.
 - Record start and end times per batch.
-- The tool does both. `uv run afterword label --run <full-run-id>` labels one batch and stops; run it again to continue. It warns when the run is more than 7 days old: run a fresh full probe first, so comments deleted upstream are not labeled (ADR-009).
+- The tools do both. Two transports write the same records and can continue each other's work (never run both at once):
+  - `uv run afterword label-ui --run <full-run-id>` (browser, the faster one) serves one page on `127.0.0.1` and opens it; the terminal prints the URL to use, `http://127.0.0.1:8765/?t=<token>`, with a new token on every launch. Keys: `1` to `9` and `0` for the class, `n c l r o x i` for the flags, Shift+`0` to `3` for the prospective grade, `g` then `0` to `3` for the retrospective grade, `e` for the reason, `w` for a note, Enter to save, `t` for the full thread, `h` for the definitions, `s` to skip, `q` to stop. Stop with `q` or Ctrl+C in the terminal; closing the tab does not stop the server. Between batches the page offers the next one.
+  - `uv run afterword label --run <full-run-id>` (terminal) labels one batch and stops. Use it for chronological timing and when no browser is available.
+  - Both resume by running the command again: the next batch starts with the first unlabeled comment. Both warn when the run is more than 7 days old: run a fresh full probe first, so comments deleted upstream are not labeled (ADR-009).
+  - Every shortcut and the stop and resume rules are in `docs/WORKFLOW.md`, section 3.
 - Labels go to `fixtures/labels/<corpus_version>/<pass>.jsonl` and batch records (start, end, hard-to-label notes) to `batches.jsonl` in the same git-ignored directory.
-- Comments are taken post by post, oldest first within a post, so no comment is labeled after a later comment from the same post has been seen.
+- Comments are taken post by post, oldest first within a post, so no comment is labeled after a later comment from the same post has been seen. Posts come in publication order, or shuffled with `--posts random --seed N` (either tool); the seed is recorded in the batch record, and the same seed resumes the same order. Keep one seed for a whole pass.
+- In both tools the retrospective grade is asked for only after the prospective grade is set.
 - Commenters are shown as "Commenter A", "Commenter B" within a thread, and the author as "You (author)". Names and handles are not shown.
-- At the class and flag prompts, `h` lists every class and flag with a one-line definition from `TAXONOMY.md`.
+- `h` lists every class and flag with a one-line definition from `TAXONOMY.md` (at the class and flag prompts in the terminal; at any time in the browser, where hovering a class or flag also shows its definition).
 - Chronological timing for C-009: `uv run afterword label --run <full-run-id> --mode chronological --week <any date in the week>`. It shows that week's comments from others oldest first, with no labeling prompts. At the end it asks whether to record the run as a valid timing (warning first if the average is under 2 seconds per comment). Confirmed runs are written under `reports/timing/`; anything else goes to `reports/timing/practice/` and is never evidence. Time a week before labeling it (`docs/WORKFLOW.md`).
 - Record any comment that was hard to label, and why, in the session notes. These are candidates for the adversarial set and for taxonomy revision.
 

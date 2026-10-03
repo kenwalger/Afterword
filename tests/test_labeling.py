@@ -187,6 +187,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "snapshot_run_id": "r1",
         "corpus_version": "unfrozen",
         "corpus_set": "dev",
+        "sample_kind": "researcher",
         "label_guide_version": "lg-v0.2",
         "taxonomy_version": "tax-v0.1",
         "normalization_version": "display-v0.1",
@@ -206,6 +207,8 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
     start, end = lines(out / "batches.jsonl")
     assert start["event"] == "batch_start"
     assert start["planned"] == 4
+    assert start["post_order"] == "published"
+    assert "seed" not in start
     assert start["started_at"] == "2026-10-09T18:00:00Z"
     assert end == {
         "event": "batch_end",
@@ -287,7 +290,8 @@ def test_resume_continues_with_the_next_unlabeled_comment(tmp_path, fake_dev):
     out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
     assert [r["comment_id"] for r in lines(out / "initial.jsonl")] == ["s1a1", "s1b1"]
     batch_ids = {e["batch_id"] for e in lines(out / "batches.jsonl")}
-    assert len(batch_ids) == 1  # same fixed clock; real batches differ by start time
+    # Same fixed clock, so the second batch gets a suffix rather than a duplicate ID.
+    assert batch_ids == {"b_20261009T180000Z", "b_20261009T180000Z_2"}
 
 
 def test_hard_to_label_notes_go_to_the_batch_record(tmp_path, fake_dev):

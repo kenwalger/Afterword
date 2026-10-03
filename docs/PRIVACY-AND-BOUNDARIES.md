@@ -1,6 +1,8 @@
 # Privacy and Boundaries
 
-**Version:** 3 (2026-10-03)
+**Version:** 4 (2026-10-03)
+
+v4 records the author's sign-off of path A (local, Ollama). Path B (Anthropic) remains unsigned.
 
 v3 adds the model-boundary records for the two classifier paths: local (Ollama) and remote (Anthropic). Neither has yet processed real comment data.
 
@@ -82,10 +84,11 @@ Built by the application from the store, never by the adapter. The same fields g
 - **Provider and models:** Ollama on the author's machine, at `http://localhost:11434`. Candidate models, pinned by content digest: `qwen3:4b-instruct-2507-q4_K_M` and `llama3.1:8b-instruct-q4_K_M` (digests recorded in `docs/FRICTION-LOG.md` when pulled and verified by the application before each run).
 - **What leaves the machine:** nothing. Requests go to the loopback interface only. The application refuses a non-loopback Ollama host unless configuration names it explicitly, and a non-loopback host is a different boundary that needs its own record.
 - **Retention:** whatever the local Ollama server keeps. Ollama does not store prompts by default; its server log may record request metadata. The store keeps each response locally (`raw_output`), purged with the comment's body (ADR-009).
+- **Context limit:** 2048 tokens with a 200-token output cap. An input that may not fit is not sent at all (it would otherwise be silently cut by Ollama); the classification is `FAILED` and the comment is surfaced.
 - **Training:** none. Local inference does not change the model.
 - **Redaction:** none beyond the field list above.
 - **Model download:** pulling a model contacts the Ollama registry. No comment data is involved.
-- **Author sign-off:** not yet recorded.
+- **Author sign-off:** signed off 2026-10-03 by the author (session 5), on the grounds that nothing leaves the machine. The sign-off covers this path only: a loopback Ollama host and the pinned models above. The roadmap condition still holds: real comments go through this path no earlier than Stage 3a, after `dev` labels exist, and only when the author runs it. The application enforces the sign-off: `afterword classify --condition b2` refuses any provider whose path is not signed off.
 
 #### Path B: remote model (Anthropic), secondary comparison
 

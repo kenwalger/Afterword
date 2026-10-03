@@ -329,7 +329,12 @@ def read_body(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))["response"]["body"]
 
 
-def _listed_articles(run_dir: Path) -> dict[int, dict[str, Any]]:
+def listed_articles(run_dir: Path) -> dict[int, dict[str, Any]]:
+    """Read the article listing pages of a saved run.
+
+    :param run_dir: Raw run directory.
+    :returns: Listed article payloads by ID, first occurrence kept.
+    """
     articles: dict[int, dict[str, Any]] = {}
     sources = sorted(run_dir.glob(ARTICLE_PAGE_GLOB))
     if not sources and (run_dir / ARTICLES_ALL_FILE).exists():
@@ -359,7 +364,7 @@ def iter_run_comments(
 
 def _run_articles(run_dir: Path, article_ids: list[int]) -> dict[int, dict[str, Any]]:
     """Article payloads for a run, from the listing pages or single fetches."""
-    listed = _listed_articles(run_dir)
+    listed = listed_articles(run_dir)
     articles = {}
     for article_id in article_ids:
         article = listed.get(article_id)
