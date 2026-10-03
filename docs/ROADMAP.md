@@ -65,6 +65,12 @@ Goal: determine whether assisted triage is useful before building a large UI.
 
 ### 3b: Preregistration
 
+Prerequisite, before preregistration can happen:
+
+- `afterword label --set test` selects only test-set comments (posts published after preregistration).
+
+Then:
+
 - Freeze all versions.
 - Recompute the accrual estimate from the observed `dev` consequential share and record it in `EVALUATION.md`.
 - Write registered thresholds into `EVALUATION.md`, with the accrual procedure and stopping rule.
@@ -124,3 +130,5 @@ Only after V1 evidence exists, decide whether CoderLegion adds a useful test of 
 ## Deferred
 
 Cross-platform identity reconciliation, Substack, LinkedIn, additional analytics, and external-user testing. None is promised by this roadmap.
+
+- External interface (ADR-012): a local MCP server first, possibly an HTTP API later, over the application service layer. Gated on the Stage 3 result; see `SCOPE.md` (Future candidates) for its limits.

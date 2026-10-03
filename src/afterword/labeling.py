@@ -2,7 +2,8 @@
 
 Runs in the author's own terminal. It reads one saved run through source-neutral
 observations (ADR-001) and writes only to git-ignored paths: labels and batch
-records under ``fixtures/labels/``, timing records under ``reports/timing/``.
+records under ``fixtures/labels/``, timing records under ``reports/timing/``
+(valid) or ``reports/timing/practice/`` (not confirmed).
 
 Comment text is shown with the display rendering in :mod:`afterword.display`,
 not a classification normalization. Commenters appear as per-thread pseudonyms
@@ -29,12 +30,13 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from afterword import timing
 from afterword.baseline import week_start
 from afterword.display import DISPLAY_VERSION, html_to_display_text, strip_controls
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
 
 LABEL_ROOT: Path = Path("fixtures/labels")
-TIMING_ROOT: Path = Path("reports/timing")
+TIMING_ROOT: Path = timing.TIMING_ROOT
 
 LABEL_GUIDE_VERSION: str = "lg-v0.2"
 TAXONOMY_VERSION: str = "tax-v0.1"
@@ -681,6 +683,11 @@ def run_chronological(
 
     :param snap: The run to review from.
     :param console: Terminal.
+    At the end the reviewer is asked whether to record the run as a valid timing,
+    with a warning first when the average is under
+    :data:`afterword.timing.MIN_SECONDS_PER_COMMENT`. Only a ``y`` makes it
+    evidence; any other ending saves it under ``reports/timing/practice/``.
+
     :param root: Repository root; the record goes under ``reports/timing/``.
     :param week: Any date in the week; the week starts on its Monday (UTC).
     :param now: Wall clock.
@@ -725,6 +732,13 @@ def run_chronological(
         complete = False
     total = round(monotonic() - t0, 1)
     ended_at = now()
+    average = timing.seconds_per_comment(total, len(per_comment))
+    console.say(
+        f"\n{'Complete' if complete else 'Stopped early'}: {len(per_comment)} of {len(items)} "
+        f"comments in {total} seconds"
+        + ("." if average is None else f" ({average} seconds per comment).")
+    )
+    valid = _confirm_valid(console, average=average, complete=complete)
 
     record = {
         "mode": "chronological",
@@ -740,13 +754,44 @@ def run_chronological(
         "started_at": _utc(started_at),
         "ended_at": _utc(ended_at),
         "total_seconds": total,
+        "seconds_per_comment": average,
+        "valid": valid,
         "per_comment_seconds": per_comment,
     }
-    out = root / TIMING_ROOT / f"chronological-{start.isoformat()}-{_stamp(started_at)}.json"
+    out_dir = timing.record_dir(root, valid=valid)
+    out = out_dir / f"chronological-{start.isoformat()}-{_stamp(started_at)}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-    console.say(
-        f"\n{'Complete' if complete else 'Stopped early'}: {len(per_comment)} of {len(items)} "
-        f"comments in {total} seconds. Record: {out}"
-    )
+    kind = "Valid timing" if valid else "Practice run, not counted as evidence"
+    console.say(f"{kind}. Record: {out}")
     return out
+
+
+def _confirm_valid(console: Console, *, average: float | None, complete: bool) -> bool:
+    """Ask whether a finished review counts as a valid timing.
+
+    :param console: Terminal.
+    :param average: Seconds per comment, or ``None`` when nothing was reviewed.
+    :param complete: Whether every comment in the week was reviewed.
+    :returns: ``True`` only for an explicit ``y``. ``n``, ``q``, end of input, and
+        an interrupt all mean practice.
+    """
+    if average is None:
+        console.say("No comments were reviewed; saving as practice.")
+        return False
+    if average < timing.MIN_SECONDS_PER_COMMENT:
+        console.say(
+            f"Warning: {average} seconds per comment is under "
+            f"{timing.MIN_SECONDS_PER_COMMENT}. That is faster than reading each comment "
+            "and its reply chain; this looks like a practice run."
+        )
+    if not complete:
+        console.say("Warning: the review stopped before the end of the week.")
+    try:
+        while True:
+            answer = console.ask("Record this as a valid timing? (y/n) ").lower()
+            if answer in ("y", "n"):
+                return answer == "y"
+            console.say("  Answer y or n.")
+    except (Quit, KeyboardInterrupt):
+        return False

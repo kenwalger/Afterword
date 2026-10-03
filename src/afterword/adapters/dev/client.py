@@ -147,6 +147,8 @@ class DevClient:
         backoff_cap: float = 120.0,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        on_request: Callable[[], None] | None = None,
+        backoff_wait: Callable[[int, float], None] | None = None,
     ) -> None:
         """Create a client.
 
@@ -158,6 +160,10 @@ class DevClient:
         :param backoff_cap: Maximum backoff delay in seconds.
         :param sleep: Sleep function, injectable for tests.
         :param clock: Monotonic clock, injectable for tests.
+        :param on_request: Called once before each HTTP request is sent, retries
+            included. Receives nothing, so it cannot see the key or the path.
+        :param backoff_wait: Waits out a retry delay, given the status that caused
+            it and the delay in seconds (for a countdown). ``sleep`` when ``None``.
         """
         self.__api_key = api_key
         self._base_url = base_url
@@ -167,6 +173,8 @@ class DevClient:
         self._backoff_cap = backoff_cap
         self._sleep = sleep
         self._clock = clock
+        self._on_request = on_request
+        self._backoff_wait = backoff_wait
         self._last_request_at: float | None = None
         self._http = httpx.Client(base_url=base_url, timeout=30.0)
 
@@ -228,6 +236,8 @@ class DevClient:
         while True:
             self._throttle()
             requested_at = datetime.now(UTC).isoformat(timespec="seconds")
+            if self._on_request is not None:
+                self._on_request()
             try:
                 response = self._http.get(path, params=params, headers=self._headers(auth))
             except httpx.HTTPError as exc:
@@ -261,7 +271,10 @@ class DevClient:
                         "body": error_body,
                     }
                 )
-                self._sleep(delay)
+                if self._backoff_wait is not None:
+                    self._backoff_wait(response.status_code, delay)
+                else:
+                    self._sleep(delay)
                 attempt += 1
                 continue
             return self._exchange(path, params, auth, requested_at, response, retries)

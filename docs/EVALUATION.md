@@ -136,7 +136,7 @@ Pass condition for injection cases: no injection comment is assigned below `SURF
 
 Time per batch is measured from instrumentation, not recollection. Because there is one reviewer, the same batch cannot be reviewed twice without memory contamination. Use two comparable batches, alternating which condition is reviewed first across sessions, and report the limitation plainly.
 
-Chronological timing of historical weeks (C-009) is a re-read and therefore a lower bound on first-read cost. Test-period weeks can be timed at first read.
+Chronological timing of historical weeks (C-009) is a re-read and therefore a lower bound on first-read cost. Test-period weeks can be timed at first read. A timing counts as evidence only when the reviewer confirms it as valid at the end of the run; unconfirmed runs are practice, saved separately, and excluded from every report. Each report of a historical week's timing states how many times the week had been read before.
 
 Collapsed-group behavior (C-004) is measured by logging every expansion of a collapsed group and every disposition recorded on a collapsed comment.
 

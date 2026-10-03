@@ -35,6 +35,7 @@ The volume baseline is computed from an explicit probe run ID, recorded in the r
 
 - Every DEV payload detail (`id_code`, `children`, `body_html`, `user`, endpoint paths) stays inside `src/afterword/adapters/dev/`.
 - Code outside the adapter consumes `afterword.observations` (or, later, the canonical model) and never refers to DEV field names.
+- CLI commands are thin transports over application service functions (ADR-012). Move existing commands behind service functions when they are next changed substantively; no standalone refactor.
 
 ## Code standards
 
@@ -75,3 +76,7 @@ No em-dashes in any prose, docs, code comments, commit messages, or generated re
 ## Attribution
 
 Do not add AI attribution anywhere: no `Co-Authored-By` trailers, "Generated with" lines, or similar credits in code comments or commit messages.
+
+## Git Workflow
+
+Never commit. Write the message to `commit-message.txt` and stop.

@@ -122,6 +122,7 @@ Claims below were added on 2026-10-02 during scoping v2.
   - **Reading:** the volume is recent and spiky, not steady. Several weeks in the last 13 reached 39 to 60 comments from others, which is enough for chronological review to plausibly cost real attention, but this has not been measured yet.
   - **Weeks chosen for timing:** typical week 2026-09-21 to 2026-09-27 (7 comments from others); busy week 2026-09-07 to 2026-09-13 (44).
   - **Not yet established:** the attention cost itself, which needs a timed chronological review of both weeks. The claim is neither supported nor weakened until then.
+- 2026-10-03: The typical week to time is replaced. 2026-09-21 had been re-read twice (once in a practice timing run, which was not recorded as evidence), so a timing of it would no longer be a usable lower bound. The replacement is 2026-07-27 to 2026-08-02 (7 comments from others), the complete week closest to the trailing-13-week median of run `20261002T171152Z`, excluding 2026-09-21 and 2026-09-07. The busy week is unchanged. Only timings confirmed as valid count; practice runs are kept apart. No review time measured yet.
 
 ## C-010: Prospective and retrospective judgment largely agree
 

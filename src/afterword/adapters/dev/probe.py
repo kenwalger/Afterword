@@ -120,6 +120,7 @@ class Probe:
         run_id: str,
         page_size: int = 10,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        progress: Callable[[str, int, int], None] | None = None,
     ) -> None:
         """Create a probe for one run.
 
@@ -129,6 +130,10 @@ class Probe:
         :param run_id: Run identifier, normally a UTC timestamp.
         :param page_size: Small page size used to walk the article listing.
         :param now: Clock for run timestamps, injectable for tests.
+        :param progress: Called with a step name (``account``, ``listing``,
+            ``details``, ``comments``, ``thread checks``), the article number or
+            page within the step, and the step's article total (0 when not counted).
+            It receives counts only.
         """
         self.client = client
         self.raw_dir = raw_dir
@@ -136,6 +141,7 @@ class Probe:
         self.run_id = run_id
         self.page_size = page_size
         self.now = now
+        self._progress = progress
         self.limitations: list[str] = []
         self.requests_sent = 0
         self.responses_429 = 0
@@ -150,6 +156,10 @@ class Probe:
         self.findings: dict[str, Any] = {}
 
     # Requests ---------------------------------------------------------------
+
+    def _step(self, name: str, current: int = 0, total: int = 0) -> None:
+        if self._progress is not None:
+            self._progress(name, current, total)
 
     def _get(
         self,
@@ -192,8 +202,10 @@ class Probe:
         if ex.status >= 400 and ex.body_is_json:
             self.error_bodies[ex.status].append(ex.body)
         if ex.retries and ex.status in (429, 503):
+            # A lookup by path carries the author's username; limitations are printed.
+            shown = template if "{username}" in template else path
             self.limitations.append(
-                f"{path}: gave up after {len(ex.retries)} retries ({ex.status})"
+                f"{shown}: gave up after {len(ex.retries)} retries ({ex.status})"
             )
         return ex
 
@@ -205,6 +217,7 @@ class Probe:
         terminated = False
         first_headers: dict[str, str] = {}
         for page in range(1, MAX_PAGES + 1):
+            self._step("listing", page)
             ex = self._get(
                 f"articles-page-{page:03d}.json",
                 ARTICLES_ENDPOINT,
@@ -258,7 +271,8 @@ class Probe:
         # which labeling needs to know whether a post changed after a comment.
         bodies: list[dict[str, Any]] = []
         statuses: Counter[int] = Counter()
-        for article_id in article_ids:
+        for n, article_id in enumerate(article_ids, start=1):
+            self._step("details", n, len(article_ids))
             ex = self._get(records.article_file(article_id), f"/api/articles/{article_id}")
             statuses[ex.status] += 1
             if ex.ok and isinstance(ex.body, dict):
@@ -284,7 +298,8 @@ class Probe:
     ) -> dict[int, list[records.CommentNode]]:
         trees: dict[int, list[records.CommentNode]] = {}
         statuses: Counter[int] = Counter()
-        for article in articles:
+        for n, article in enumerate(articles, start=1):
+            self._step("comments", n, len(articles))
             article_id = article["id"]
             ex = self._get(
                 records.comments_file(article_id), COMMENTS_ENDPOINT, {"a_id": article_id}
@@ -376,6 +391,7 @@ class Probe:
         if not trees or not any(trees.values()):
             self.limitations.append("no comments found; thread-level checks skipped")
             return None
+        self._step("thread checks")
         largest = max(trees, key=lambda aid: len(trees[aid]))
         full_ids = {n.id_code for n in trees[largest]}
         self.findings["largest_thread"] = {"article_id": largest, "nodes": len(full_ids)}
@@ -466,10 +482,13 @@ class Probe:
         self.findings.update(
             run_id=self.run_id,
             adapter_version=ADAPTER_VERSION,
-            scope="all" if article is None else f"article:{article}",
+            # A URL holds the author's username; the scope is printed, so it waits
+            # for the resolved numeric ID.
+            scope="all" if article is None else "article:unresolved",
             started_at=started.isoformat(timespec="seconds"),
         )
 
+        self._step("account")
         me_ex = self._get(records.ME_FILE, "/api/users/me")
         self.findings["auth"] = {"me_endpoint": "/api/users/me", "me_status": me_ex.status}
         if not me_ex.ok or not isinstance(me_ex.body, dict):

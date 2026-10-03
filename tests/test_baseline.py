@@ -151,3 +151,29 @@ def test_post_age_at_comment():
     ]
     # a published 08-03: comments on 08-03, 08-12, 08-05 -> 0, 9, 2 days; b published 08-17: 1 day.
     assert ages["all"] == {"0-7": 3, "8-30": 1, "31-90": 0, "91-365": 0, "366+": 0}
+
+
+def test_replacement_typical_week_skips_excluded_weeks():
+    # Complete weeks: 08-03 (2), 08-10 (1), 08-17 (1), 08-24 (0), 08-31 (0); median 1.
+    report = baseline.build(
+        observations(),
+        as_of=date(2026, 9, 10),
+        exclude_weeks=[date(2026, 8, 19)],  # any date in the week of 08-17
+    )
+    replacement = report["replacement_typical_week"]
+    assert replacement["median"] == 1
+    assert replacement["excluded_weeks"] == ["2026-08-17"]
+    assert replacement["week"] == {
+        "week_start": "2026-08-10",
+        "week_end": "2026-08-16",
+        "comments_from_others": 1,
+    }
+    text = baseline.render_markdown(report)
+    assert "Replacement typical week (closest to the median of 1" in text
+    assert "2026-08-10 to 2026-08-16, 1 comments from others." in text
+
+
+def test_no_exclusions_means_no_replacement():
+    report = baseline.build(observations(), as_of=date(2026, 9, 10))
+    assert report["replacement_typical_week"] is None
+    assert "Replacement typical week" not in baseline.render_markdown(report)

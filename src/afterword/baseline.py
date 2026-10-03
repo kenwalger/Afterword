@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 import statistics
 from collections import Counter
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -191,11 +192,23 @@ def concentration(per_article_counts: list[int]) -> dict[str, Any]:
     }
 
 
-def build(obs: RunObservations, *, as_of: date) -> dict[str, Any]:
+def build(
+    obs: RunObservations,
+    *,
+    as_of: date,
+    review_timing: dict[str, Any] | None = None,
+    exclude_weeks: Iterable[date] = (),
+) -> dict[str, Any]:
     """Compute the C-009 volume baseline.
 
     :param obs: Observations from one full-scope run.
     :param as_of: Date the run finished. Weeks and months that contain it are partial.
+    :param review_timing: Valid chronological timings and the count of ignored
+        practice records, from :func:`afterword.timing.load_valid`. ``None`` when
+        not loaded.
+    :param exclude_weeks: Weeks (any date in each) that may not be chosen as the
+        replacement typical week, such as weeks already re-read. Empty means no
+        replacement is computed.
     :returns: The report as JSON-ready data. Aggregates only.
     """
     # Deletion placeholders hold a thread position but are no one's comment.
@@ -254,6 +267,17 @@ def build(obs: RunObservations, *, as_of: date) -> dict[str, Any]:
     non_empty = [n for n in trailing_counts if n > 0]
     recent = all_weeks[-RECENT_WEEKS:]
     recent_desc = describe([n for _, n in recent])
+    excluded = sorted({week_start(d) for d in exclude_weeks})
+    replacement = None
+    if excluded:
+        replacement = {
+            "basis": f"trailing {len(recent)} complete weeks before {as_of.isoformat()}",
+            "median": recent_desc.get("median"),
+            "excluded_weeks": [d.isoformat() for d in excluded],
+            "week": pick_week(
+                [w for w in recent if w[0] not in excluded], recent_desc.get("median", 0)
+            ),
+        }
 
     return {
         "run_id": obs.run_id,
@@ -289,12 +313,14 @@ def build(obs: RunObservations, *, as_of: date) -> dict[str, Any]:
             }
             for window, desc in ((trailing, trailing_desc), (recent, recent_desc))
         ],
+        "replacement_typical_week": replacement,
         "weekly": [{**w, "week_start": w["week_start"].isoformat()} for w in weekly],
         "monthly": calendar_months(dated_others, dated_mine, as_of),
         "post_age_at_comment_from_others": {
             "all": post_age_at_comment(ages(others)),
             f"trailing_{RECENT_WEEKS}_weeks": post_age_at_comment(ages(recent_others)),
         },
+        "review_timing": review_timing or {"valid": [], "ignored": 0},
     }
 
 
@@ -305,6 +331,34 @@ def _stats_row(label: str, d: dict[str, Any]) -> str:
         f"| {label} | {d['n']} | {d['total']} | {d['min']} | {d['median']} | "
         f"{d['mean']} | {d['p90']} | {d['max']} |"
     )
+
+
+def _timing_lines(review_timing: dict[str, Any]) -> list[str]:
+    lines = [
+        "## Chronological review time (C-009)",
+        "",
+        "Only timings confirmed as valid at the end of the run are counted. Practice and",
+        "unconfirmed records are ignored. Historical weeks are re-reads, so these times",
+        "are a lower bound on first-read cost.",
+        "",
+    ]
+    rows = review_timing["valid"]
+    if rows:
+        lines += [
+            "| Week | Comments reviewed | Complete | Seconds | Seconds per comment | Run |",
+            "| --- | --- | --- | --- | --- | --- |",
+            *[
+                f"| {r['week_start']} to {r['week_end']} | {r['comments_reviewed']} of "
+                f"{r['comments_in_week']} | {'yes' if r['complete'] else 'no'} | "
+                f"{r['total_seconds']} | {r['seconds_per_comment']} | `{r['snapshot_run_id']}` |"
+                for r in rows
+            ],
+            "",
+        ]
+    else:
+        lines += ["No valid timings recorded yet.", ""]
+    lines.append(f"Practice or unconfirmed records ignored: {review_timing['ignored']}.")
+    return lines
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -393,6 +447,21 @@ def render_markdown(report: dict[str, Any]) -> str:
                 )
             else:
                 lines.append(f"- **{name}:** none (no complete weeks).")
+    replacement = report.get("replacement_typical_week")
+    if replacement:
+        week = replacement["week"]
+        lines += [
+            "",
+            f"Replacement typical week (closest to the median of {replacement['median']}, "
+            f"{replacement['basis']}, excluding {', '.join(replacement['excluded_weeks'])}): "
+            + (
+                f"{week['week_start']} to {week['week_end']}, "
+                f"{week['comments_from_others']} comments from others."
+                if week
+                else "none."
+            ),
+        ]
+    lines += ["", *_timing_lines(report["review_timing"])]
     lines += [
         "",
         "## Per calendar month",

@@ -1,6 +1,8 @@
 # Scope
 
-**Version:** 2 (2026-10-02)
+**Version:** 3 (2026-10-02)
+
+v3 adds the external interface direction (ADR-012): out of current scope, recorded as a future candidate with its limits.
 
 ## Scope rule
 
@@ -105,6 +107,7 @@ Allow the human to record that a comment led to:
 - A universal definition of comment quality.
 - Replacing platform-native moderation tools.
 - Real-time notification. Sync is on demand or scheduled; freshness requirements are not part of V1.
+- An HTTP API, MCP server, or any external interface (see ADR-012 and Future candidates).
 
 ## Future candidates, not commitments
 
@@ -118,6 +121,8 @@ If V1 produces useful evidence, later stages may investigate:
 - Clustering repeated themes across posts.
 - Lightweight acknowledgment workflows where APIs permit them.
 - Validation with a second, higher-volume author.
+- An external interface over the application service layer (ADR-012): first a local MCP server (stdio), possibly an HTTP API later. Gated on the Stage 3 result. Candidate first capabilities, in order: propagation queries ("which comments caused a change to one of my projects?"), then the attention queue as computed by the priority policy. Read-only first; writes need per-action human confirmation.
+- Person-scoped queries ("what has this commenter said about X?") are explicitly not covered by the external interface above. They depend on C-005, require a reputation-bias evaluation, and need their own ADR. Topic queries implying semantic search also need their own ADR (a new model boundary).
 
 These must not justify V1 architectural complexity unless V1 demonstrably requires it.
 

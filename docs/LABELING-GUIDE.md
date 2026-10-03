@@ -88,7 +88,7 @@ Original labels are not changed after this check. If agreement is poor, the corp
 - Labels go to `fixtures/labels/<corpus_version>/<pass>.jsonl` and batch records (start, end, hard-to-label notes) to `batches.jsonl` in the same git-ignored directory.
 - Comments are taken post by post, oldest first within a post, so no comment is labeled after a later comment from the same post has been seen.
 - Commenters are shown as "Commenter A", "Commenter B" within a thread, and the author as "You (author)". Names and handles are not shown.
-- Chronological timing for C-009: `uv run afterword label --run <full-run-id> --mode chronological --week <any date in the week>`. It shows that week's comments from others oldest first, with no labeling prompts, and writes a timing record under `reports/timing/`.
+- Chronological timing for C-009: `uv run afterword label --run <full-run-id> --mode chronological --week <any date in the week>`. It shows that week's comments from others oldest first, with no labeling prompts. At the end it asks whether to record the run as a valid timing (warning first if the average is under 2 seconds per comment). Confirmed runs are written under `reports/timing/`; anything else goes to `reports/timing/practice/` and is never evidence. Time a week before labeling it (`docs/WORKFLOW.md`).
 - Record any comment that was hard to label, and why, in the session notes. These are candidates for the adversarial set and for taxonomy revision.
 
 ## Label record

@@ -1,86 +1,65 @@
 """Command-line entry point: `afterword probe`, `afterword baseline`, `afterword label`.
 
+The CLI is a transport (ADR-012): it parses arguments, calls
+:mod:`afterword.service`, and formats what comes back.
+
 For `probe` and `baseline`, console output is limited to counts, statuses, IDs,
-and file paths. It never includes comment text, commenter names, or the API
-key. `label` is the exception by design: it shows comment text (never names)
+times, and file paths. It never includes comment text, commenter names, or the
+API key. `label` is the exception by design: it shows comment text (never names)
 in the author's own terminal, and is never run by an assistant session.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 
-from afterword import baseline, labeling
-from afterword.adapters.dev import records
-from afterword.adapters.dev.client import ENV_VAR, DevClient, MissingCredentialError
-from afterword.adapters.dev.probe import (
-    FINDINGS_FILE,
-    INDEX_FILE,
-    Probe,
-    ProbeLockedError,
-    probe_lock,
-)
+from afterword import labeling, service
+from afterword.progress import StatusLine
 
-RAW_ROOT: Path = Path("fixtures/dev-api/source/real")
-REPORT_ROOT: Path = Path("reports")
-LOCK_FILE: str = ".probe.lock"
+# Kept here for callers and tests that locate outputs through the CLI.
+RAW_ROOT: Path = service.RAW_ROOT
+REPORT_ROOT: Path = service.REPORT_ROOT
+LOCK_FILE: str = service.LOCK_FILE
 
 
-def _run_dirs(root: Path) -> list[Path]:
-    return sorted(p for p in root.iterdir() if p.is_dir()) if root.exists() else []
-
-
-def _resolve_compare(root: Path, value: str | None) -> Path | None:
-    if value is None:
-        return None
-    probe_reports = root / REPORT_ROOT / "probe"
-    if value == "latest":
-        candidates = [p for p in _run_dirs(probe_reports) if (p / INDEX_FILE).exists()]
-        if not candidates:
-            raise SystemExit("--compare-to latest: no earlier run with a comment index")
-        return candidates[-1]
-    path = probe_reports / value
-    if not (path / INDEX_FILE).exists():
-        raise SystemExit(f"--compare-to: no comment index for run {value}")
-    return path
+def _fail(error: service.ServiceError) -> int:
+    print(str(error), file=sys.stderr)
+    return error.code
 
 
 def cmd_probe(args: argparse.Namespace) -> int:
-    """Run the read-only DEV probe.
+    """Run the read-only DEV probe, with a status line and start, end, and elapsed times.
 
     :param args: Parsed arguments.
     :returns: Process exit status.
     """
-    root = Path(args.root)
-    compare = _resolve_compare(root, args.compare_to)
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    raw_dir = root / RAW_ROOT / run_id
-    report_dir = root / REPORT_ROOT / "probe" / run_id
+    status = StatusLine()
+    hooks = service.ProbeHooks(
+        request=status.request,
+        wait=status.wait,
+        step=status.step,
+        started=lambda run_id: status.start(f"probe run {run_id}"),
+        finished=lambda run_id: status.finish(f"probe run {run_id}"),
+    )
     try:
-        client = DevClient.from_env(min_interval=args.min_interval)
-    except MissingCredentialError:
-        print(f"{ENV_VAR} is not set. It is read from the environment only.", file=sys.stderr)
-        return 2
-    lock = root / REPORT_ROOT / "probe" / LOCK_FILE
-    try:
-        with probe_lock(lock), client:
-            probe = Probe(client, raw_dir, report_dir, run_id=run_id, page_size=args.page_size)
-            findings = probe.run(article=args.article, compare_to=compare)
-    except ProbeLockedError:
-        print(
-            f"another probe is running (lock file {lock}). "
-            "If no probe is running, delete the lock file and retry.",
-            file=sys.stderr,
+        result = service.run_probe(
+            Path(args.root),
+            article=args.article,
+            compare_to=args.compare_to,
+            page_size=args.page_size,
+            min_interval=args.min_interval,
+            hooks=hooks,
         )
-        return 3
+    except service.ServiceError as exc:
+        return _fail(exc)
 
+    findings = result.findings
     comments = findings.get("comments", {})
-    print(f"run {run_id}: {findings['outcome']} (scope {findings['scope']})")
+    print(f"run {result.run_id}: {findings['outcome']} (scope {findings['scope']})")
     print(
         f"requests sent: {findings['rate_limits']['requests_sent']}, "
         f"429s: {findings['rate_limits']['responses_429']}"
@@ -98,30 +77,8 @@ def cmd_probe(args: argparse.Namespace) -> int:
         )
     for item in findings["limitations"]:
         print(f"limitation: {item}")
-    print(f"findings: {report_dir / FINDINGS_FILE}")
+    print(f"findings: {result.findings_path}")
     return 0 if findings["outcome"] != "FAILED" else 1
-
-
-def _full_run(root: Path, run_id: str) -> Path | None:
-    """Find a saved full-scope run that did not fail, printing why if there is none.
-
-    :param root: Repository root.
-    :param run_id: Probe run ID.
-    :returns: The run's raw directory, or ``None``.
-    """
-    run_file = root / RAW_ROOT / run_id / records.RUN_FILE
-    if not run_file.exists():
-        print(f"no probe run {run_id}", file=sys.stderr)
-        return None
-    run = json.loads(run_file.read_text(encoding="utf-8"))
-    if run.get("scope") != "all" or run.get("outcome") == "FAILED":
-        print(
-            f"run {run_id} is scope {run.get('scope')}, outcome {run.get('outcome')}; "
-            "this needs a full-scope run that did not fail",
-            file=sys.stderr,
-        )
-        return None
-    return run_file.parent
 
 
 def cmd_baseline(args: argparse.Namespace) -> int:
@@ -130,27 +87,37 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     :param args: Parsed arguments.
     :returns: Process exit status.
     """
-    # The run is always explicit, so a run containing test comments is never picked
-    # up by default; the report records which run it came from.
-    root = Path(args.root)
-    run_dir = _full_run(root, args.run)
-    if run_dir is None:
+    try:
+        exclude = [date.fromisoformat(d) for d in args.exclude_week or []]
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 2
-    obs = records.load_run(run_dir)
-    as_of = (obs.finished_at or datetime.now(UTC)).date()
-    report = baseline.build(obs, as_of=as_of)
-    out = root / REPORT_ROOT / f"baseline-{obs.run_id}.md"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(baseline.render_markdown(report), encoding="utf-8")
-    (root / REPORT_ROOT / f"baseline-{obs.run_id}.json").write_text(
-        json.dumps(report, indent=2) + "\n", encoding="utf-8"
-    )
-    t = report["totals"]
+    try:
+        result = service.build_baseline(Path(args.root), args.run, exclude_weeks=exclude)
+    except service.ServiceError as exc:
+        return _fail(exc)
+    t = result.report["totals"]
     print(
         f"articles {t['articles']}, comments {t['comments']} "
         f"(others {t['comments_from_others']}, author {t['comments_by_author']})"
     )
-    print(f"report: {out}")
+    rt = result.report["review_timing"]
+    print(
+        f"valid review timings: {len(rt['valid'])}, "
+        f"practice or unconfirmed ignored: {rt['ignored']}"
+    )
+    replacement = result.report["replacement_typical_week"]
+    if replacement:
+        week = replacement["week"]
+        print(
+            "replacement typical week: "
+            + (
+                f"{week['week_start']} ({week['comments_from_others']} comments from others)"
+                if week
+                else "none"
+            )
+        )
+    print(f"report: {result.markdown_path}")
     return 0
 
 
@@ -178,27 +145,24 @@ def cmd_label(args: argparse.Namespace) -> int:
     if args.ids:
         lines = Path(args.ids).read_text(encoding="utf-8").splitlines()
         only_ids = {line.strip() for line in lines if line.strip()}
-    run_dir = _full_run(root, args.run)
-    if run_dir is None:
-        return 2
+    try:
+        session = service.open_for_labeling(root, args.run)
+    except service.ServiceError as exc:
+        return _fail(exc)
 
     # Comment text can hold any character; never crash the session on one.
     reconfigure = getattr(sys.stdout, "reconfigure", None)
     if reconfigure is not None:
         reconfigure(errors="replace")
-    snap = labeling.Snapshot(records.load_run(run_dir, include_text=True))
-    finished = snap.obs.finished_at
-    if finished is None or datetime.now(UTC) - finished > labeling.STALE_AFTER:
-        age = (
-            "an unknown time" if finished is None else f"{(datetime.now(UTC) - finished).days} days"
-        )
+    if session.stale:
+        age = "an unknown time" if session.age is None else f"{session.age.days} days"
         print(
             f"warning: run {args.run} finished {age} ago. Comments deleted upstream since "
             "then are still shown (ADR-009). Run a fresh full probe before labeling."
         )
-    excluded = snap.excluded_counts()
+    excluded = session.excluded
     print(
-        f"run {args.run}: {len(snap.subjects())} comments to label; not labeled: "
+        f"run {args.run}: {session.subjects} comments to label; not labeled: "
         f"{excluded['by_author']} by the author, {excluded['deletion_placeholders']} deletion "
         f"placeholders, {excluded['unexpected_shapes']} unexpected shapes, "
         f"{excluded['undated']} undated"
@@ -206,15 +170,15 @@ def cmd_label(args: argparse.Namespace) -> int:
     if excluded["unexpected_shapes"]:
         print("warning: unexpected shapes need a friction entry before this run is used (ADR-009)")
     if only_ids is not None:
-        known = {c.source_object_id for c in snap.subjects()}
+        known = service.labelable_ids(session)
         print(f"--ids: {len(only_ids & known)} of {len(only_ids)} IDs are labelable in this run")
 
     console = labeling.Console()
     if week is not None:
-        labeling.run_chronological(snap, console, root=root, week=week)
+        service.time_week(session, console, root=root, week=week)
         return 0
-    labeling.run_labeling(
-        snap,
+    service.label_batch(
+        session,
         console,
         root=root,
         pass_name=args.pass_name,
@@ -246,6 +210,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     base = sub.add_parser("baseline", help="C-009 volume baseline from a probe run")
     base.add_argument("--run", required=True, help="full-scope probe run ID")
+    base.add_argument(
+        "--exclude-week",
+        action="append",
+        metavar="DATE",
+        help="a week already re-read (any date in it); repeat for each. With this, the "
+        "report names the replacement typical week closest to the trailing-13 median",
+    )
     base.set_defaults(func=cmd_baseline)
 
     label = sub.add_parser(

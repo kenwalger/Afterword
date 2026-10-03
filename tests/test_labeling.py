@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from afterword import cli, labeling
+from afterword import cli, labeling, timing
 from afterword.adapters.dev import records
 from afterword.adapters.dev.client import DevClient
 from afterword.adapters.dev.probe import Probe
@@ -309,7 +309,7 @@ def test_unsafe_names_are_refused(tmp_path, fake_dev):
 
 def test_chronological_mode_times_one_week_in_order(tmp_path, fake_dev):
     snap = snapshot(tmp_path)
-    script = Script(["", "", ""])
+    script = Script(["", "", "", "y"])
     clock = ticker(2.0)
     out = labeling.run_chronological(
         snap,
@@ -329,6 +329,10 @@ def test_chronological_mode_times_one_week_in_order(tmp_path, fake_dev):
     assert [c["comment_id"] for c in record["per_comment_seconds"]] == ["s1a1", "s1b1"]
     assert [c["seconds"] for c in record["per_comment_seconds"]] == [2.0, 2.0]
     assert record["total_seconds"] == 10.0  # includes the start prompt
+    assert record["seconds_per_comment"] == 5.0
+    assert record["valid"] is True
+    assert "Record this as a valid timing? (y/n) " in script.prompts
+    assert not any("Warning" in line for line in script.out)
     assert not any(p.startswith(("Class", "Prospective")) for p in script.prompts)
     for name in NAMES:
         assert name not in json.dumps(record)
@@ -336,13 +340,77 @@ def test_chronological_mode_times_one_week_in_order(tmp_path, fake_dev):
 
 def test_chronological_mode_records_a_stopped_review(tmp_path, fake_dev):
     snap = snapshot(tmp_path)
-    out = labeling.run_chronological(
-        snap, Script(["", "", "q"]).console, root=tmp_path, week=date(2026, 8, 3)
-    )
+    script = Script(["", "", "q"])
+    out = labeling.run_chronological(snap, script.console, root=tmp_path, week=date(2026, 8, 3))
     assert out is not None
     record = json.loads(out.read_text(encoding="utf-8"))
     assert record["complete"] is False
     assert record["comments_reviewed"] == 1
+    # The validity question is still asked; end of input means practice.
+    assert "stopped before the end of the week" in script.text
+    assert record["valid"] is False
+    assert out.parent == tmp_path / labeling.TIMING_ROOT / timing.PRACTICE_DIR
+
+
+def chronological(tmp_path: Path, answers: list[str], step: float) -> tuple[Path, Script]:
+    snap = snapshot(tmp_path)
+    script = Script(answers)
+    clock = ticker(step)
+    out = labeling.run_chronological(
+        snap,
+        script.console,
+        root=tmp_path,
+        week=date(2026, 8, 3),
+        now=lambda: NOW,
+        monotonic=lambda: next(clock),
+    )
+    assert out is not None
+    return out, script
+
+
+def test_a_fast_review_warns_before_asking(tmp_path, fake_dev):
+    # 0.5 s per clock tick: about 1.25 s per comment, under the 2 s floor.
+    seen_at_prompt: list[str] = []
+    snap = snapshot(tmp_path)
+    script = Script(["", "", "", "y"])
+    read = script.read
+
+    def read_and_note(prompt: str) -> str:
+        if prompt.startswith("Record this"):
+            seen_at_prompt.extend(script.out)
+        return read(prompt)
+
+    clock = ticker(0.5)
+    out = labeling.run_chronological(
+        snap,
+        labeling.Console(read_and_note, script.write),
+        root=tmp_path,
+        week=date(2026, 8, 3),
+        now=lambda: NOW,
+        monotonic=lambda: next(clock),
+    )
+    assert out is not None
+    assert any(line.startswith("Warning: 1.2 seconds per comment") for line in seen_at_prompt)
+    record = json.loads(out.read_text(encoding="utf-8"))
+    # A warned run the reviewer still confirms is recorded as valid, with its average.
+    assert record["valid"] is True
+    assert record["seconds_per_comment"] < timing.MIN_SECONDS_PER_COMMENT
+
+
+@pytest.mark.parametrize("answers", [["n"], ["maybe", "n"], ["q"], []])
+def test_anything_but_yes_is_saved_as_practice(tmp_path, fake_dev, answers):
+    out, script = chronological(tmp_path, ["", "", "", *answers], step=3.0)
+    assert out.parent == tmp_path / labeling.TIMING_ROOT / timing.PRACTICE_DIR
+    assert json.loads(out.read_text(encoding="utf-8"))["valid"] is False
+    assert "Practice run, not counted as evidence" in script.text
+    if answers[:1] == ["maybe"]:
+        assert "Answer y or n." in script.text
+
+
+def test_a_review_stopped_before_any_comment_is_practice_without_asking(tmp_path, fake_dev):
+    out, script = chronological(tmp_path, ["", "q"], step=3.0)
+    assert out.parent.name == timing.PRACTICE_DIR
+    assert not any("valid timing" in p for p in script.prompts)
 
 
 def test_chronological_mode_with_an_empty_week_writes_nothing(tmp_path, fake_dev):
@@ -398,6 +466,7 @@ def test_every_output_path_is_git_ignored():
         labeling.LABEL_ROOT / "corpus-v1" / "self_agreement.jsonl",
         labeling.LABEL_ROOT / "unfrozen" / "batches.jsonl",
         labeling.TIMING_ROOT / "chronological-2026-09-21-20261009T180000Z.json",
+        labeling.TIMING_ROOT / timing.PRACTICE_DIR / "chronological-2026-09-21-x.json",
     ]
     for path in paths:
         result = subprocess.run(

@@ -8,10 +8,11 @@ commit (tracked, plus untracked files that are not ignored).
 Prints counts per file only. Never prints a matched value.
 
 Exception: the author's own handle, name, and email are allowed in
-`pyproject.toml` (package metadata) and `NOTICE` (license attribution). Other
-commenters' terms are enforced in every file, including those two. A commenter
-term that is a whole word of the author's own identity (such as a shared first
-name) counts as author identity, so it is allowed only in those two files.
+`pyproject.toml` (package metadata), `NOTICE` (license attribution), and
+`README.md` (the repository's clone URL). Other commenters' terms are enforced
+in every file, including those three. A commenter term that is a whole word of
+the author's own identity (such as a shared first name) counts as author
+identity, so it is allowed only in those three files.
 
 Usage: uv run python scripts/check_committable.py
 Runs as the pre-commit hook in scripts/hooks/ (install: git config core.hooksPath scripts/hooks).
@@ -28,8 +29,9 @@ from pathlib import Path
 from afterword.adapters.dev.records import identity_terms
 
 RAW_ROOT: Path = Path("fixtures/dev-api/source/real")
-# Files whose job is to name the author: package metadata and the license NOTICE.
-AUTHOR_IDENTITY_ALLOWED_IN: frozenset[str] = frozenset({"pyproject.toml", "NOTICE"})
+# Files whose job is to name the author: package metadata, the license NOTICE, and
+# the README (its clone URL contains the author's handle).
+AUTHOR_IDENTITY_ALLOWED_IN: frozenset[str] = frozenset({"pyproject.toml", "NOTICE", "README.md"})
 # Synthetic fixture addresses and documentation placeholders are not identities.
 EMAIL_SHAPE: re.Pattern[str] = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 SAFE_EMAIL_SUFFIXES: tuple[str, ...] = (".invalid", "@example.com")
@@ -108,7 +110,7 @@ def main() -> int:
         allowed = name in AUTHOR_IDENTITY_ALLOWED_IN
         bad = n_others + n_shaped + (0 if allowed else n_author + n_email)
         violations += bad
-        status = "VIOLATION" if bad else "allowed (author identity in metadata or NOTICE)"
+        status = "VIOLATION" if bad else "allowed (author identity in an allowed file)"
         print(
             f"{name}: author_terms={n_author} other_terms={n_others} "
             f"author_email={n_email} other_email_shaped={n_shaped} -> {status}"
