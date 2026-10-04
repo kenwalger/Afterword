@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 7 (2026-10-04)
+**Version:** 8 (2026-10-04)
+
+v8 (2026-10-04, `tax-v0.2`) records `CONTAINS_CODE` and `CONTAINS_LINK` as structural flags in `flags_by_source`. Nothing earlier is removed.
 
 v7 (2026-10-04, with 150 `dev` labels recorded) adds the `calibration` value of EvaluationLabel `pass` and states which label analysis uses (`LABELING-GUIDE.md` `lg-v0.3`). Nothing earlier is removed.
 
@@ -166,7 +168,7 @@ A model interpretation of a comment. Never part of the comment itself.
 - `taxonomy_version`
 - `primary_class`
 - `flags` (list)
-- `flags_by_source` (which flags came from the model, from structure such as `REPLY_TO_AUTHOR`, and from the deterministic pre-check)
+- `flags_by_source` (which flags came from the model, from structure (`REPLY_TO_AUTHOR`, and from `tax-v0.2` `CONTAINS_CODE` and `CONTAINS_LINK`, set from the comment's normalization for B1 and B2 alike), and from the deterministic pre-check)
 - `confidence` (value state; `LOW`, `MEDIUM`, or `HIGH` when `PRESENT`; `NOT_EXPOSED` for a heuristic)
 - `explanation`
 - `classifier_kind` (`HEURISTIC` for B1, `MODEL` for B2 and secondary models)

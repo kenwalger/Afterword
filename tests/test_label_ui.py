@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import http.client
 import json
 import re
@@ -12,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from afterword import cli, label_ui, labeling, service
+from afterword import cli, label_ui, label_ui_page, labeling, service
 from afterword.label_ui_page import PAGE
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
 from tests.test_labeling import NAMES, Script, label_answers, lines, make_run, ticker
@@ -207,6 +208,16 @@ def test_state_shows_as_of_context_with_pseudonyms_only(tmp_path, fake_dev):
     assert comment["reply_to_author"] is True
     assert [t["who"] for t in comment["thread"]] == ["Commenter A", "You (author)", "Commenter A"]
     assert comment["thread"][-1]["is_this"] is True
+    # tax-v0.2: shown read-only, from normalization; no key toggles them.
+    assert comment["structural_flags"] == ["REPLY_TO_AUTHOR", "CONTAINS_CODE"]
+    assert {f["name"] for f in state["taxonomy"]["structural_flags"]} == {
+        "REPLY_TO_AUTHOR",
+        "CONTAINS_CODE",
+        "CONTAINS_LINK",
+    }
+    assert {f["name"] for f in state["taxonomy"]["flags"]}.isdisjoint(
+        {"CONTAINS_CODE", "CONTAINS_LINK"}
+    )
     text = json.dumps(state)
     for name in NAMES:
         assert name not in text
@@ -220,6 +231,8 @@ def test_invalid_labels_are_refused_and_nothing_is_written(tmp_path, fake_dev):
         {"primary_class": None},
         {"primary_class": "NOT_A_CLASS"},
         {"flags": ["REPLY_TO_AUTHOR"]},
+        {"flags": ["CONTAINS_CODE"]},  # structural from tax-v0.2: never the labeler's
+        {"flags": ["CONTAINS_LINK"]},
         {"flags": "CONTAINS_CODE"},
         {"prospective": None},
         {"prospective": True},
@@ -409,10 +422,29 @@ def test_cli_label_ui_validates_like_label(tmp_path, fake_dev, capsys):
 def test_the_page_is_self_contained_and_inserts_text_safely():
     assert PAGE.isascii()
     assert not re.search(r"https?://", PAGE)
-    assert not re.search(r"<(?:link|img|iframe)\b|\bsrc\s*=|@import|url\(", PAGE)
+    # The only <link> elements are the inlined favicons (data URIs, nothing fetched).
+    icons = re.findall(
+        r'<link rel="icon" type="image/png" sizes="\d+x\d+" href="data:[^"]+">', PAGE
+    )
+    assert len(icons) == 2
+    rest = PAGE
+    for icon in icons:
+        rest = rest.replace(icon, "")
+    assert not re.search(r"<(?:link|img|iframe)\b|\bsrc\s*=|@import|url\(", rest)
     assert "innerHTML" not in PAGE and "outerHTML" not in PAGE
     assert "insertAdjacentHTML" not in PAGE and "eval(" not in PAGE
     assert "textContent" in PAGE
+
+
+def test_the_favicon_is_the_aw_mark_inlined_byte_for_byte():
+    root = Path(__file__).resolve().parents[1]
+    for size, data in (
+        (16, label_ui_page.FAVICON_16_PNG_B64),
+        (32, label_ui_page.FAVICON_32_PNG_B64),
+    ):
+        assert base64.b64decode(data) == (root / "img" / f"favicon-{size}x{size}.png").read_bytes()
+        assert f"base64,{data}" in PAGE
+    assert "__FAVICON" not in PAGE
 
 
 def test_keys_are_distinct_and_cover_every_class_and_labeler_flag():

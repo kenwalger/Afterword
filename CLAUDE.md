@@ -12,7 +12,7 @@ Rules for any session working in this repository.
 
 **Stage 0** of `docs/ROADMAP.md` is finishing in parallel with **Stage 1 to 3a groundwork** (plan approved 2026-10-03, session 4).
 
-- Stage 0 done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Timed chronological reviews done (2026-10-03, recorded in `CLAIMS.md` 2026-10-04). Remaining, by the author: labeling the `dev` corpus, and the Stage 0 gate decision on C-009.
+- Stage 0 done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Timed chronological reviews done (2026-10-03, recorded in `CLAIMS.md` 2026-10-04). Stage 0 gate decided 2026-10-04: continue as planned (C-012 added). Remaining, by the author: labeling the `dev` corpus, from 2026-10-04 with `--posts random --seed N`. Analyses of partial labels report publication-order and shuffled labels separately (`afterword.label_records.split_by_post_order`).
 - Groundwork in scope, all of it independent of labels and real comment data, all through the service layer (ADR-012):
   1. Docs: `DATA-MODEL` v5, `PRIORITY-POLICY` clarifications, `EVALUATION` v4, model-boundary records in `PRIVACY-AND-BOUNDARIES` v3.
   2. Normalization `norm-v0.1` (separate from the labeling tool's `display-v0.1`) and edit detection by normalized text.

@@ -82,7 +82,9 @@ def lines(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def label_answers(cls: str = "3", flags: str = "4", pro: str = "2", retro: str = "3") -> list[str]:
+# Labeler flag menu (tax-v0.2): 1 NEEDS_THREAD_CONTEXT, 2 REFERENCES_SPECIFIC_CLAIM,
+# 3 ADDRESSED_TO_OTHER_COMMENTER, 4 HOSTILE_TONE, 5 POSSIBLE_INSTRUCTION_TEXT.
+def label_answers(cls: str = "3", flags: str = "2", pro: str = "2", retro: str = "3") -> list[str]:
     return [cls, flags, pro, retro, "needs an answer", "", ""]
 
 
@@ -189,7 +191,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "corpus_set": "dev",
         "sample_kind": "researcher",
         "label_guide_version": "lg-v0.3",
-        "taxonomy_version": "tax-v0.1",
+        "taxonomy_version": "tax-v0.2",
         "normalization_version": "display-v0.1",
         "primary_class": "TECHNICAL_QUESTION",
         "flags": ["REFERENCES_SPECIFIC_CLAIM"],
@@ -227,7 +229,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
 
 def test_q_at_the_save_prompt_saves_the_label_and_its_note_then_stops(tmp_path, fake_dev):
     snap = snapshot(tmp_path)
-    answers = ["3", "4", "2", "3", "needs an answer", "hard one", "q"]
+    answers = ["3", "2", "2", "3", "needs an answer", "hard one", "q"]
     script = Script(answers)
     assert run(snap, tmp_path, script) == 1
     out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
@@ -252,7 +254,7 @@ def test_end_of_input_at_the_save_prompt_also_saves(tmp_path, fake_dev):
 
 def test_quit_with_answers_entered_says_so_and_records_it(tmp_path, fake_dev):
     snap = snapshot(tmp_path)
-    script = Script(["3", "4", "q"])
+    script = Script(["3", "2", "q"])
     assert run(snap, tmp_path, script) == 0
     out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
     assert not (out / "initial.jsonl").exists()
@@ -356,6 +358,7 @@ def test_cli_label_status_prints_counts_only(tmp_path, fake_dev, capsys, monkeyp
     assert "labeled 1, remaining 3 (pass initial)" in out
     assert "labeled comments by pass: initial 1, calibration 0, self_agreement 0" in out
     assert "labels by tool: terminal 1, browser 0, not recorded 0" in out
+    assert "labels by post order: published 1, random 0\n" in out
     for text in (*NAMES, "needs an answer", "TECHNICAL_QUESTION", "s1a1", "Synthetic"):
         assert text not in out
 
@@ -402,7 +405,7 @@ def test_redo_restarts_the_label(tmp_path, fake_dev):
 
 def test_help_lists_every_class_and_flag_with_a_definition(tmp_path, fake_dev):
     snap = snapshot(tmp_path)
-    script = Script(["h", "1", "h", "4", "2", "3", "needs an answer", "", ""])
+    script = Script(["h", "1", "h", "2", "2", "3", "needs an answer", "", ""])
     run(snap, tmp_path, script)
     helps = [o for o in script.out if o == taxonomy.help_text()]
     assert len(helps) == 2  # once at the class prompt, once at the flags prompt
@@ -453,8 +456,10 @@ def test_batch_size_is_capped_and_ids_restrict_the_queue(tmp_path, fake_dev):
     out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
     (label,) = lines(out / "self_agreement.jsonl")
     assert label["comment_id"] == "s1a3"
-    assert label["flags"] == ["REPLY_TO_AUTHOR", "REFERENCES_SPECIFIC_CLAIM"]
-    assert "REPLY_TO_AUTHOR is set automatically" in script.text
+    # s1a3 replies to the author and has inline code: both set by the tool.
+    assert label["flags"] == ["REPLY_TO_AUTHOR", "CONTAINS_CODE", "REFERENCES_SPECIFIC_CLAIM"]
+    assert "Set automatically: REPLY_TO_AUTHOR, CONTAINS_CODE." in script.text
+    assert "CONTAINS_CODE" not in labeling.LABELER_FLAGS
 
 
 def test_unsafe_names_are_refused(tmp_path, fake_dev):

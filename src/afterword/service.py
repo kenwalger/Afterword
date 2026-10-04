@@ -751,6 +751,25 @@ def _union(by_source: dict[str, list[str]]) -> tuple[str, ...]:
     return tuple(f for f in taxonomy.FLAGS if any(f in v for v in by_source.values()))
 
 
+def structural_flags(c: domain.Comment, *, reply_to_author: bool) -> list[str]:
+    """Return the flags a comment carries by structure, the same for B1 and B2.
+
+    ``REPLY_TO_AUTHOR`` from the thread, and, from `tax-v0.2`, ``CONTAINS_CODE``
+    and ``CONTAINS_LINK`` from the comment's normalization. Neither condition
+    sets them by judgment.
+
+    :param c: A stored comment with its source body.
+    :param reply_to_author: Whether its parent was written by the post's author.
+    :returns: Flag names in taxonomy order.
+    """
+    found = set(
+        normalize.content_flags(normalize.normalize(c.body_source, c.body_source_format or "HTML"))
+    )
+    if reply_to_author:
+        found.add(taxonomy.REPLY_TO_AUTHOR)
+    return [f for f in taxonomy.FLAGS if f in found]
+
+
 def _b1(
     cid: str,
     c: domain.Comment,
@@ -955,7 +974,7 @@ def classify_comments(
             )
             pre = precheck.precheck(inp.comment)
             extra = {
-                "structure": [taxonomy.REPLY_TO_AUTHOR] if reply_to_author else [],
+                "structure": structural_flags(c, reply_to_author=reply_to_author),
                 "precheck": [taxonomy.POSSIBLE_INSTRUCTION_TEXT] if pre.flagged else [],
             }
             k = repo.find_classification(cid, c.comment_id, key, (domain.OK, domain.MALFORMED))

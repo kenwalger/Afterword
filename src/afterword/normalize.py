@@ -33,6 +33,7 @@ import unicodedata
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
+from afterword import taxonomy
 from afterword.display import strip_controls
 
 NORMALIZATION_VERSION: str = "norm-v0.1"
@@ -99,6 +100,24 @@ class NormalizedText:
         :returns: ``True`` when any link was found.
         """
         return bool(self.links)
+
+
+def content_flags(normalized: NormalizedText) -> frozenset[str]:
+    """Set the deterministic content flags (`tax-v0.2`) from normalized structure.
+
+    ``CONTAINS_CODE`` when the comment has a code block or any inline code span;
+    ``CONTAINS_LINK`` when it has at least one link. Never judged by a labeler
+    or a model.
+
+    :param normalized: The comment's normalized text and structure.
+    :returns: A subset of :data:`afterword.taxonomy.CONTENT_FLAGS`.
+    """
+    flags = set()
+    if normalized.has_code:
+        flags.add(taxonomy.CONTAINS_CODE)
+    if normalized.has_link:
+        flags.add(taxonomy.CONTAINS_LINK)
+    return frozenset(flags)
 
 
 def text_hash(text: str) -> str:

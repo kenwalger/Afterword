@@ -1,4 +1,4 @@
-"""The taxonomy (`tax-v0.1`) as data: classes, flags, and one-line definitions.
+"""The taxonomy (`tax-v0.2`) as data: classes, flags, and one-line definitions.
 
 `docs/TAXONOMY.md` is the source of truth. This module mirrors it so that the
 labeling tool's help screen, the heuristic baseline, and the classifier prompt
@@ -8,7 +8,7 @@ document.
 
 from __future__ import annotations
 
-TAXONOMY_VERSION: str = "tax-v0.1"
+TAXONOMY_VERSION: str = "tax-v0.2"
 
 # Precedence order from TAXONOMY.md, then UNCERTAIN (never a tie-break).
 CLASSES: tuple[str, ...] = (
@@ -35,19 +35,21 @@ CLASS_DEFINITIONS: dict[str, str] = {
     "TECHNICAL_EXTENSION": "Adds technical substance without disputing anything.",
     "CONVERSATIONAL": "Discussion with a specific point, but nothing that needs action.",
     "LIGHTWEIGHT_ACKNOWLEDGMENT": "Thanks, praise, or agreement with no further content.",
-    "LIKELY_SPAM_OR_NOISE": "Off-topic promotion, generated filler, link drops, unrelated text.",
+    "LIKELY_SPAM_OR_NOISE": "Promotion as its main purpose (on-topic or not), filler, link drops.",
     "UNCERTAIN": "Cannot choose with reasonable confidence, or meaning needs missing context.",
 }
 
 REPLY_TO_AUTHOR: str = "REPLY_TO_AUTHOR"
 POSSIBLE_INSTRUCTION_TEXT: str = "POSSIBLE_INSTRUCTION_TEXT"
+CONTAINS_CODE: str = "CONTAINS_CODE"
+CONTAINS_LINK: str = "CONTAINS_LINK"
 
 # Table order from TAXONOMY.md.
 FLAGS: tuple[str, ...] = (
     "NEEDS_THREAD_CONTEXT",
     REPLY_TO_AUTHOR,
-    "CONTAINS_CODE",
-    "CONTAINS_LINK",
+    CONTAINS_CODE,
+    CONTAINS_LINK,
     "REFERENCES_SPECIFIC_CLAIM",
     "ADDRESSED_TO_OTHER_COMMENTER",
     "HOSTILE_TONE",
@@ -57,18 +59,21 @@ FLAGS: tuple[str, ...] = (
 FLAG_DEFINITIONS: dict[str, str] = {
     "NEEDS_THREAD_CONTEXT": "Meaning depends on the parent comment or thread.",
     REPLY_TO_AUTHOR: "Direct reply to a comment by the post's author. Set structurally.",
-    "CONTAINS_CODE": "Includes a code block or inline code of substance.",
-    "CONTAINS_LINK": "Includes one or more links.",
+    CONTAINS_CODE: "Includes a code block or inline code. Set from normalization.",
+    CONTAINS_LINK: "Includes one or more links. Set from normalization.",
     "REFERENCES_SPECIFIC_CLAIM": (
-        "Points at a specific sentence, step, figure, or claim in the post."
+        "Points at the exact sentence, step, figure, or claim in the post; not its topic."
     ),
     "ADDRESSED_TO_OTHER_COMMENTER": "Primarily directed at someone other than the author.",
     "HOSTILE_TONE": "Rude or aggressive tone. Does not change the primary class.",
     POSSIBLE_INSTRUCTION_TEXT: "Reads as instructions to an automated system.",
 }
 
-# Flags that come from structure, never from a labeler's or model's judgment.
-STRUCTURAL_FLAGS: frozenset[str] = frozenset({REPLY_TO_AUTHOR})
+# Flags read from the normalized text (`norm-v0.1` and successors), never judged.
+CONTENT_FLAGS: frozenset[str] = frozenset({CONTAINS_CODE, CONTAINS_LINK})
+# Flags that come from structure, never from a labeler's or model's judgment
+# (tax-v0.2: the code and link flags joined REPLY_TO_AUTHOR).
+STRUCTURAL_FLAGS: frozenset[str] = frozenset({REPLY_TO_AUTHOR}) | CONTENT_FLAGS
 
 
 def help_text() -> str:

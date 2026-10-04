@@ -96,8 +96,6 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 | --- | --- |
 | `1` to `9`, `0` | Class, in TAXONOMY.md precedence order (`0` is `UNCERTAIN`) |
 | `n` | `NEEDS_THREAD_CONTEXT` |
-| `c` | `CONTAINS_CODE` |
-| `l` | `CONTAINS_LINK` |
 | `r` | `REFERENCES_SPECIFIC_CLAIM` |
 | `o` | `ADDRESSED_TO_OTHER_COMMENTER` |
 | `x` | `HOSTILE_TONE` |
@@ -114,7 +112,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 | `q` | Stop the session (asks to confirm while a comment is open) |
 | `b` | After a batch: start the next batch |
 
-Flag keys toggle. Every key except Enter and Esc is ignored while typing in a text field. A label is saved only when it has a class and a prospective grade, plus a reason for a grade of 2 or 3; otherwise the page says what is missing.
+Flag keys toggle. From `tax-v0.2` (2026-10-04) `CONTAINS_CODE` and `CONTAINS_LINK` are set from normalization and shown read-only, marked `auto`, beside `REPLY_TO_AUTHOR`; the `c` and `l` keys no longer exist. In the terminal the flag menu lists only the flags you choose (1 `NEEDS_THREAD_CONTEXT`, 2 `REFERENCES_SPECIFIC_CLAIM`, 3 `ADDRESSED_TO_OTHER_COMMENTER`, 4 `HOSTILE_TONE`, 5 `POSSIBLE_INSTRUCTION_TEXT`), and the automatic ones are named under it. Every key except Enter and Esc is ignored while typing in a text field. A label is saved only when it has a class and a prospective grade, plus a reason for a grade of 2 or 3; otherwise the page says what is missing.
 
 ### Resuming and stopping
 
@@ -135,7 +133,7 @@ Flag keys toggle. Every key except Enter and Esc is ignored while typing in a te
 uv run afterword label status --run <run-id>
 ```
 
-Prints, for the run and corpus version: eligible comments, labeled and remaining (initial pass), labeled comments by pass, labels by tool (`terminal`, `browser`, or `not recorded` for batches from before 2026-10-04, when the tool started being recorded), and any labeled comment no longer eligible in the run. Counts only: no classes, grades, IDs, or text. Progress while labeling is always totals only, so a running distribution cannot steer the next label.
+Prints, for the run and corpus version: eligible comments, labeled and remaining (initial pass), labeled comments by pass, labels by tool (`terminal`, `browser`, or `not recorded` for batches from before 2026-10-04, when the tool started being recorded), labels by post order (`published` or `random`, from each batch record), and any labeled comment no longer eligible in the run. Counts only: no classes, grades, IDs, or text. Progress while labeling is always totals only, so a running distribution cannot steer the next label.
 
 ### Calibration pass
 

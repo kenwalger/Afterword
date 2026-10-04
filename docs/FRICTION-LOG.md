@@ -14,7 +14,7 @@ This file is the index of the public friction log. The entries are in one file p
 | 4: Stage 1 to 3a groundwork, part 1 | 2026-10-03 | [`session-4.md`](friction-log/session-4.md) | "The first pre-check patterns matched ordinary prose"; "The cache key covers the whole model input"; "Line-ending conversion would change fixture hashes"; "A non-ASCII scan of the session notes printed real comment text". |
 | 5: label UI, store, classifier, providers | 2026-10-03 to 2026-10-04 | [`session-5.md`](friction-log/session-5.md) | "The deterministic pre-check carried the injection results (ADR-007, ADR-008)"; "Explanations complied with injections even when tiers held"; "Qwen over-flags: model-set flags raised 10 of 54 tiers"; "Label integrity check: 27 labels, not 29". |
 | 6: documentation housekeeping | 2026-10-04 | [`session-6.md`](friction-log/session-6.md) | "When the terminal labeling tool writes a label" (`q` at the `Save?` prompt discards that comment); "Line endings: 45 working files were CRLF, not 11". |
-| 7: labeling-facing work, then experimental changes | 2026-10-04 | [`session-7.md`](friction-log/session-7.md) | "Open items in session summaries were out of date"; "C-009: the typical week meets the falsification condition"; "The terminal tool's quit path, fixed". |
+| 7: labeling-facing work, then experimental changes | 2026-10-04 | [`session-7.md`](friction-log/session-7.md) | "Open items in session summaries were out of date"; "C-009: the typical week meets the falsification condition"; "The terminal tool's quit path, fixed"; "Oracle ceiling: pp-v0.1 caps review reduction near 18% on these labels"; "Removing code and link flags moved the pressure onto the others". |
 
 ## Adding a session
 

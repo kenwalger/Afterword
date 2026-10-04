@@ -31,7 +31,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from afterword import label_records, taxonomy, timing
+from afterword import label_records, normalize, taxonomy, timing
 from afterword.baseline import week_start
 from afterword.display import DISPLAY_VERSION, html_to_display_text, strip_controls
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
@@ -60,6 +60,8 @@ POST_ORDERS: tuple[str, ...] = ("published", "random")
 CLASSES: tuple[str, ...] = taxonomy.CLASSES
 # REPLY_TO_AUTHOR is structural (TAXONOMY.md) and set by the tool, not chosen.
 REPLY_TO_AUTHOR: str = taxonomy.REPLY_TO_AUTHOR
+# From tax-v0.2 the code and link flags are structural too: the tool sets them
+# from the comment's classification normalization, shown read-only.
 LABELER_FLAGS: tuple[str, ...] = tuple(
     f for f in taxonomy.FLAGS if f not in taxonomy.STRUCTURAL_FLAGS
 )
@@ -358,6 +360,25 @@ class Snapshot:
         parent = self.by_id.get(c.parent_source_object_id or "")
         return bool(parent and parent.is_content_author and not parent.is_deletion_placeholder)
 
+    def structural_flags(self, c: ObservedComment) -> list[str]:
+        """Return the flags the tool sets for a comment, never the labeler.
+
+        ``REPLY_TO_AUTHOR`` from the thread, and ``CONTAINS_CODE`` and
+        ``CONTAINS_LINK`` from the comment's classification normalization
+        (`norm-v0.1`), not from the display rendering.
+
+        :param c: A comment.
+        :returns: Flag names in taxonomy order.
+        """
+        found = set(
+            normalize.content_flags(
+                normalize.normalize(c.body_source, c.body_source_format or "HTML")
+            )
+        )
+        if self.reply_to_author(c):
+            found.add(REPLY_TO_AUTHOR)
+        return [f for f in taxonomy.FLAGS if f in found]
+
     def author_replied(self, c: ObservedComment) -> bool:
         """Report whether the author's direct reply to a comment exists in this run.
 
@@ -512,8 +533,9 @@ def make_label(
 ) -> dict[str, Any]:
     """Build one label record, the same for every transport (terminal or browser).
 
-    ``REPLY_TO_AUTHOR`` is structural: it is added here when the comment replies
-    to the author, and refused if a labeler supplies it.
+    Structural flags are added here and refused if a labeler supplies one:
+    ``REPLY_TO_AUTHOR`` when the comment replies to the author, and, from
+    `tax-v0.2`, ``CONTAINS_CODE`` and ``CONTAINS_LINK`` from normalization.
 
     :param snap: The run being labeled.
     :param c: The labeled comment.
@@ -541,7 +563,7 @@ def make_label(
     if prospective >= 2 and not reason:
         raise ValueError("a reason is required for grade 2 or 3")
     ordered = [f for f in LABELER_FLAGS if f in flags]
-    all_flags = ([REPLY_TO_AUTHOR] if snap.reply_to_author(c) else []) + ordered
+    all_flags = snap.structural_flags(c) + ordered
     return {
         "label_id": f"l_{c.source_object_id}_{ctx.pass_name}",
         "comment_id": c.source_object_id,
@@ -591,6 +613,7 @@ def comment_view(snap: Snapshot, c: ObservedComment) -> dict[str, Any]:
         "context_reconstructed": snap.context_reconstructed(c),
         "replied_before_labeling": snap.author_replied(c),
         "reply_to_author": snap.reply_to_author(c),
+        "structural_flags": snap.structural_flags(c),
         "thread": [
             {
                 "who": names[t.source_object_id],
@@ -868,7 +891,7 @@ def _ask_label(
     started = monotonic()
     full = False
     console.say(render(snap, c, position=position, full_thread=full))
-    reply_to_author = snap.reply_to_author(c)
+    structural = snap.structural_flags(c)
     while True:
         console.say("Primary class (TAXONOMY.md precedence order):\n" + _menu(CLASSES))
         while True:
@@ -890,8 +913,8 @@ def _ask_label(
                 break
             console.say("  Not understood, try again.")
 
-        auto = f"  ({REPLY_TO_AUTHOR} is set automatically: this replies to you.)"
-        console.say("Flags:\n" + _menu(LABELER_FLAGS) + ("\n" + auto if reply_to_author else ""))
+        auto = f"  (Set automatically: {', '.join(structural)}.)"
+        console.say("Flags:\n" + _menu(LABELER_FLAGS) + ("\n" + auto if structural else ""))
         flags = _ask_valid(
             console,
             "Flags [numbers, comma-separated; Enter for none; h = help]: ",
@@ -918,7 +941,7 @@ def _ask_label(
             "Hard to label? Note for the session notes (optional, not stored in the label): "
         )
 
-        all_flags = ([REPLY_TO_AUTHOR] if reply_to_author else []) + flags
+        all_flags = structural + flags
         retro = "skipped" if retrospective is None else str(retrospective)
         console.say(
             f"\n  {primary} | flags: {', '.join(all_flags) or 'none'} | "

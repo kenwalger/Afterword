@@ -78,9 +78,11 @@ def test_b2_sends_only_the_boundary_fields_and_records_provenance(runs, tmp_path
 
     k, p = latest(tmp_path, "s1a3")
     assert k.key.model_digest == ollama.PINNED_DIGESTS[QWEN]
-    assert k.key.prompt_version == "pr-v0.1" and k.key.taxonomy_version == "tax-v0.1"
+    assert k.key.prompt_version == "pr-v0.2" and k.key.taxonomy_version == "tax-v0.2"
     assert k.input_fields_sent == ("post_title", "reply_to_author", "parent_comment", "comment")
-    assert k.flags_by_source["structure"] == ["REPLY_TO_AUTHOR"]
+    # s1a3 has inline code: CONTAINS_CODE comes from normalization, beside REPLY_TO_AUTHOR.
+    assert k.flags_by_source["structure"] == ["REPLY_TO_AUTHOR", "CONTAINS_CODE"]
+    assert "CONTAINS_CODE" in k.flags
     assert p.tier == "SURFACE" and p.rule_applied == "class_default:TECHNICAL_QUESTION"
 
 
@@ -95,6 +97,36 @@ def test_b2_is_incremental_and_reclassifies_an_edit(runs, tmp_path, no_live_api)
     assert (result.classified, result.reused) == (1, 3)
     _, p = latest(tmp_path, "s1b1")
     assert "override:edited_since_review" in p.rules_fired
+
+
+def test_cached_pr_v0_1_results_are_not_reused_under_pr_v0_2(
+    runs, tmp_path, no_live_api, monkeypatch
+):
+    fake = FakeOllama(no_live_api)
+    with monkeypatch.context() as m:
+        m.setattr("afterword.classifier.PROMPT_VERSION", "pr-v0.1")
+        m.setattr("afterword.taxonomy.TAXONOMY_VERSION", "tax-v0.1")
+        old = classify(tmp_path)
+    assert old.classified == 4 and len(fake.chats) == 4
+    current = classify(tmp_path)
+    assert (current.classified, current.reused) == (4, 0)
+    assert len(fake.chats) == 8
+    k, _ = latest(tmp_path, "s1a1")
+    assert (k.key.prompt_version, k.key.taxonomy_version) == ("pr-v0.2", "tax-v0.2")
+    # The prompt version alone is enough to miss the cache.
+    with monkeypatch.context() as m:
+        m.setattr("afterword.classifier.PROMPT_VERSION", "pr-v0.1")
+        assert classify(tmp_path).reused == 0
+
+
+def test_b1_and_b2_receive_the_same_structural_flags(runs, tmp_path, no_live_api):
+    FakeOllama(no_live_api)
+    classify(tmp_path, "b1")
+    heuristic_k, _ = latest(tmp_path, "s1a3")
+    classify(tmp_path)
+    model_k, _ = latest(tmp_path, "s1a3")
+    assert heuristic_k.flags_by_source["structure"] == model_k.flags_by_source["structure"]
+    assert heuristic_k.flags_by_source["heuristic"] == []
 
 
 def test_an_edited_parent_changes_the_reply_key(runs, tmp_path, no_live_api):
@@ -202,6 +234,7 @@ def copy_corpus(root: Path) -> Path:
 def test_bench_loads_only_verified_synthetic_sets(tmp_path):
     corpus = copy_corpus(tmp_path)
     assert len(bench.load_cases(tmp_path, ["adversarial", "synthetic-bench"])) == 54
+    assert len(bench.load_cases(tmp_path, list(bench.DEFAULT_SETS))) == 24 + 35
     with pytest.raises(bench.BenchRefused, match="not a synthetic set"):
         bench.load_cases(tmp_path, ["dev"])
 
@@ -256,6 +289,12 @@ def test_bench_reports_timings_validity_and_injections(tmp_path, no_live_api):
     saved = json.loads(result.report_path.read_text(encoding="utf-8"))
     assert saved["model_digest"] == ollama.PINNED_DIGESTS[QWEN]
     assert saved["options"]["num_ctx"] == 2048 and saved["options"]["think"] is False
+    # tax-v0.2: code and link flags come from normalization, never from the model.
+    by_id = {r["case_id"]: r for r in saved["results"]}
+    assert by_id["bench-001"]["structural_flags"] == ["CONTAINS_CODE"]
+    assert all(
+        not set(r["model_flags"]) & {"CONTAINS_CODE", "CONTAINS_LINK"} for r in by_id.values()
+    )
 
 
 def test_bench_requires_the_synthetic_flag(tmp_path, capsys):

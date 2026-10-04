@@ -77,8 +77,46 @@ def test_progress_counts_eligible_comments_by_pass_and_tool():
         relabeled=1,
         by_pass={"initial": 3, "calibration": 1, "self_agreement": 0},
         by_tool={"terminal": 1, "browser": 2, "not recorded": 1},
+        by_post_order={"published": 4, "random": 0, "unknown": 0},
         not_in_run=1,
     )
+
+
+def test_labels_split_by_the_post_order_of_their_batch():
+    batches = [
+        {"event": "batch_start", "batch_id": "old"},  # predates post_order: published
+        {"event": "batch_start", "batch_id": "p", "post_order": "published"},
+        {"event": "batch_start", "batch_id": "r", "post_order": "random", "seed": 7},
+    ]
+    labels = [label("a", batch="old"), label("b", batch="p"), label("c", batch="r")]
+    labels.append(label("d", batch="missing"))
+    split = lr.split_by_post_order(labels, batches)
+    assert {k: [r["comment_id"] for r in v] for k, v in split.items()} == {
+        "published": ["a", "b"],
+        "random": ["c"],
+        "unknown": ["d"],
+    }
+
+
+def test_oracle_ceiling_applies_the_policy_to_the_labels():
+    labels = [
+        label("a", cls="CORRECTION", pro=3),
+        label("b", cls="LIGHTWEIGHT_ACKNOWLEDGMENT", pro=0, flags=["REPLY_TO_AUTHOR"]),
+        label("c", cls="LIKELY_SPAM_OR_NOISE", pro=2),
+        label("d", cls="TECHNICAL_EXTENSION", pro=1),
+    ]
+    ceiling = lr.oracle_ceiling(labels)
+    assert ceiling["class_only"]["by_tier"] == {"SURFACE": 1, "QUEUE": 1, "COLLAPSED": 2}
+    assert ceiling["class_only"]["consequential_by_tier"] == {
+        "SURFACE": 1,
+        "QUEUE": 0,
+        "COLLAPSED": 1,
+    }
+    assert ceiling["class_only"]["consequential_surfaced"] == 1
+    assert ceiling["class_and_flags"]["collapsed"] == 1
+    table = lr.class_crosstab(labels)
+    assert table["CORRECTION"] == {"0": 0, "1": 0, "2": 0, "3": 1, "total": 1, "tier": "SURFACE"}
+    assert list(table) == list(taxonomy.CLASSES)
 
 
 def test_summary_counts_classes_grades_agreement_and_replies():
@@ -133,5 +171,36 @@ def test_progress_carries_no_class_or_grade():
         "relabeled",
         "by_pass",
         "by_tool",
+        "by_post_order",
         "not_in_run",
     }
+
+
+def test_summaries_report_each_post_order_and_the_whole():
+    batches = [
+        {"event": "batch_start", "batch_id": "p", "post_order": "published"},
+        {"event": "batch_start", "batch_id": "r", "post_order": "random"},
+    ]
+    labels = [label("a", batch="p", pro=3), label("b", batch="r"), label("c", batch="r")]
+    out = lr.summarize_by_post_order(labels, batches)
+    assert set(out) == {"published", "random", "all"}
+    assert (out["published"]["total"], out["random"]["total"], out["all"]["total"]) == (1, 2, 3)
+    assert out["published"]["consequential"] == 1
+
+
+def test_analysis_uses_deterministic_code_and_link_flags_for_every_label():
+    old = label("a", flags=["REPLY_TO_AUTHOR", "CONTAINS_LINK", "HOSTILE_TONE"])
+    updated = lr.with_content_flags(old, {"CONTAINS_CODE"})
+    assert updated["flags"] == ["REPLY_TO_AUTHOR", "CONTAINS_CODE", "HOSTILE_TONE"]
+    assert old["flags"] == ["REPLY_TO_AUTHOR", "CONTAINS_LINK", "HOSTILE_TONE"]  # unchanged
+    assert lr.with_content_flags(label("b"), set())["flags"] == []
+
+
+def test_the_broad_rsc_ceiling_ignores_rsc_on_tax_v0_1_labels_only():
+    old = label("a", cls="LIGHTWEIGHT_ACKNOWLEDGMENT", flags=["REFERENCES_SPECIFIC_CLAIM"])
+    old["taxonomy_version"] = "tax-v0.1"
+    new = old | {"comment_id": "b", "taxonomy_version": "tax-v0.2"}
+    ceiling = lr.oracle_ceiling([old, new])
+    assert ceiling["class_and_flags"]["collapsed"] == 0
+    assert ceiling["class_and_flags_without_broad_rsc"]["collapsed"] == 1
+    assert list(ceiling) == [name for name, _, _ in lr.ORACLE_VARIANTS]

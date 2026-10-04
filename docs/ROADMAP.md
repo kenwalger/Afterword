@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 3 (2026-10-04)
+**Version:** 4 (2026-10-04)
+
+v4 adds the labeler calibration exercise to Deferred (`LABELING-AT-SCALE.md`) and removes a stale "not yet recorded" note from the Stage 0 gate input, since the gate decision is recorded below it.
 
 v3 records the Stage 1, 2, and 3a groundwork built ahead of Stage 0's end, separating "built" from "gate passed"; corrects the labeling guide version to `lg-v0.2` and the ADR range to ADR-001 to ADR-013; splits the fixture item into the synthetic manifest (done) and the real corpus manifest (not yet); and adds the explanation warning to Stage 4.
 
@@ -13,7 +15,7 @@ Each stage ends at a gate. A gate can return **continue**, **reframe**, or **sto
 Goal: define the question before implementation changes it.
 
 - [x] Project brief and scope (v2)
-- [x] Provisional taxonomy (`tax-v0.1`)
+- [x] Provisional taxonomy (`tax-v0.1`; `tax-v0.2` from 2026-10-04, no class changes)
 - [x] Provisional priority policy (`pp-v0.1`)
 - [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule)
 - [x] ADR-001 to ADR-013 (ADR-001 to ADR-011 with the design; ADR-012, the service layer, and ADR-013, local-first with a hosted path preserved, added 2026-10-03)
@@ -29,7 +31,9 @@ Goal: define the question before implementation changes it.
 
 **Gate:** if C-009 shows trivial volume, decide explicitly whether to continue as a methodology study. Otherwise continue.
 
-Gate input (2026-10-04): the typical week's read took under 4 minutes, which meets C-009's falsification condition; the busy week's took about 17.5 minutes, which does not. The decision is the author's and is not yet recorded.
+Gate input (2026-10-04): the typical week's read took under 4 minutes, which meets C-009's falsification condition; the busy week's took about 17.5 minutes, which does not. The decision is the author's.
+
+Gate decision (2026-10-04, the author): **continue as planned.** The cost of chronological review is concentrated in busy weeks; whether assisted triage pays off mainly there is recorded as C-012 and measured on the test period.
 
 ## Stage 1: DEV ingestion
 
@@ -68,11 +72,11 @@ Goal: determine whether assisted triage is useful before building a large UI.
 
 ### 3a: Development
 
-- [x] Implement taxonomy prompt with schema-constrained output. (2026-10-03: classifier `pr-v0.1` with an incremental cache; Ollama provider, path signed off; Anthropic provider, path not signed off, tested against mocked HTTP only.)
+- [x] Implement taxonomy prompt with schema-constrained output. (2026-10-03: classifier `pr-v0.1` with an incremental cache, `pr-v0.2` from 2026-10-04 without the code and link flags; Ollama provider, path signed off; Anthropic provider, path not signed off, tested against mocked HTTP only.)
 - [x] Implement priority policy. (2026-10-03: `pp-v0.1` as pure, tested code, recording `rule_applied` and `rules_fired`.)
 - [x] Implement heuristic baseline (B1). (2026-10-03: `hb-v0.1`, a draft until tuned on `dev`.)
 - [ ] Iterate on `dev` only. (Needs `dev` labels.)
-- [ ] Run the adversarial set; fix injection handling. (2026-10-03: run once on both local models, synthetic sets only, `docs/benchmarks/2026-10-03-synthetic-local-models.md`. The pre-check `pc-v0.1` has two known gaps, adv-109 and adv-110, not yet fixed.)
+- [ ] Run the adversarial set; fix injection handling. (2026-10-03: run once on both local models, synthetic sets only, `docs/benchmarks/2026-10-03-synthetic-local-models.md`. Rerun 2026-10-04 under `pr-v0.2`: injection tiers unchanged, 8 of 10 for both. The pre-check `pc-v0.1` has two known gaps, adv-109 and adv-110, not yet fixed.)
 
 ### 3b: Preregistration
 
@@ -143,4 +147,5 @@ Only after V1 evidence exists, decide whether CoderLegion adds a useful test of 
 
 Cross-platform identity reconciliation, Substack, LinkedIn, additional analytics, and external-user testing. None is promised by this roadmap.
 
+- Labeler calibration exercise (`LABELING-AT-SCALE.md`, Labeler onboarding): about 20 synthetic comments with researcher-approved reference labels and rationales, covering the boundaries that change a tier or proved hard in V1 labeling; reveal-after-answer in the label UI; agreement summarized per boundary; answers recorded as `sample_kind: calibration_exercise` and excluded from every measure. Gated on the Stage 3 result, except that a minimal version may be built earlier as an optional refresher for the author's calibration pass.
 - External interface (ADR-012): a local MCP server first, possibly an HTTP API later, over the application service layer. Gated on the Stage 3 result; see `SCOPE.md` (Future candidates) for its limits.

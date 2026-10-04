@@ -2,17 +2,52 @@
 
 Comment text and every other server value are inserted with ``textContent``,
 never as HTML. ``__TOKEN__`` is replaced with the session token when served.
+
+The favicon is the "Aw" mark (``docs/BRAND.md``), inlined as data URIs from
+``img/favicon-16x16.png`` and ``img/favicon-32x32.png`` so the page still loads
+nothing; ``tests/test_label_ui.py`` checks the inlined bytes match the files.
 """
 
 from __future__ import annotations
 
-PAGE: str = r"""<!doctype html>
+# The "Aw" mark, base64 PNG, from img/favicon-16x16.png and img/favicon-32x32.png.
+FAVICON_16_PNG_B64: str = (
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABfUlEQVR4AdxPPUhCURQ+54ZkDSJqSzUUBS21BiZB"
+    "VPQcC0IKlKaGxpZCXaRIaLGCFpd+HkEN0RJRlo7REDS2BBZCg4uiSKDWvX3vDY9sKWqJLue75/d+536Cfnn+IIHL"
+    "5ToBbgDvd9Q1SHA6nV1ENKWU6gUmEX9pDQTMrOFFDthB7IcnLawfGd6AFtVPJyJ6vxmH9SUtuj/YQICG8SgthLhC"
+    "POB2uzuIuJ1w/JGDMZLUzZI7vYuJFibWUmtztx8JbNg6ilmWUvbAE2RoxFQZie3aFakFwSJBrNocdk+QSOqYURYB"
+    "9A+h4AD6AAxQEd4PlrKtZvOxUg9K1rPM5MH26VxzyyH6ZBEwsx8bs4VCwVcsFocRJ4FxkvJFKLVc5+rmq2zKE4kA"
+    "fpO5jwVqnwmqKGwApkHGMYLLSj77CBlnmfh83tYqnonU05u0J9EzzfoBNsewedus4iqVSnfIZ673VlZT8dAWSnQe"
+    "C5Yv4qHZ9HqgZOQGLAIj+Qn+AcE7AAAA//8WhQGmAAAABklEQVQDAAGdiyFvC3Z2AAAAAElFTkSuQmCC"
+)
+FAVICON_32_PNG_B64: str = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADo0lEQVR4AexUS2xMYRQ+586MerQ67SAsWCAsJIKE"
+    "iIQgdCp0QaLiGSIWEvHY0FJJSaj3I5FIJF71WJgICRJGPWJhIRYEiWjisaBk+hhjSLTuf3zndu7NtDOqiwqRuTnf"
+    "f85/zrn//f5v/n8s+stPjkBOgX9fgeLi4kXAERdFRUVTe/LidEeBKnxwgwtmXou4x6xLAtj1UHxpDOCZiMzGpMv3"
+    "UO+2/W6hMFZigPDhq+qhwIBQKDRR455Adwjodxosy9qjgQJkStUrwpW1m0sra2s1Tkd467m5qF0Lbz07Iz2vcXjb"
+    "+RPADo27IuBHwyxAd1/X1NT0GB9u1jngESCm0cBc5NKNmWQ3M88jssamF0q2XJjGImuw6AvN/5IATvtkNAQB9Mpt"
+    "eBsL3oVXm1hQUBDSgIQSRJxPaQ8UmUPCenZiJDQorURsmU2Yv+k/Lu8yPP2SADPr76894vf765xAHCIa+pDTw4jN"
+    "W0kRClB1tbeWEFcI01UheW5ZPFBfUMypOjOCmcqY+HCkvNzWnPeSTjrBlflZY2Njg9aMMaqEhsTMTl3YxBkrliSH"
+    "99FCybZzUzCfCgKHmCghYjwFxPavJ5LPdqs5pb2KrATy8/OV9QRtAAbjOt5R4CCexNwAaiUYGM8XeLV+OlgiFUL0"
+    "MLpr+UOwjBO1KzB94+kgsaxC7Xj0wIqvlHqyEggEArq4W9MdzET/THxMT7SbHxIMBsfhgOAMEP3Ik0B4+8UxIjwP"
+    "qEE/kTExIinWOK9vYDV84HubfQzeM3cxL5EKHHlT8VER2esCuZuAYyAUFjKOAj729yXb3swsz6I1S29ogyHrE3xo"
+    "4cJLPvwc6xCfv79/1Ud4z7IRsJhZFcDm5HVzc/PGlpaWChc4B5Xe20SlJD5HAcuYUTjxi1HD7lngiUlAwCpMjmyd"
+    "DyWGGfEd1Hw6MggUFhaOR4PKTiDiHTrkHIvH408RYGGMRFOSDa+cADusAt4V1PeOOAkMlqgC0ktYtmN6I1qz5CV8"
+    "B8sggOvlXj9tzCCAJH6N9usIgoEPT+9NQk5tspDsi0Tar5cmjKgCGtFYY9sHnKjTkEGgra2tDjIvUPh8vlud+p2p"
+    "bds7ta5obfl0B1ItUPTP633WaUgNvfoE6zVvhMuie1c+SKU7uAwCiUTiEWS+oojFYskO3akJeuq1rnj/tv7JzV3L"
+    "rigi1eWtqRbHXasu+6b5aM2y604iy5BBIEvPH03lCOQUyCnw/yvwuz+RnwAAAP//Qy4p0QAAAAZJREFUAwCUKFVQ"
+    "HrnyIAAAAABJRU5ErkJggg=="
+)
+
+_PAGE: str = r"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>Afterword labeling</title>
+<link rel="icon" type="image/png" sizes="16x16" href="data:image/png;base64,__FAVICON_16__">
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,__FAVICON_32__">
 <style>
 :root {
   --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #66665f;
@@ -242,7 +277,7 @@ function contextCard(c) {
   }
   if (c.reply_to_author) {
     card.append(el("div", {class: "status ok",
-      text: "Replies to you: " + st.taxonomy.structural_flag.name + " is set automatically"}));
+      text: "Replies to you: REPLY_TO_AUTHOR is set automatically"}));
   }
   if (c.replied_before_labeling) {
     card.append(el("div", {class: "status warn", text: "Your reply to this comment exists "
@@ -287,9 +322,10 @@ function formCard(c) {
       () => { form.cls = k.name; render(); }, k.definition));
   }
   box.append(el("h2", {text: "Flags"}));
-  if (c.reply_to_author) {
-    box.append(el("div", {class: "opt on"}, el("span", {class: "key", text: "auto"}),
-      el("span", {text: tx.structural_flag.name})));
+  for (const name of c.structural_flags) {
+    const def = tx.structural_flags.find((x) => x.name === name);
+    box.append(el("div", {class: "opt on", title: def ? def.definition : ""},
+      el("span", {class: "key", text: "auto"}), el("span", {text: name})));
   }
   for (const f of tx.flags) {
     box.append(option("checkbox", form.flags.has(f.name), f.key, f.name, () => {
@@ -389,8 +425,9 @@ function renderHelp() {
   for (const f of tx.flags) {
     dl.append(el("dt", {text: f.key + "  " + f.name}), el("dd", {text: f.definition}));
   }
-  dl.append(el("dt", {text: "auto  " + tx.structural_flag.name}),
-    el("dd", {text: tx.structural_flag.definition}));
+  for (const f of tx.structural_flags) {
+    dl.append(el("dt", {text: "auto  " + f.name}), el("dd", {text: f.definition}));
+  }
   h.replaceChildren(el("div", {class: "muted", text: "h or Esc closes"}), dl);
 }
 
@@ -498,3 +535,7 @@ load();
 </body>
 </html>
 """
+
+PAGE: str = _PAGE.replace("__FAVICON_16__", FAVICON_16_PNG_B64).replace(
+    "__FAVICON_32__", FAVICON_32_PNG_B64
+)

@@ -1,6 +1,12 @@
 # Evaluation Plan
 
-**Version:** 7 (2026-10-04)
+**Version:** 10 (2026-10-04)
+
+v10 (2026-10-04, after the `pr-v0.2` synthetic benchmark, before any classification of a real comment) records that model-set flags which can only raise tiers each erode review reduction, two candidate designs to evaluate on `dev`, and the duplicate-flag decision left for preregistration. No policy or prompt changes.
+
+v9 (2026-10-04, `tax-v0.2` and `pr-v0.2`, before any classification of a real comment) makes `CONTAINS_CODE` and `CONTAINS_LINK` structural for B1 and B2 and drops them from model flag precision, and adds a third oracle ceiling without `tax-v0.1` `REFERENCES_SPECIFIC_CLAIM` raises.
+
+v8 (2026-10-04, later the same day, still before any classification of a real comment) adds the volume split as a secondary analysis (C-012) and records a provisional oracle ceiling for `pp-v0.1` on the 150 `dev` labels.
 
 v7 (2026-10-04, with 150 of the `dev` comments labeled and before any classification of a real comment) records a provisional accrual estimate from the partial consequential share. Nothing registered exists yet, so nothing registered changes.
 
@@ -95,7 +101,7 @@ Candidate features: question mark present, code block present, link present, `RE
 
 The marginal value of the model is B2 minus B1. If B1 is close to B2, that is a reportable result, not a failure to hide.
 
-B1 and B2 receive the same normalized text (`norm-v0.1` or its successor), the same structural flags (`REPLY_TO_AUTHOR`), and the same deterministic `POSSIBLE_INSTRUCTION_TEXT` pre-check, and both feed the same priority policy. The comparison therefore isolates classification. `hb-v0.1` starts as a draft written before any labels existed; its thresholds and lexicon are tuned on `dev`, and each change is a new heuristic version.
+B1 and B2 receive the same normalized text (`norm-v0.1` or its successor), the same structural flags (`REPLY_TO_AUTHOR`, and from `tax-v0.2` `CONTAINS_CODE` and `CONTAINS_LINK`, set from normalization), and the same deterministic `POSSIBLE_INSTRUCTION_TEXT` pre-check, and both feed the same priority policy. The comparison therefore isolates classification. `hb-v0.1` starts as a draft written before any labels existed; its thresholds and lexicon are tuned on `dev`, and each change is a new heuristic version.
 
 ### Which model is B2
 
@@ -141,7 +147,7 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 ## Secondary measures
 
 - Per-class precision and recall.
-- **Flag precision**, per flag and per classifier: of the flags a classifier sets, how many the labels also carry. Reported with the count set and the count agreeing, never as a rate alone. `CONTAINS_CODE` and `CONTAINS_LINK` are also checked against normalization, which is exact.
+- **Flag precision**, per flag and per classifier: of the flags a classifier sets, how many the labels also carry. Reported with the count set and the count agreeing, never as a rate alone. From `tax-v0.2` (`pr-v0.2`) `CONTAINS_CODE` and `CONTAINS_LINK` are structural: set from normalization for B1 and B2 alike, exact by construction, and not part of model flag precision. Labels are compared with the deterministic code and link flags whatever taxonomy version they were made under (`TAXONOMY.md`). `REFERENCES_SPECIFIC_CLAIM` precision is reported separately against `tax-v0.1` and `tax-v0.2` labels, which apply the flag differently.
 - **Flag-caused tier raises**: how many comments a classifier-set flag (`REFERENCES_SPECIFIC_CLAIM`, `NEEDS_THREAD_CONTEXT`, `POSSIBLE_INSTRUCTION_TEXT`) raised above what the class default, structural flags, and pre-check give, and how many of those the labels grade 0 or 1. Over-flagging fails safe, since flags only raise tiers, but each unneeded raise costs review reduction, so it is reported beside it.
 - Count of `UNCERTAIN` assignments.
 - Count of comments requiring thread context.
@@ -149,6 +155,41 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 - Prospective versus retrospective agreement (C-010), separately for `dev` (hindsight available when labeled) and `test` (labeled at first read).
 - Grades given after replying versus before (`replied_before_labeling`).
 - Labeler self-agreement (see `LABELING-GUIDE.md`).
+- **Volume split (C-012).** Review reduction, consequential recall, and, where weeks are timed, review time per week, reported separately for test-period weeks above the trailing-13-week median volume of comments from others and for weeks at or below it. The median is computed from the last full probe run before preregistration, recorded with the run ID, and frozen with the other versions; weeks are Monday to Sunday, UTC, as in the C-009 baseline. Each group reports its number of weeks and comments. With at most 16 weeks the groups are small, so the split is indicative and reported in counts.
+
+## Provisional observations on `dev`
+
+Recorded while `dev` labeling is under way. They describe partial labels, change nothing registered, and are superseded by the same analysis on the full `dev` set.
+
+### Oracle ceiling of `pp-v0.1` (2026-10-04, provisional)
+
+What the policy would do if every class were predicted perfectly: `pp-v0.1` applied to the 150 analysis labels themselves (`afterword.label_records.oracle_ceiling`). Caveats: the 150 are the comments on the earliest-published posts (every batch used publication order), and 108 of them (72%) were labeled after the author had replied.
+
+| Primary class | Grade 0 | 1 | 2 | 3 | Total | Default tier |
+| --- | --- | --- | --- | --- | --- | --- |
+| `CORRECTION` | 0 | 0 | 1 | 1 | 2 | `SURFACE` |
+| `CHALLENGE_OR_COUNTEREXAMPLE` | 1 | 0 | 1 | 0 | 2 | `SURFACE` |
+| `TECHNICAL_QUESTION` | 0 | 10 | 12 | 1 | 23 | `SURFACE` |
+| `OPPORTUNITY` | 0 | 0 | 0 | 0 | 0 | `SURFACE` |
+| `DIRECT_QUESTION` | 0 | 4 | 1 | 0 | 5 | `QUEUE` |
+| `TECHNICAL_EXTENSION` | 7 | 23 | 16 | 3 | 49 | `QUEUE` |
+| `CONVERSATIONAL` | 19 | 20 | 3 | 0 | 42 | `QUEUE` |
+| `LIGHTWEIGHT_ACKNOWLEDGMENT` | 18 | 1 | 0 | 0 | 19 | `COLLAPSED` |
+| `LIKELY_SPAM_OR_NOISE` | 8 | 0 | 0 | 0 | 8 | `COLLAPSED` |
+| `UNCERTAIN` | 0 | 0 | 0 | 0 | 0 | `SURFACE` |
+
+| Ceiling | SURFACE | QUEUE | COLLAPSED (review reduction) | Consequential surfaced |
+| --- | --- | --- | --- | --- |
+| Class defaults only | 27 | 96 | 27 of 150 (18.0%; Wilson 12.7% to 24.9%) | 39 of 39 |
+| Class and labeled flags | 28 | 103 | 19 of 150 (12.7%; Wilson 8.3% to 18.9%) | 39 of 39 |
+| Class and labeled flags, without `REFERENCES_SPECIFIC_CLAIM` raises (added later the same day, with `tax-v0.2`) | 28 | 102 | 20 of 150 (13.3%; Wilson 8.8% to 19.7%) | 39 of 39 |
+
+The third row ignores `REFERENCES_SPECIFIC_CLAIM` on these labels, all `tax-v0.1`, which applied the flag more broadly than `tax-v0.2`'s test (`TAXONOMY.md`). It raised only 1 comment that nothing else raised, an acknowledgment graded below 2: almost every comment carrying it was already at `QUEUE` or above by class or by another flag.
+
+- **Where the consequential comments sit:** 16 at `SURFACE` and 23 at `QUEUE`, none at `COLLAPSED`, under either ceiling. Of the 39, 19 are `TECHNICAL_EXTENSION` (a `QUEUE` class) and 13 `TECHNICAL_QUESTION`.
+- **Recall is not the constraint here; reduction is.** Only acknowledgments and spam collapse by default, and they are 27 of these 150. Perfect classification would therefore leave at least 82% of comments within the review threshold.
+- **Flags lower the ceiling further.** With the labeled flags applied, 8 acknowledgments leave `COLLAPSED`: 5 on the structural `REPLY_TO_AUTHOR`, 2 on `NEEDS_THREAD_CONTEXT`, 1 on `REFERENCES_SPECIFIC_CLAIM`. None of the 8 is graded consequential. The author set `REFERENCES_SPECIFIC_CLAIM` on 82 of the 150 labels and `NEEDS_THREAD_CONTEXT` on 50.
+- **What this does not say:** anything about a classifier. It bounds what `pp-v0.1` can deliver on these labels. Whether the policy should change (a new policy version, chosen on `dev`) is a Stage 3a question, recomputed on the full set.
 
 ## Adversarial set
 
@@ -184,6 +225,31 @@ Before accrual begins (ADR-010):
 4. Commit. The commit time starts accrual.
 
 During accrual nothing registered may change. After the stopping rule is met, check each week's sealed outputs against their committed hashes, reveal them, and score B1 and B2 once. Any change afterward creates new versions and requires a new accrual period for a clean measurement.
+
+### Model-set flags only raise tiers (2026-10-04, from synthetic data)
+
+**Observation.** Under `pp-v0.1` a flag can only raise a tier (ADR-007), so every flag a model may set is a channel through which over-flagging erodes review reduction, and nothing pushes back. Removing some flags shifts the pressure to others. In the `pr-v0.2` benchmark (`docs/benchmarks/2026-10-03-synthetic-local-models.md`, 2026-10-04 section) `CONTAINS_CODE` and `CONTAINS_LINK` left the model's output. They had never raised a tier, yet both models then set the tier-raising flags more often. On the 54 shared cases:
+
+- qwen: `REFERENCES_SPECIFIC_CLAIM` 31 to 43, `NEEDS_THREAD_CONTEXT` 7 to 16; flag-caused raises 10 to 16; collapsed 6 to 0.
+- llama: `REFERENCES_SPECIFIC_CLAIM` 12 to 16, `NEEDS_THREAD_CONTEXT` 15 to 18; raises 1 to 3.
+
+The labels show the same pressure from the other side: the author's `tax-v0.1` labels carry `REFERENCES_SPECIFIC_CLAIM` on 82 of 150.
+
+**Informational, no model choice:** on the synthetic sets, qwen with `pr-v0.2` collapses 0 of 59 cases under `pp-v0.1`, which would be zero review reduction. Synthetic cases written by Claude are not evidence about real comments; the result that counts is on `dev`.
+
+**Candidate designs, for later evaluation on `dev` only** (not on synthetic data; neither is adopted, and the policy and prompt are unchanged):
+
+- **(a) Evidence-required flags.** A model-set judgment flag raises a tier only when the output carries checkable evidence for it. For example, `REFERENCES_SPECIFIC_CLAIM` counts only if the model quotes the exact referenced span of the post, and the quote is verified against the post text. A flag without valid evidence is recorded but does not raise. This needs the post body in the model input, a new model-boundary question (`PRIVACY-AND-BOUNDARIES.md`), and a new prompt and policy version.
+- **(b) Informational judgment flags.** Model-set `REFERENCES_SPECIFIC_CLAIM` and `NEEDS_THREAD_CONTEXT` are recorded and shown, but no longer raise tiers; structural flags, `POSSIBLE_INSTRUCTION_TEXT`, and the class default still do. This is a policy change (`pp-v0.2`). Its cost is any consequential comment that only those flags would have rescued, such as adv-007 in the synthetic set.
+
+Both are judged on `dev` by the same measures as everything else: consequential recall and review reduction at the same time, with flag-caused raises and their grades reported. The choice, if any, is made before preregistration and frozen with the other versions.
+
+### Decisions left for preregistration
+
+- **Duplicate flags in model output.** A model output that lists a flag twice is currently `MALFORMED` (`duplicate_flag`) and surfaced. Qwen did this in 1 of 54 outputs under `pr-v0.1` and 3 of 59 under `pr-v0.2`; the schema dialects cannot forbid it.
+  - **Strict (current).** Validity means exactly the schema. Every malformed output fails safe to `SURFACE`, the validity rate stays an honest measure of how well the model follows the format, and nothing in the result was edited. The cost: a readable classification is thrown away, and each one surfaces a comment that may not need it, costing review reduction.
+  - **De-duplicate as a recorded repair.** Keep the first occurrence and record the repair (for example `repaired:duplicate_flag` beside the outcome), and keep the raw output. The classification is used, so a cosmetic slip no longer costs review reduction. The cost: the parser starts deciding what the model "meant", the validity rate must then be reported both before and after repair, and the repair rule becomes part of what is frozen and could hide a model that degrades in other ways.
+  - Decide before preregistration, report the rate under both readings either way, and freeze the rule with the prompt version.
 
 ## Registered thresholds
 

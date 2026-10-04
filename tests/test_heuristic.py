@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from afterword.heuristic import HEURISTIC_VERSION, LONG_THRESHOLD, classify, features, prose
-from afterword.normalize import normalize
+from afterword.normalize import content_flags, normalize
 
 LONG = "word " * (LONG_THRESHOLD // 5 + 1)
 
@@ -64,10 +64,13 @@ def test_lexicon_matches_whole_words_only():
     assert not b1("<p>Wrongly accused, errors aside, I agree.</p>").features.lexicon_match
 
 
-def test_content_flags_come_from_structure():
-    assert b1("<p>Use <code>x</code></p>").flags == {"CONTAINS_CODE"}
-    assert b1('<p><a href="https://example.com">a</a></p>').flags == {"CONTAINS_LINK"}
-    assert b1("<p>plain</p>").flags == frozenset()
+def test_content_flags_come_from_normalization_not_the_heuristic():
+    # tax-v0.2: the service sets code and link flags for B1 and B2 alike.
+    assert b1("<p>Use <code>x</code></p>").flags == frozenset()
+    assert content_flags(normalize("<p>Use <code>x</code></p>", "HTML")) == {"CONTAINS_CODE"}
+    link = normalize('<p><a href="https://example.com">a</a></p>', "HTML")
+    assert content_flags(link) == {"CONTAINS_LINK"}
+    assert content_flags(normalize("<p>plain</p>", "HTML")) == frozenset()
 
 
 def test_length_threshold_boundary():

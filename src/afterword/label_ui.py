@@ -45,10 +45,9 @@ TOKEN_HEADER: str = "X-Afterword-Token"
 # Keyboard: digits choose the class in TAXONOMY.md precedence order (0 is the tenth).
 CLASS_KEYS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
 # Letters toggle labeler flags. h, t, s, q, g, e, w are commands on the page.
+# From tax-v0.2 the code and link flags are structural, so `c` and `l` are free.
 FLAG_KEYS: dict[str, str] = {
     "NEEDS_THREAD_CONTEXT": "n",
-    "CONTAINS_CODE": "c",
-    "CONTAINS_LINK": "l",
     "REFERENCES_SPECIFIC_CLAIM": "r",
     "ADDRESSED_TO_OTHER_COMMENTER": "o",
     "HOSTILE_TONE": "x",
@@ -71,10 +70,11 @@ def taxonomy_payload() -> dict[str, Any]:
             {"name": name, "key": FLAG_KEYS[name], "definition": taxonomy.FLAG_DEFINITIONS[name]}
             for name in labeling.LABELER_FLAGS
         ],
-        "structural_flag": {
-            "name": taxonomy.REPLY_TO_AUTHOR,
-            "definition": taxonomy.FLAG_DEFINITIONS[taxonomy.REPLY_TO_AUTHOR],
-        },
+        "structural_flags": [
+            {"name": name, "definition": taxonomy.FLAG_DEFINITIONS[name]}
+            for name in taxonomy.FLAGS
+            if name in taxonomy.STRUCTURAL_FLAGS
+        ],
     }
 
 
@@ -314,6 +314,7 @@ def make_handler(
             self.send_header(
                 "Content-Security-Policy",
                 "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+                "img-src data:; "
                 "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             )
             self.end_headers()

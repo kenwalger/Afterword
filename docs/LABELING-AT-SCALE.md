@@ -2,6 +2,8 @@
 
 **Status:** Future design note. Not in V1 scope. Gated on the Stage 3 result (see `SCOPE.md`, Future candidates).
 
+Revised 2026-10-04: adds labeler onboarding through a calibration exercise.
+
 ## The problem
 
 V1 ground truth comes from one researcher labeling every comment in a historical corpus of a few hundred. That is tedious but feasible. It does not scale:
@@ -57,7 +59,7 @@ Targeted samples are efficient for improving the system and biased by constructi
 
 ### Separation rules
 
-1. Every label records its `sample_kind`: `researcher`, `random_audit`, `targeted`, or `implicit`.
+1. Every label records its `sample_kind`: `researcher`, `random_audit`, `targeted`, `implicit`, or `calibration_exercise` (see Labeler onboarding).
 2. Metrics are computed only from `researcher` or `random_audit` labels.
 3. A label used to make an improvement is never also used to measure that improvement. Random audits measure; targeted labels improve.
 
@@ -102,6 +104,48 @@ Implications:
 - **Measurement windows.** Any reported metric states the period its labels were made in.
 
 Drift is distinct from inconsistency. The 14-day self-agreement check in `LABELING-GUIDE.md` measures short-term consistency. Drift is the long-term change that remains after consistency is accounted for. See C-011 in `CLAIMS.md`.
+
+## Labeler onboarding: the calibration exercise
+
+Anyone who labels for Afterword, including the author of a new account, goes through a short calibration exercise before labeling real comments, so that the learning curve happens on practice material instead of in the ground truth.
+
+### Why
+
+Definitions alone are not enough. The V1 author's first 150 labels showed the learning curve clearly: `REFERENCES_SPECIFIC_CLAIM` was applied to 82 of 150 comments, in the broad sense of "engages with the post" rather than the defined sense of "points to an exact sentence, step, figure, or claim." Labeling one's own comments adds a second difficulty: the labeler already knows how most threads turned out. Every new labeler would face both.
+
+### What it is
+
+- About 20 synthetic comments, each with a **reference label** (primary class, flags, prospective grade) and a **one-paragraph rationale** explaining the decision.
+- The comments concentrate on the boundaries that change a tier or are known to be hard:
+  - acknowledgment versus conversational (`COLLAPSED` versus `QUEUE`)
+  - self-promotion as spam versus a technical contribution with a link, versus an opportunity
+  - the `REFERENCES_SPECIFIC_CLAIM` test: an exact referent in the post, or only the topic
+  - `NEEDS_THREAD_CONTEXT`: meaning that depends on the thread, versus a reply that stands alone
+  - correction versus challenge, and a correction hidden inside praise (precedence)
+  - when `UNCERTAIN` is the honest answer
+  - prospective grading without hindsight
+- Synthetic only. No real comment, commenter, or thread appears in it.
+
+### How it works
+
+1. The labeler labels each exercise comment in the normal labeling interface, without seeing the reference label.
+2. After each comment, the reference label and rationale are revealed, with the labeler's answer beside them.
+3. At the end, agreement is summarized **per boundary**, not as a single score, so the labeler sees which distinctions need attention.
+4. The exercise can be repeated. A second attempt uses a different ordering, and, where the set allows, different comments for the same boundaries.
+
+It is a teaching tool, not a gate. Nobody is blocked from labeling by a score, and exercise results are never used as evidence about the system.
+
+### Rules
+
+- **Separate from evaluation material.** The calibration set is its own versioned file, not the adversarial or benchmark sets, so that showing its reference labels to labelers never touches model evaluation.
+- **Reference labels are approved by the researcher.** Drafted reference labels (for example, written by a coding assistant) are proposals until the researcher reviews and approves each one.
+- **Versioned with the taxonomy.** Each calibration set records the taxonomy and labeling-guide versions it teaches. A taxonomy change that alters a boundary produces a new calibration set version.
+- **Recorded, but kept apart.** Exercise answers are stored with `sample_kind: calibration_exercise` and excluded from every measure, alongside the separation rules above.
+- **Worked examples in the guide.** The hardest boundaries also appear as worked examples in `LABELING-GUIDE.md`, so the reasoning is available while labeling, not only during the exercise.
+
+### Possible early use
+
+A minimal version (the set, plus reveal-after-answer in the label UI) could also serve the V1 author before the calibration pass, as a refresher on the tax-v0.2 boundaries. That is optional and does not change V1 measurement.
 
 ## Organizations
 

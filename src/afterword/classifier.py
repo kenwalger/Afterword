@@ -1,4 +1,4 @@
-"""The model classifier wrapper, prompt version ``pr-v0.1`` (ADR-007, ADR-008).
+"""The model classifier wrapper, prompt version ``pr-v0.2`` (ADR-007, ADR-008).
 
 The prompt puts fixed instructions and the taxonomy first (the system text) and
 the data last (the user message): the post title, whether the comment replies
@@ -14,7 +14,10 @@ temperature 0. A transport failure is ``FAILED`` and retried on the next run.
 Both go to ``SURFACE`` through the priority policy.
 
 The model chooses a class, flags, a confidence, and an explanation. It never
-chooses priority, and ``REPLY_TO_AUTHOR`` is structural, so the model cannot set it.
+chooses priority, and structural flags are not its to set: ``REPLY_TO_AUTHOR``
+and, from ``pr-v0.2`` (``tax-v0.2``), ``CONTAINS_CODE`` and ``CONTAINS_LINK``,
+which come from normalization. They are absent from the prompt and the output
+schema, and an output that names one is malformed.
 """
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ from afterword.providers import (
     ProviderError,
 )
 
-PROMPT_VERSION: str = "pr-v0.1"
+PROMPT_VERSION: str = "pr-v0.2"
 MODEL_FLAGS: tuple[str, ...] = tuple(
     f for f in taxonomy.FLAGS if f not in taxonomy.STRUCTURAL_FLAGS
 )

@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from afterword import classifier, domain, policy, precheck, taxonomy
+from afterword.normalize import content_flags as normalize_content_flags
 from afterword.normalize import normalize
 from afterword.providers import Provider
 
@@ -34,7 +35,12 @@ MANIFEST: Path = CORPUS_DIR / "MANIFEST.md"
 SETS: dict[str, str] = {
     "adversarial": "adversarial.jsonl",
     "synthetic-bench": "synthetic-bench.jsonl",
+    "synthetic-bench-v2": "synthetic-bench-v2.jsonl",
 }
+# What `afterword bench` runs without --set. synthetic-bench-v2 holds every
+# synthetic-bench case unchanged plus the tax-v0.2 boundary cases, so the old
+# set is kept for comparison but not run twice by default.
+DEFAULT_SETS: tuple[str, ...] = ("adversarial", "synthetic-bench-v2")
 _ROW: re.Pattern[str] = re.compile(
     r"^\|\s*`(?P<file>[^`]+)`\s*\|\s*`(?P<set>[^`]+)`\s*\|\s*(?P<n>\d+)\s*\|"
     r"\s*(?P<prov>[a-z-]+)\s*\|\s*`(?P<sha>[0-9a-f]{64})`\s*\|"
@@ -132,7 +138,13 @@ def run_case(
     started = clock()
     result = classifier.classify(provider, inp)
     wall = clock() - started
-    structural = {taxonomy.REPLY_TO_AUTHOR} if inp.reply_to_author else set()
+    structural = set(
+        normalize_content_flags(
+            normalize(case["body_html"], case.get("body_source_format", "HTML"))
+        )
+    )
+    if inp.reply_to_author:
+        structural.add(taxonomy.REPLY_TO_AUTHOR)
     pre = precheck.precheck(text)
     pre_flags = {taxonomy.POSSIBLE_INSTRUCTION_TEXT} if pre.flagged else set()
     model_flags = set(result.flags)
@@ -151,6 +163,7 @@ def run_case(
         "failed_reason": reason if result.outcome == domain.FAILED else None,
         "primary_class": result.primary_class,
         "model_flags": sorted(model_flags),
+        "structural_flags": sorted(structural),
         "confidence": result.confidence,
         "precheck_flagged": pre.flagged,
         "precheck_rules": list(pre.rules_matched),

@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from afterword import heuristic, taxonomy
-from afterword.normalize import normalize
+from afterword.normalize import content_flags, normalize
 from afterword.policy import PolicyInput, Tier, assign
 from afterword.precheck import precheck
 
@@ -20,6 +20,7 @@ CORPUS = ROOT / "fixtures" / "corpus"
 SETS = {
     "adversarial": CORPUS / "adversarial.jsonl",
     "synthetic-bench": CORPUS / "synthetic-bench.jsonl",
+    "synthetic-bench-v2": CORPUS / "synthetic-bench-v2.jsonl",
 }
 KEYS = {
     "case_id",
@@ -54,7 +55,7 @@ def cases(name: str) -> list[dict[str, Any]]:
 
 
 def all_cases() -> list[dict[str, Any]]:
-    return cases("adversarial") + cases("synthetic-bench")
+    return cases("adversarial") + cases("synthetic-bench") + cases("synthetic-bench-v2")
 
 
 @pytest.mark.parametrize("case", all_cases(), ids=lambda c: c["case_id"])
@@ -70,9 +71,29 @@ def test_schema(case):
         assert set(case["parent"]) == {"body_html", "by_content_author"}
 
 
-def test_case_ids_are_unique():
-    ids = [c["case_id"] for c in all_cases()]
-    assert len(ids) == len(set(ids))
+def test_case_ids_are_unique_within_each_version():
+    for current in (cases("adversarial") + cases("synthetic-bench"), cases("synthetic-bench-v2")):
+        ids = [c["case_id"] for c in current]
+        assert len(ids) == len(set(ids))
+
+
+def test_bench_v2_keeps_every_v1_case_and_adds_the_tax_v0_2_boundaries():
+    old, new = cases("synthetic-bench"), cases("synthetic-bench-v2")
+    assert [c | {"set": "synthetic-bench-v2"} for c in old] == new[: len(old)]
+    added = new[len(old) :]
+    assert [c["case_id"] for c in added] == [f"bench-{n:03d}" for n in range(31, 36)]
+    assert [c["intended"]["primary_class"] for c in added] == [
+        "LIKELY_SPAM_OR_NOISE",
+        "TECHNICAL_EXTENSION",
+        "OPPORTUNITY",
+        "CORRECTION",
+        "LIGHTWEIGHT_ACKNOWLEDGMENT",
+    ]
+    for c in added:  # tax-v0.2: intended content flags are exactly what normalization sets
+        intended = set(c["intended"]["flags"]) & taxonomy.CONTENT_FLAGS
+        assert intended == content_flags(normalize(c["body_html"], "HTML"))
+    assert "REFERENCES_SPECIFIC_CLAIM" in added[3]["intended"]["flags"]
+    assert "REFERENCES_SPECIFIC_CLAIM" not in added[4]["intended"]["flags"]
 
 
 def test_adversarial_set_covers_every_evaluation_category():
@@ -108,7 +129,7 @@ def test_flagged_cases_surface_whatever_the_classifier_says(case):
 def test_b1_runs_end_to_end(case):
     normalized = normalize(case["body_html"], "HTML")
     result = heuristic.classify(normalized)
-    flags = set(result.flags)
+    flags = set(result.flags) | content_flags(normalized)
     if precheck(normalized.text).flagged:
         flags.add(taxonomy.POSSIBLE_INSTRUCTION_TEXT)
     if case["reply_to_author"]:

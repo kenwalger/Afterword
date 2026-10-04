@@ -240,10 +240,14 @@ def cmd_label_status(args: argparse.Namespace) -> int:
         return _fail(exc)
     by_pass = ", ".join(f"{name} {n}" for name, n in counts.by_pass.items())
     by_tool = ", ".join(f"{name} {n}" for name, n in counts.by_tool.items())
+    by_order = ", ".join(
+        f"{name} {n}" for name, n in counts.by_post_order.items() if n or name != "unknown"
+    )
     print(f"corpus version {args.corpus_version}: {counts.eligible} eligible comments")
     print(f"labeled {counts.labeled}, remaining {counts.remaining} (pass initial)")
     print(f"labeled comments by pass: {by_pass}")
     print(f"labels by tool: {by_tool}")
+    print(f"labels by post order: {by_order}")
     if counts.not_in_run:
         print(f"labeled comments not eligible in this run: {counts.not_in_run}")
     return 0
@@ -448,7 +452,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
     :param args: Parsed arguments.
     :returns: Process exit status.
     """
-    sets = args.set or list(bench.SETS)
+    sets = args.set or list(bench.DEFAULT_SETS)
     print(f"bench: {args.provider} {args.model or ''} on {', '.join(sets)} (synthetic only)")
     try:
         result = service.run_benchmark(

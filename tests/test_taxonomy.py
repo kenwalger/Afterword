@@ -44,3 +44,15 @@ def test_labeling_and_policy_use_the_same_names():
     assert labeling.CLASSES == taxonomy.CLASSES
     assert set(labeling.LABELER_FLAGS) == set(taxonomy.FLAGS) - taxonomy.STRUCTURAL_FLAGS
     assert set(policy.CLASS_DEFAULTS) == set(taxonomy.CLASSES)
+
+
+def test_structural_flags_are_the_ones_the_document_says_are_set_structurally():
+    section = DOC.split("## Flags", 1)[1]
+    structural = {
+        name
+        for name, meaning in re.findall(r"^\| `([A-Z_]+)` \| (.+?) \|$", section, re.MULTILINE)
+        if "Set structurally" in meaning
+    }
+    assert structural == taxonomy.STRUCTURAL_FLAGS
+    assert {"CONTAINS_CODE", "CONTAINS_LINK"} == taxonomy.CONTENT_FLAGS
+    assert not set(labeling.LABELER_FLAGS) & taxonomy.STRUCTURAL_FLAGS

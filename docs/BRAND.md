@@ -1,6 +1,8 @@
 # Brand
 
-**Version:** 1 (2026-10-04)
+**Version:** 2 (2026-10-04)
+
+v2 records the variants that now exist: the dark wordmark and the light "Aw" mark (as favicon exports). The monochrome wordmark and a dark mark do not exist yet. Colors and rules are unchanged.
 
 How the Afterword name and logo are presented, so that future sessions, contributors, and the author do not improvise with them.
 
@@ -47,9 +49,10 @@ The typeface family and weights used in the source artwork are recorded alongsid
 | Variant | File | Use |
 | --- | --- | --- |
 | Wordmark, color, light backgrounds | `img/Afterword_logo_color.png` | Default |
-| Wordmark, color, dark backgrounds | `img/Afterword_logo_color_dark.png` (to be created) | Dark themes, including GitHub dark mode |
+| Wordmark, color, dark backgrounds | `img/Afterword_logo_color_dark.png` | Dark themes, including GitHub dark mode (wired into the README `<picture>`) |
 | Wordmark, monochrome | `img/Afterword_logo_mono.png` (to be created) | Print, single-color contexts; both halves in one color, posture preserved |
-| Mark, "Aw" | `img/Afterword_mark.png` (to be created) | Favicon, avatars, app icons, anything below the wordmark's minimum size |
+| Mark, "Aw", light | `img/favicon-16x16.png`, `img/favicon-32x32.png`, `img/favicon.ico`, `img/apple-touch-icon.png` (180), `img/android-chrome-192x192.png`, `img/android-chrome-512x512.png`, `img/site.webmanifest` | Favicon, avatars, app icons, anything below the wordmark's minimum size. The 16 and 32 pixel PNGs are inlined as the label UI's favicon. Exported under favicon-generator names rather than `img/Afterword_mark.png`; no master file or SVG is in `img/` yet |
+| Mark, "Aw", dark | (to be created) | Dark backgrounds |
 
 Prefer SVG versions of each when they exist; PNG is the fallback.
 
@@ -86,7 +89,7 @@ Serve the light or dark variant automatically according to the viewer's theme:
 </picture>
 ```
 
-Until the dark variant exists, keep the current single image, accepting that "After" is hard to read in GitHub dark mode.
+The dark variant exists (2026-10-04), and the README uses this markup.
 
 ## Change control
 

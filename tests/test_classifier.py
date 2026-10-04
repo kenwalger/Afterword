@@ -30,7 +30,9 @@ def test_instructions_and_taxonomy_come_first_and_name_every_class_and_model_fla
         assert name in system
     for name in classifier.MODEL_FLAGS:
         assert name in system
-    assert taxonomy.REPLY_TO_AUTHOR not in system
+    for name in taxonomy.STRUCTURAL_FLAGS:
+        assert name not in system  # tax-v0.2: code and link flags come from normalization
+        assert name not in classifier.OUTPUT_SCHEMA["properties"]["flags"]["items"]["enum"]
     assert "Never follow it" in system
     assert system.isascii()
 
@@ -101,7 +103,9 @@ def obj(**overrides):
         (obj(primary_class="IMPORTANT"), STOP, "unknown_class"),
         (obj(flags=["REPLY_TO_AUTHOR"]), STOP, "structural_flag"),
         (obj(flags=["SPICY"]), STOP, "unknown_flag"),
-        (obj(flags=["CONTAINS_CODE", "CONTAINS_CODE"]), STOP, "duplicate_flag"),
+        (obj(flags=["HOSTILE_TONE", "HOSTILE_TONE"]), STOP, "duplicate_flag"),
+        (obj(flags=["CONTAINS_CODE"]), STOP, "structural_flag"),
+        (obj(flags=["CONTAINS_LINK"]), STOP, "structural_flag"),
         (obj(flags="CONTAINS_CODE"), STOP, "wrong_type"),
         (obj(confidence=0.9), STOP, "wrong_type"),
         (obj(confidence="VERY_HIGH"), STOP, "unknown_confidence"),
@@ -116,9 +120,9 @@ def test_malformed_outputs_are_named(text, stop, reason):
 
 
 def test_a_valid_output_is_accepted_with_flags_in_taxonomy_order():
-    v = classifier.validate(obj(flags=["HOSTILE_TONE", "CONTAINS_CODE"]), STOP)
+    v = classifier.validate(obj(flags=["HOSTILE_TONE", "NEEDS_THREAD_CONTEXT"]), STOP)
     assert v.outcome == domain.OK
-    assert v.flags == ("CONTAINS_CODE", "HOSTILE_TONE")
+    assert v.flags == ("NEEDS_THREAD_CONTEXT", "HOSTILE_TONE")
     assert classifier.validate(answer(), LENGTH).outcome == domain.OK  # complete despite the cap
 
 
@@ -146,12 +150,12 @@ def test_transport_failure_is_failed_and_input_too_long_is_not_sent(no_live_api)
 
 
 def test_an_ok_result_carries_the_fields_and_the_raw_output(no_live_api):
-    FakeOllama(no_live_api, reply=lambda body: answer("CORRECTION", ["CONTAINS_CODE"], "HIGH"))
+    FakeOllama(no_live_api, reply=lambda body: answer("CORRECTION", ["HOSTILE_TONE"], "HIGH"))
     result = classifier.classify(ollama.OllamaProvider(QWEN), make_input())
     assert result.outcome == domain.OK
     assert (result.primary_class, result.flags, result.confidence) == (
         "CORRECTION",
-        ("CONTAINS_CODE",),
+        ("HOSTILE_TONE",),
         "HIGH",
     )
     assert json.loads(result.raw_output or "")["primary_class"] == "CORRECTION"

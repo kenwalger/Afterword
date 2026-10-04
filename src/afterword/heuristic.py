@@ -113,11 +113,9 @@ def classify(normalized: NormalizedText) -> HeuristicResult:
     :returns: Class proxy, content flags, the rule that fired, and the features.
     """
     f = features(normalized)
-    flags = set()
-    if normalized.has_code:
-        flags.add("CONTAINS_CODE")
-    if f.link:
-        flags.add("CONTAINS_LINK")
+    # Code and link flags are structural from tax-v0.2: the service sets them from
+    # normalization for B1 and B2 alike, so the heuristic sets no flags itself.
+    flags: set[str] = set()
 
     if f.lexicon_match:
         primary, rule = "CORRECTION", "lexicon"

@@ -54,6 +54,7 @@ Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries 
 {"label_id": "l_1a2b_initial", "comment_id": "1a2b", "snapshot_run_id": "20261009T170000Z", "corpus_version": "unfrozen", "corpus_set": "dev", "sample_kind": "researcher", "label_guide_version": "lg-v0.1", "taxonomy_version": "tax-v0.1", "normalization_version": "display-v0.1", "primary_class": "CORRECTION", "flags": ["REFERENCES_SPECIFIC_CLAIM"], "consequential_prospective": 3, "consequential_retrospective": 3, "consequential_retrospective_state": "PRESENT", "context_reconstructed": true, "replied_before_labeling": false, "reason": "Step 2 command is wrong for current CLI", "pass": "initial", "batch_id": "b_20261009T184000Z", "duration_seconds": 48.2, "labeled_at": "2026-10-09T18:40:00Z"}
 ```
 
+- `flags`: from `tax-v0.2`, the structural flags (`REPLY_TO_AUTHOR`, `CONTAINS_CODE`, `CONTAINS_LINK`) come first, set by the tool (code and link from `norm-v0.1` of the comment's source body), then the labeler's. Analysis uses the deterministic code and link flags for every label, whatever its `taxonomy_version` (`docs/TAXONOMY.md`).
 - `snapshot_run_id`: the probe run the comment and its context were read from. Provenance, not identity.
 - `normalization_version`: the text rendering the labeler saw. `display-v0.1` is the labeling tool's display rendering, not the Stage 2 classification normalization.
 - `corpus_version`: `unfrozen` until `dev` is frozen at preregistration.

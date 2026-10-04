@@ -129,6 +129,7 @@ Claims below were added on 2026-10-02 during scoping v2.
   - **What the figures are.** Both are re-reads of historical weeks, so they are lower bounds on first-read cost (`EVALUATION.md`, Effort measurement). The comments in both weeks had been seen before, when they arrived; how many times each week had been read before its timing is not recorded. No practice timing of either week is on record, and both were timed before any comment in them was labeled (the first labeling batch started at 18:44 UTC that day). They cover reading only, oldest first with each reply chain: not deciding what to do, replying, or following up.
   - **Reading against the falsification condition.** The typical week falls in the "only a few minutes" range named above: under 4 minutes. The busy week does not: about 17.5 minutes for one week's comments. Weekly volume is spiky (trailing 13 weeks: median 7, max 60), so the cost is small in an ordinary week and real in a busy one. On this evidence the claim holds for busy weeks and not for a typical week.
   - **Consequence.** The Stage 0 gate (`ROADMAP.md`) asks for an explicit decision when C-009 shows trivial volume. That decision, to continue as planned or to continue and describe the project as a methodology study, is the author's and is not recorded here.
+- 2026-10-04 (later): Stage 0 gate decision by the author: **continue as planned.** This supersedes "not yet recorded" in the status line above, which is left as written. The split this evidence suggests (cheap in a typical week, costly in a busy one) becomes a claim of its own, C-012, tested on the prospective test period.
 
 ## C-010: Prospective and retrospective judgment largely agree
 
@@ -153,3 +154,19 @@ Claims below were added on 2026-10-03 (session 5).
 **Would weaken/falsify:** Long-term agreement matches 14-day agreement.
 
 **Status:** UNTESTED
+
+---
+
+Claims below were added on 2026-10-04 (session 7).
+
+## C-012: The value of assisted triage is concentrated in high-volume weeks
+
+**Claim:** Assisted triage delivers most of its value in high-volume weeks; in typical weeks chronological review is already cheap.
+
+**Evidence needed:** Test-period results reported separately for weeks above and below the trailing-13-week median volume.
+
+**Would weaken/falsify:** Benefit is similar across volume levels, or negligible in busy weeks too.
+
+**Status:** UNTESTED
+
+- 2026-10-04: Added after the C-009 timings (typical week 3.8 minutes, busy week 17.5 minutes, both re-reads) and the author's decision to continue as planned. Measured as a secondary analysis in `EVALUATION.md` (volume split). No evidence yet.
