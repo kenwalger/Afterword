@@ -111,7 +111,7 @@ Claims below were added on 2026-10-02 during scoping v2.
 
 **Would weaken/falsify:** Chronological review of a typical week takes only a few minutes. In that case the project continues as a methodology study and is described that way.
 
-**Status:** PARTIALLY MEASURED. Volume measured; chronological review time not yet measured.
+**Status:** MEASURED, MIXED. Volume and chronological reading time are measured (2026-10-04 entry). The typical week took under 4 minutes to read, which meets the falsification condition; the busy week took about 17.5 minutes, which does not. The Stage 0 gate decision (continue, or continue as a methodology study) is the author's and is not yet recorded.
 
 - 2026-10-02: Volume measured from probe run `20261002T171152Z` (all 138 published DEV articles; report `baseline-20261002T171152Z`, git-ignored). The run contains no deletion placeholders and none of the hand-test comments.
   - **Totals:** 707 comments returned: 432 from others and 275 by the author (39% of all comments, excluded under ADR-011).
@@ -123,6 +123,12 @@ Claims below were added on 2026-10-02 during scoping v2.
   - **Weeks chosen for timing:** typical week 2026-09-21 to 2026-09-27 (7 comments from others); busy week 2026-09-07 to 2026-09-13 (44).
   - **Not yet established:** the attention cost itself, which needs a timed chronological review of both weeks. The claim is neither supported nor weakened until then.
 - 2026-10-03: The typical week to time is replaced. 2026-09-21 had been re-read twice (once in a practice timing run, which was not recorded as evidence), so a timing of it would no longer be a usable lower bound. The replacement is 2026-07-27 to 2026-08-02 (7 comments from others), the complete week closest to the trailing-13-week median of run `20261002T171152Z`, excluding 2026-09-21 and 2026-09-07. The busy week is unchanged. Only timings confirmed as valid count; practice runs are kept apart. No review time measured yet.
+- 2026-10-04: Both chronological timings were recorded as valid on 2026-10-03, from probe run `20261003T141450Z`, and are entered here a day late: every session summary after 2026-10-03 listed them as open. Figures are from the two records under `reports/timing/` (git-ignored), counts and times only.
+  - **Typical week, 2026-07-27 to 2026-08-02:** 7 of 7 comments from others read, complete, in 228.4 seconds (3.8 minutes; 32.6 seconds per comment).
+  - **Busy week, 2026-09-07 to 2026-09-13:** 44 of 44 read, complete, in 1051.7 seconds (17.5 minutes; 23.9 seconds per comment).
+  - **What the figures are.** Both are re-reads of historical weeks, so they are lower bounds on first-read cost (`EVALUATION.md`, Effort measurement). The comments in both weeks had been seen before, when they arrived; how many times each week had been read before its timing is not recorded. No practice timing of either week is on record, and both were timed before any comment in them was labeled (the first labeling batch started at 18:44 UTC that day). They cover reading only, oldest first with each reply chain: not deciding what to do, replying, or following up.
+  - **Reading against the falsification condition.** The typical week falls in the "only a few minutes" range named above: under 4 minutes. The busy week does not: about 17.5 minutes for one week's comments. Weekly volume is spiky (trailing 13 weeks: median 7, max 60), so the cost is small in an ordinary week and real in a busy one. On this evidence the claim holds for busy weeks and not for a typical week.
+  - **Consequence.** The Stage 0 gate (`ROADMAP.md`) asks for an explicit decision when C-009 shows trivial volume. That decision, to continue as planned or to continue and describe the project as a methodology study, is the author's and is not recorded here.
 
 ## C-010: Prospective and retrospective judgment largely agree
 

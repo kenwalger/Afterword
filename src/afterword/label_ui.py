@@ -145,7 +145,11 @@ class LabelUI:
 
         :returns: JSON-ready state.
         """
-        base: dict[str, Any] = {"taxonomy": self._taxonomy, "pass": self.options.pass_name}
+        base: dict[str, Any] = {
+            "taxonomy": self._taxonomy,
+            "pass": self.options.pass_name,
+            "progress": self.progress(),
+        }
         if self.stopped:
             return base | {"status": "stopped", "labeled_total": self.labeled_total}
         if self.batch is None:
@@ -172,6 +176,21 @@ class LabelUI:
                 "comment": service.label_view(batch, self.index),
             }
         )
+
+    def progress(self) -> dict[str, int]:
+        """Count progress for the badge: totals only, never classes or grades.
+
+        :returns: ``labeled`` (initial pass), ``relabeled`` (calibration pass),
+            and ``eligible`` comments in the run.
+        """
+        counts = service.label_progress(
+            self.session, root=self.root, corpus_version=self.options.corpus_version
+        )
+        return {
+            "labeled": counts.labeled,
+            "relabeled": counts.relabeled,
+            "eligible": counts.eligible,
+        }
 
     def _current(self, comment_id: Any) -> labeling.LabelBatch:
         if self.stopped or self.batch is None or self._finished():

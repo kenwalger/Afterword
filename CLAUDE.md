@@ -12,7 +12,7 @@ Rules for any session working in this repository.
 
 **Stage 0** of `docs/ROADMAP.md` is finishing in parallel with **Stage 1 to 3a groundwork** (plan approved 2026-10-03, session 4).
 
-- Stage 0 done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Remaining, by the author: timed chronological reviews (C-009) and labeling the `dev` corpus with `afterword label`.
+- Stage 0 done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Timed chronological reviews done (2026-10-03, recorded in `CLAIMS.md` 2026-10-04). Remaining, by the author: labeling the `dev` corpus, and the Stage 0 gate decision on C-009.
 - Groundwork in scope, all of it independent of labels and real comment data, all through the service layer (ADR-012):
   1. Docs: `DATA-MODEL` v5, `PRIORITY-POLICY` clarifications, `EVALUATION` v4, model-boundary records in `PRIVACY-AND-BOUNDARIES` v3.
   2. Normalization `norm-v0.1` (separate from the labeling tool's `display-v0.1`) and edit detection by normalized text.
@@ -26,6 +26,8 @@ Rules for any session working in this repository.
   10. Service functions and CLI commands for the above.
   11. Benchmark of the two approved Ollama models on synthetic fixtures only.
 - Checkpoint: after items 1 to 6, stop for the author to commit before items 7 to 11.
+
+Orientation checks open items at their source, not in earlier session summaries: count the valid timing records under `reports/timing/` (`afterword.timing.load_valid`, aggregates only) and the label records under `fixtures/labels/` (`afterword.label_records`, counts only). Never print record contents. A summary that lists an item as open can be out of date.
 
 Model calls, local or remote, run only on synthetic data. No real comment data goes to any model, and no real data is ingested into the store by Claude, until the author says so and the model-boundary record for that path is signed off.
 

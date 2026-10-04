@@ -188,7 +188,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "corpus_version": "unfrozen",
         "corpus_set": "dev",
         "sample_kind": "researcher",
-        "label_guide_version": "lg-v0.2",
+        "label_guide_version": "lg-v0.3",
         "taxonomy_version": "tax-v0.1",
         "normalization_version": "display-v0.1",
         "primary_class": "TECHNICAL_QUESTION",
@@ -208,6 +208,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
     assert start["event"] == "batch_start"
     assert start["planned"] == 4
     assert start["post_order"] == "published"
+    assert start["tool"] == "terminal"
     assert "seed" not in start
     assert start["started_at"] == "2026-10-09T18:00:00Z"
     assert end == {
@@ -217,7 +218,146 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "labeled": 1,
         "skipped": 1,
         "ended_by": "quit",
+        "abandoned_in_progress": False,
     }
+
+
+# Saving on quit (session 6: q at Save? used to discard the comment on screen) ------
+
+
+def test_q_at_the_save_prompt_saves_the_label_and_its_note_then_stops(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    answers = ["3", "4", "2", "3", "needs an answer", "hard one", "q"]
+    script = Script(answers)
+    assert run(snap, tmp_path, script) == 1
+    out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
+    (label,) = lines(out / "initial.jsonl")
+    assert (label["comment_id"], label["primary_class"]) == ("s1a1", "TECHNICAL_QUESTION")
+    events = lines(out / "batches.jsonl")
+    assert {"event": "note", "batch_id": label["batch_id"], "comment_id": "s1a1",
+            "note": "hard one"} in events  # fmt: skip
+    end = events[-1]
+    assert (end["labeled"], end["ended_by"], end["abandoned_in_progress"]) == (1, "quit", False)
+    assert "saved before stopping" in script.text
+    assert "q = save and stop" in script.prompts[-1]
+    assert len(script.prompts) == len(answers)  # stopped: no second comment was shown
+
+
+def test_end_of_input_at_the_save_prompt_also_saves(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    script = Script(label_answers()[:-1])  # every answer, then end of input at Save?
+    assert run(snap, tmp_path, script) == 1
+    assert len(lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")) == 1
+
+
+def test_quit_with_answers_entered_says_so_and_records_it(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    script = Script(["3", "4", "q"])
+    assert run(snap, tmp_path, script) == 0
+    out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
+    assert not (out / "initial.jsonl").exists()
+    assert lines(out / "batches.jsonl")[-1]["abandoned_in_progress"] is True
+    assert "was NOT saved" in script.text
+
+
+def test_quit_before_any_answer_is_not_an_abandoned_label(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    script = Script(["q"])
+    run(snap, tmp_path, script)
+    events = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "batches.jsonl")
+    assert events[-1]["abandoned_in_progress"] is False
+    assert "was not labeled" in script.text
+
+
+def test_ctrl_c_at_the_save_prompt_discards_and_says_so(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    answers = iter(label_answers()[:-1])
+
+    def read(prompt: str) -> str:
+        if prompt.startswith("Save?"):
+            raise KeyboardInterrupt
+        return next(answers)
+
+    out: list[str] = []
+    console = labeling.Console(read, out.append)
+    clock = ticker()
+    labeling.run_labeling(
+        snap, console, root=tmp_path, now=lambda: NOW, monotonic=lambda: next(clock)
+    )
+    labels = tmp_path / labeling.LABEL_ROOT / "unfrozen"
+    assert not (labels / "initial.jsonl").exists()
+    assert lines(labels / "batches.jsonl")[-1]["abandoned_in_progress"] is True
+    assert any("was NOT saved" in o for o in out)
+
+
+# Progress and calibration ----------------------------------------------------------
+
+
+def test_the_closing_line_gives_totals_only(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    script = Script([*label_answers(), "q"])
+    run(snap, tmp_path, script)
+    assert "1 labeled this session, bringing the total to 1 of 4." in script.out
+    script = Script([*label_answers(cls="8", pro="0", retro=""), *label_answers(), "q"])
+    run(snap, tmp_path, script)
+    assert "2 labeled this session, bringing the total to 3 of 4." in script.out
+    closing = script.out[-1]
+    for name in taxonomy.CLASSES:
+        assert name not in closing
+
+
+def test_calibration_relabels_only_labeled_comments_and_never_overwrites(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    run(snap, tmp_path, Script([*label_answers(), *label_answers(cls="8", pro="0"), "q"]))
+    out = tmp_path / labeling.LABEL_ROOT / "unfrozen"
+    before = (out / "initial.jsonl").read_bytes()
+
+    script = Script([*label_answers(cls="7", pro="1", retro="1"), "q"])
+    run(snap, tmp_path, script, pass_name="calibration")
+    assert (out / "initial.jsonl").read_bytes() == before
+    (label,) = lines(out / "calibration.jsonl")
+    assert (label["label_id"], label["pass"]) == ("l_s1a1_calibration", "calibration")
+    assert label["primary_class"] == "CONVERSATIONAL"
+    # The prior label is never shown: the only class named is the one just chosen.
+    summaries = [o for o in script.out if " | prospective " in o]
+    assert summaries and all("TECHNICAL_QUESTION" not in o for o in summaries)
+    assert "bringing the total in pass calibration to 1 of 4." in script.out[-1]
+
+    run(snap, tmp_path, Script([*label_answers(), "q"]), pass_name="calibration")
+    labeled = lines(out / "calibration.jsonl")
+    assert [r["comment_id"] for r in labeled] == ["s1a1", "s1b1"]
+    script = Script([])
+    run(snap, tmp_path, script, pass_name="calibration")
+    assert "Nothing left to label in pass calibration" in script.text
+
+
+def test_calibration_with_ids_is_limited_to_labeled_comments(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    run(snap, tmp_path, Script([*label_answers(), "q"]))
+    batch = labeling.LabelBatch(
+        snap, root=tmp_path, pass_name="calibration", only_ids={"s1a1", "s1a3"}
+    )
+    assert [c.source_object_id for c in batch.queue] == ["s1a1"]
+
+
+def test_cli_label_status_prints_counts_only(tmp_path, fake_dev, capsys, monkeypatch):
+    make_run(tmp_path)
+    snap = labeling.Snapshot(records.load_run(tmp_path / cli.RAW_ROOT / "r1", include_text=True))
+    run(snap, tmp_path, Script([*label_answers(), "q"]))
+    capsys.readouterr()
+
+    def no_input(prompt: str) -> str:
+        raise AssertionError("status must not prompt")
+
+    monkeypatch.setattr("builtins.input", no_input)
+    assert cli.main(["--root", str(tmp_path), "label", "status", "--run", "r1"]) == 0
+    out = capsys.readouterr().out
+    assert "4 eligible comments" in out
+    assert "labeled 1, remaining 3 (pass initial)" in out
+    assert "labeled comments by pass: initial 1, calibration 0, self_agreement 0" in out
+    assert "labels by tool: terminal 1, browser 0, not recorded 0" in out
+    for text in (*NAMES, "needs an answer", "TECHNICAL_QUESTION", "s1a1", "Synthetic"):
+        assert text not in out
 
 
 def test_retrospective_prompt_comes_only_after_the_prospective_grade(tmp_path, fake_dev):
@@ -483,6 +623,7 @@ def test_cli_refuses_scoped_runs(tmp_path, fake_dev, capsys, monkeypatch):
 def test_every_output_path_is_git_ignored():
     paths = [
         labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl",
+        labeling.LABEL_ROOT / "unfrozen" / "calibration.jsonl",
         labeling.LABEL_ROOT / "corpus-v1" / "self_agreement.jsonl",
         labeling.LABEL_ROOT / "unfrozen" / "batches.jsonl",
         labeling.TIMING_ROOT / "chronological-2026-09-21-20261009T180000Z.json",

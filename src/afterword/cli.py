@@ -8,6 +8,7 @@ times, and file paths. It never includes comment text, commenter names, or the
 API key. `label` is the exception by design: it shows comment text (never names)
 in the author's own terminal, and is never run by an assistant session; `label-ui`
 shows it only in a page served on 127.0.0.1, and prints counts and its URL.
+`label status` prints progress counts only, with no class or grade distribution.
 """
 
 from __future__ import annotations
@@ -183,6 +184,8 @@ def cmd_label(args: argparse.Namespace) -> int:
     :returns: Process exit status.
     """
     root = Path(args.root)
+    if args.action == "status":
+        return cmd_label_status(args)
     if args.mode == "chronological" and not args.week:
         print("--mode chronological needs --week (any date in the week)", file=sys.stderr)
         return 2
@@ -217,6 +220,32 @@ def cmd_label(args: argparse.Namespace) -> int:
         post_order=args.posts,
         seed=args.seed,
     )
+    return 0
+
+
+def cmd_label_status(args: argparse.Namespace) -> int:
+    """Print labeling progress for a run: counts only, no classes, grades, IDs, or text.
+
+    :param args: Parsed arguments of ``label status``.
+    :returns: Process exit status.
+    """
+    opened = _open_labeling(args)
+    if isinstance(opened, int):
+        return opened
+    try:
+        counts = service.label_progress(
+            opened, root=Path(args.root), corpus_version=args.corpus_version
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    by_pass = ", ".join(f"{name} {n}" for name, n in counts.by_pass.items())
+    by_tool = ", ".join(f"{name} {n}" for name, n in counts.by_tool.items())
+    print(f"corpus version {args.corpus_version}: {counts.eligible} eligible comments")
+    print(f"labeled {counts.labeled}, remaining {counts.remaining} (pass initial)")
+    print(f"labeled comments by pass: {by_pass}")
+    print(f"labels by tool: {by_tool}")
+    if counts.not_in_run:
+        print(f"labeled comments not eligible in this run: {counts.not_in_run}")
     return 0
 
 
@@ -509,6 +538,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     label = sub.add_parser(
         "label", help="label comments, or time a chronological review (local terminal)"
+    )
+    label.add_argument(
+        "action",
+        nargs="?",
+        choices=("status",),
+        help="status: print labeling progress for the run (counts only) and exit",
     )
     _labeling_options(label)
     label.add_argument("--mode", choices=("label", "chronological"), default="label")

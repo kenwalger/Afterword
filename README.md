@@ -13,19 +13,20 @@ Afterword asks whether AI can reduce the part of a comment stream that needs imm
 
 ## Status
 
-Stage 0 of `docs/ROADMAP.md` is open for timing and labeling, with Stage 1 to 3a groundwork built ahead and tested on synthetic data only. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
+Stage 0 of `docs/ROADMAP.md` is open for labeling, with Stage 1 to 3a groundwork built ahead and tested on synthetic data only. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
 
 Done:
 
 - Experiment design (docs and ADRs), committed before any code.
 - A read-only DEV probe (`afterword probe`) that verified the capability matrix, including edit and deletion behavior.
-- The C-009 volume baseline (`afterword baseline --run <run>`): 432 comments from others across 138 posts, recent and spiky. Review time is not yet measured.
+- The C-009 volume baseline (`afterword baseline --run <run>`): 432 comments from others across 138 posts, recent and spiky.
+- The C-009 chronological timings (2026-10-03): a typical week (7 comments) read in 3.8 minutes, a busy week (44) in 17.5 minutes. Both are re-reads, so lower bounds, and cover reading only. The typical week meets C-009's falsification condition; the Stage 0 gate decision is open (`docs/CLAIMS.md`).
 - A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
 - The corpus targets decision: the historical corpus is `dev`, and the test set is prospective (ADR-010, amended).
 - A local browser labeling interface (`afterword label-ui`, session 5), writing the same records as `label`.
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper `pr-v0.1`; the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 
-Open: timed chronological reviews and labeling (the author). No model has classified a real comment. Both local models were benchmarked on the synthetic sets only (`docs/benchmarks/`), with no model chosen.
+Open: labeling the `dev` corpus, and the Stage 0 gate decision on C-009 (the author). No model has classified a real comment. Both local models were benchmarked on the synthetic sets only (`docs/benchmarks/`), with no model chosen.
 
 ## Quick start
 
@@ -58,7 +59,9 @@ uv run afterword label --run <run-id>
 - `probe` is read-only (GET only). It saves raw payloads under git-ignored `fixtures/dev-api/source/real/<run-id>/` and value-free findings under `reports/probe/<run-id>/`. Its console output is counts and IDs only, safe to share.
 - `--mode chronological` times a plain oldest-first read of one week (C-009) and asks at the end whether to record it as a valid timing.
 - `label-ui` is the faster way to label. It serves one page on 127.0.0.1 and opens it in your browser; if the browser does not open, use the `open: http://127.0.0.1:8765/?t=<token>` line it prints (the whole URL, token included; it changes on every launch). Keys: `1` to `9` and `0` choose the class, letters toggle flags, Shift+`0` to `3` sets the prospective grade, `g` then `0` to `3` the retrospective grade, `e` types the reason, Enter saves, `h` shows the definitions, `s` skips, `q` stops. Each Enter writes the label at once. Stop with `q` in the page or Ctrl+C in the terminal (closing the tab leaves the server running); run the command again to resume with the next unlabeled comment.
-- `label` labels the same batches in the terminal, one batch of at most 40 comments, then stops; run it again to continue. Use it for `--mode chronological` (timing exists only there) or without a browser. The two write the same records and can continue each other's work, but never run both at once.
+- `label` labels the same batches in the terminal, one batch of at most 40 comments, then stops; run it again to continue. Use it for `--mode chronological` (timing exists only there) or without a browser. The two write the same records and can continue each other's work, but never run both at once. In the terminal, `q` at the `Save?` prompt saves the label, then stops; `q` at an earlier prompt leaves the comment on screen unsaved, and the tool says so.
+- `uv run afterword label status --run <run-id>` prints labeling progress for the run: labeled, remaining, and labels by pass and by tool. Counts only, never classes or grades.
+- `--pass calibration` (either tool) re-labels comments that already have an initial label, from scratch, with the earlier label hidden; `--ids <file>` picks which. Nothing is overwritten (`docs/LABELING-GUIDE.md`).
 - Either tool takes `--posts random --seed N`, which shuffles the order of posts reproducibly; comments within a post stay oldest first. Keep the same seed for a whole pass.
 - The full labeling routine, including every shortcut, is in `docs/WORKFLOW.md` (section 3).
 - `uv run afterword baseline --run <run-id>` writes the C-009 volume report under `reports/`.

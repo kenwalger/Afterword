@@ -39,6 +39,8 @@ header {
   display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline;
 }
 header strong { font-size: 16px; }
+.badge { margin-left: auto; font-size: 13px; padding: 2px 10px; border-radius: 999px;
+  background: var(--accent-bg); color: var(--text); white-space: nowrap; }
 .muted { color: var(--muted); }
 main { display: flex; gap: 16px; padding: 16px; align-items: flex-start; flex-wrap: wrap; }
 #left { flex: 3 1 480px; min-width: 0; }
@@ -98,6 +100,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   <strong>Afterword labeling</strong>
   <span id="where" class="muted"></span>
   <span id="progress"></span>
+  <span id="badge" class="badge"
+    title="Totals: labeled (initial pass), relabeled (calibration), eligible in this run"></span>
 </header>
 <div id="screen"></div>
 <div id="help" role="dialog" aria-label="Definitions"></div>
@@ -187,6 +191,10 @@ function header() {
   } else {
     prog.textContent = st.labeled_total + " labeled this session";
   }
+  const p = st.progress;
+  document.getElementById("badge").textContent = p
+    ? p.labeled + " labeled | " + p.relabeled + " relabeled | " + p.eligible + " eligible"
+    : "";
 }
 
 function render() {

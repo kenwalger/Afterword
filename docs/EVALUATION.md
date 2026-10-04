@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 6 (2026-10-03)
+**Version:** 7 (2026-10-04)
+
+v7 (2026-10-04, with 150 of the `dev` comments labeled and before any classification of a real comment) records a provisional accrual estimate from the partial consequential share. Nothing registered exists yet, so nothing registered changes.
 
 v6 (2026-10-03, after a benchmark on synthetic data only, before any classification of a real comment) adds flag precision and flag-caused tier raises as secondary measures. The synthetic benchmark showed one candidate model setting tier-raising flags on most cases (`docs/benchmarks/2026-10-03-synthetic-local-models.md`).
 
@@ -62,7 +64,15 @@ The proposal estimated accrual time from the trailing 13 weeks of volume (mean 1
 
 Once `dev` labeling is complete, recompute this estimate with the observed consequential share and record it here, dated, before the preregistration commit.
 
-*Not yet recomputed.*
+**2026-10-04, PROVISIONAL (partial labels; superseded when `dev` labeling is complete).**
+
+- **Share:** 39 of the first 150 labeled `dev` comments are prospectively graded 2 or 3: 26.0% (Wilson 95% interval 19.6% to 33.6%). Counted from the analysis labels (`LABELING-GUIDE.md`); none were calibration labels.
+- **Accrual at that share:** 20 consequential comments need about 77 comments (102 at the interval's low end), so the 100-comment target binds across the whole interval. That is about 6 weeks at the trailing-13-week mean rate (17.0 per week; replay 3 / 7 / 11 weeks) and about 14 weeks at the median rate (7 per week), both inside the 16-week cap. The assumed 15% gave 8 to 10 weeks.
+- **Why it is provisional:**
+  - **Not a random sample.** The 150 are the comments on the earliest-published posts: every batch so far used publication order. The share on later posts can differ.
+  - **Hindsight.** 108 of the 150 (72%) were labeled after the author had replied (`replied_before_labeling`), so the prospective grades may carry hindsight that test-set grades, labeled at first read, will not.
+  - **Small sample.** One labeler, 150 comments, a 14-point-wide interval.
+- **What would change it:** the share on the full `dev` set. If it falls below about 20%, the consequential target binds again and the estimate lengthens (8 to 10 weeks at 15%, mean rate).
 
 ### Risks to accrual
 

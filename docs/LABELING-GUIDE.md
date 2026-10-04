@@ -1,6 +1,8 @@
 # Labeling Guide
 
-**Version:** `lg-v0.2`
+**Version:** `lg-v0.3`
+
+`lg-v0.3` (2026-10-04, with 150 `dev` labels made under `lg-v0.2`) adds the calibration pass and the rule for which label analysis uses when a comment has more than one. Grades, definitions, tests, context reconstruction, and the initial pass are unchanged, so `lg-v0.2` labels need no change.
 
 `lg-v0.2` (2026-10-02, before any labels existed) defines how context is reconstructed and what `context_reconstructed` means, and records labeling time as `duration_seconds`. Grades, definitions, and tests are unchanged from `lg-v0.1`.
 
@@ -69,12 +71,28 @@ The reconstruction is partial, and the limits are known:
 - Label each test comment before any classifier output for it is revealed. Shadow-mode outputs stay sealed until accrual stops (ADR-010).
 - Do not consult the commenter's profile or history.
 
+## Calibration pass
+
+Early labels are made before the labeler has settled how the guide applies to real comments. A calibration pass re-labels selected comments that already have an initial label, so that early judgments can be redone once the labeler has more experience, without losing the originals.
+
+- Run either tool with `--pass calibration`, usually with `--ids <file>` naming the comments to redo. Only comments with an initial label are offered.
+- Label from scratch. The earlier label is never shown, and the labeler does not look it up before or during the batch. Context, blinding, and every other rule of the initial pass apply.
+- Calibration labels go to `calibration.jsonl` and never overwrite the initial label, which stays on disk unchanged.
+- A calibration pass is not the self-agreement check. It replaces a label in analysis; the self-agreement check only measures consistency and replaces nothing.
+- How calibration labels differ from the originals is reported as counts only: agreement on class, on prospective grade, on the consequential binary (with the direction of each change), and on flags.
+
+## Which label analysis uses
+
+When a comment has more than one label, analysis uses **the latest label from any pass other than `self_agreement`**, by `labeled_at`. In practice: the calibration label when one exists, otherwise the initial label. A tie in time goes to the calibration label. Self-agreement labels are never the analysis label.
+
+All labels are kept. The analysis label is chosen when results are computed (`afterword.label_records.analysis_labels`), never by rewriting files. Every result states how many of its labels are calibration labels.
+
 ## Self-agreement check
 
 At least 14 days after the initial labeling pass:
 
 1. Re-label a random sample of 25 comments from the test set, plus every comment originally graded 2 or 3.
-2. Do not look at the original labels until finished.
+2. Do not look at the original labels until finished. "Original" means the label analysis uses for that comment (above); the 14 days count from when that label was made.
 3. Record agreement on primary class (Cohen's kappa) and on the consequential binary (raw agreement plus a list of every disagreement).
 4. Discuss each disagreement in the evaluation notes.
 

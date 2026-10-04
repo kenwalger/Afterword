@@ -31,6 +31,7 @@ fixtures/
   labels/              # git-ignored, written by `afterword label`
     <corpus_version>/
       initial.jsonl
+      calibration.jsonl
       self_agreement.jsonl
       batches.jsonl
 ```
@@ -61,7 +62,8 @@ Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries 
 - `consequential_retrospective_state`: `PRESENT`, or `UNKNOWN` when the labeler skipped the retrospective grade (the grade is then `null`).
 - `context_reconstructed`: see `docs/LABELING-GUIDE.md`.
 - `replied_before_labeling`: `true` when the author's direct reply to the comment exists in the snapshot. Derived by the tool, not chosen. A prospective grade given after replying may carry hindsight.
-- `batch_id` and `duration_seconds`: the labeling batch, `b_<start time>`, with `_2`, `_3` appended when another batch already started in the same second (start and end times, and the post order with its seed when shuffled, are in `batches.jsonl`; a `batch_start` without `post_order` predates the option and was `published`) and the time from the comment being shown to the label being saved.
+- `pass`: `initial`, `calibration` (a re-label from scratch of a comment with an initial label, written to `calibration.jsonl`; never overwrites), or `self_agreement`. Which label analysis uses is in `docs/LABELING-GUIDE.md`.
+- `batch_id` and `duration_seconds`: the labeling batch, `b_<start time>`, with `_2`, `_3` appended when another batch already started in the same second (start and end times, and the post order with its seed when shuffled, are in `batches.jsonl`; a `batch_start` without `post_order` predates the option and was `published`; `tool` on `batch_start` is `terminal` or `browser`, absent before 2026-10-04; a terminal `batch_end` carries `abandoned_in_progress`, true when the session stopped with answers entered for the comment on screen, which were not saved) and the time from the comment being shown to the label being saved.
 
 ## Freezing
 

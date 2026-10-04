@@ -235,6 +235,25 @@ def test_invalid_labels_are_refused_and_nothing_is_written(tmp_path, fake_dev):
     assert ui.state()["position"] == 1
 
 
+def test_state_carries_a_totals_only_progress_badge(tmp_path, fake_dev):
+    ui = make_ui(tmp_path)
+    assert ui.state()["progress"] == {"labeled": 0, "relabeled": 0, "eligible": 4}
+    ui.submit(answer(ui))
+    assert ui.state()["progress"] == {"labeled": 1, "relabeled": 0, "eligible": 4}
+    ui.stop()
+    (start, *_) = batch_events(tmp_path)
+    assert start["tool"] == "browser"
+    assert "abandoned_in_progress" not in batch_events(tmp_path)[-1]
+
+    calibration = make_ui(tmp_path, pass_name="calibration")
+    assert calibration.state()["comment"]["comment_id"] == "s1a1"
+    calibration.submit(answer(calibration, primary_class="CONVERSATIONAL"))
+    assert calibration.state()["progress"] == {"labeled": 1, "relabeled": 1, "eligible": 4}
+    assert calibration.state()["status"] == "batch_done"  # only labeled comments are relabeled
+    assert 'id="badge"' in PAGE
+    assert "relabeled" in PAGE
+
+
 def test_skip_note_completion_and_next_batch(tmp_path, fake_dev):
     ui = make_ui(tmp_path, batch_size=2)
     ui.skip({"comment_id": "s1a1", "note": "ambiguous"})

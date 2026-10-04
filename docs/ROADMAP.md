@@ -15,12 +15,12 @@ Goal: define the question before implementation changes it.
 - [x] Project brief and scope (v2)
 - [x] Provisional taxonomy (`tax-v0.1`)
 - [x] Provisional priority policy (`pp-v0.1`)
-- [x] Labeling guide (`lg-v0.2`)
+- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule)
 - [x] ADR-001 to ADR-013 (ADR-001 to ADR-011 with the design; ADR-012, the service layer, and ADR-013, local-first with a hosted path preserved, added 2026-10-03)
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
 - [x] Measure volume baseline: comments per post and per week across the author's DEV history (C-009; 2026-10-02)
-- [ ] Time chronological reviews of two weeks, a typical week and a busy week (C-009; `afterword label --mode chronological`)
+- [x] Time chronological reviews of two weeks, a typical week and a busy week (C-009; `afterword label --mode chronological`; timed 2026-10-03, recorded in `CLAIMS.md` 2026-10-04: typical week 3.8 minutes, busy week 17.5 minutes, both re-reads)
 - [x] Define the fixture format and the synthetic corpus manifest (2026-10-03: `fixtures/README.md`, `fixtures/corpus/MANIFEST.md`, with hashes checked by a test)
 - [ ] Real corpus manifest: `dev` file hashes, committed when `dev` is frozen at preregistration (ADR-010)
 - [x] Decide corpus targets (2026-10-02: historical `dev`, prospective `test`; ADR-010 amended, `docs/proposals/accepted/2026-10-02-corpus-targets.md`)
@@ -28,6 +28,8 @@ Goal: define the question before implementation changes it.
 - [x] Build the adversarial set, including injection cases (2026-10-03: synthetic, 24 cases, `fixtures/corpus/adversarial.jsonl`; hand-picked hard cases from labeling notes may be added as a new version)
 
 **Gate:** if C-009 shows trivial volume, decide explicitly whether to continue as a methodology study. Otherwise continue.
+
+Gate input (2026-10-04): the typical week's read took under 4 minutes, which meets C-009's falsification condition; the busy week's took about 17.5 minutes, which does not. The decision is the author's and is not yet recorded.
 
 ## Stage 1: DEV ingestion
 

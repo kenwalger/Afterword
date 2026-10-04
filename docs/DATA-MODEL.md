@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 6 (2026-10-03)
+**Version:** 7 (2026-10-04)
+
+v7 (2026-10-04, with 150 `dev` labels recorded) adds the `calibration` value of EvaluationLabel `pass` and states which label analysis uses (`LABELING-GUIDE.md` `lg-v0.3`). Nothing earlier is removed.
 
 v6 (2026-10-03, before any label or stored record existed) adds `sample_kind` to EvaluationLabel, so future label sources fit without migration (every V1 label is `researcher`); and, from the first implementation of the store, `LifecycleEvent`, `consecutive_absences` and `current_payload_hash` on Comment, `current_payload_hash` on ContentItem, and `error` on Classification.
 
@@ -220,7 +222,7 @@ Ground truth for the corpus. Separate from operational overrides.
 - `context_reconstructed` (boolean)
 - `replied_before_labeling` (boolean; the author's direct reply to the comment existed in the snapshot when it was labeled)
 - `reason`
-- `pass` (`initial`, `self_agreement`)
+- `pass` (`initial`, `calibration`, `self_agreement`; a calibration label re-labels a comment from scratch and never overwrites its initial label. Analysis uses the latest label from a pass other than `self_agreement`, `LABELING-GUIDE.md`)
 - `snapshot_run_id` (the sync or probe run the comment and its context were read from; provenance, not identity)
 - `batch_id` (labeling batch; batch start and end times are recorded with the batch)
 - `duration_seconds` (time from the comment being shown to the label being saved)

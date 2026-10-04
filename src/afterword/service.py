@@ -29,6 +29,7 @@ from afterword import (
     classifier,
     domain,
     heuristic,
+    label_records,
     labeling,
     lifecycle,
     normalize,
@@ -312,7 +313,7 @@ def label_batch(
     :param session: An opened run.
     :param console: Terminal.
     :param root: Repository root.
-    :param pass_name: ``initial`` or ``self_agreement``.
+    :param pass_name: ``initial``, ``calibration``, or ``self_agreement``.
     :param corpus_version: Output directory name and label field.
     :param corpus_set: ``dev`` or ``test``.
     :param batch_size: Comments in the batch, at most :data:`afterword.labeling.MAX_BATCH`.
@@ -344,6 +345,31 @@ def labelable_ids(session: LabelingSession) -> set[str]:
     return {c.source_object_id for c in session.snapshot.subjects()}
 
 
+def label_progress(
+    session: LabelingSession, *, root: Path, corpus_version: str
+) -> label_records.LabelProgress:
+    """Count labeling progress for a run: totals only, never classes or grades.
+
+    The one count behind ``afterword label status``, the terminal tool's closing
+    line, and the label UI's badge. Eligibility is the labeling tools' own.
+
+    :param session: An opened run.
+    :param root: Repository root.
+    :param corpus_version: Which labels to count.
+    :returns: Labeled, remaining, relabeled, and counts by pass and by tool.
+    :raises ServiceError: If the corpus version is not a safe name.
+    """
+    try:
+        labeling.safe_name(corpus_version)
+    except ValueError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    return label_records.progress(
+        labelable_ids(session),
+        label_records.read_labels(root, corpus_version),
+        label_records.read_batches(root, corpus_version),
+    )
+
+
 def start_label_batch(
     session: LabelingSession,
     *,
@@ -358,11 +384,12 @@ def start_label_batch(
 ) -> labeling.LabelBatch | None:
     """Choose and start one labeling batch, for a transport other than the terminal.
 
-    The batch, its order, and its records are the same as ``afterword label``.
+    The batch, its order, and its records are the same as ``afterword label``;
+    its batch record names the transport as ``browser``.
 
     :param session: An opened run.
     :param root: Repository root.
-    :param pass_name: ``initial`` or ``self_agreement``.
+    :param pass_name: ``initial``, ``calibration``, or ``self_agreement``.
     :param corpus_version: Output directory name and label field.
     :param corpus_set: ``dev`` or ``test``.
     :param batch_size: Comments in the batch, at most :data:`afterword.labeling.MAX_BATCH`.
@@ -381,6 +408,7 @@ def start_label_batch(
         only_ids=only_ids,
         post_order=post_order,
         seed=seed,
+        tool="browser",
     )
     if not batch.items:
         return None

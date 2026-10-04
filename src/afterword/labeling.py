@@ -31,15 +31,15 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from afterword import taxonomy, timing
+from afterword import label_records, taxonomy, timing
 from afterword.baseline import week_start
 from afterword.display import DISPLAY_VERSION, html_to_display_text, strip_controls
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
 
-LABEL_ROOT: Path = Path("fixtures/labels")
+LABEL_ROOT: Path = label_records.LABEL_ROOT
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
-LABEL_GUIDE_VERSION: str = "lg-v0.2"
+LABEL_GUIDE_VERSION: str = "lg-v0.3"
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
@@ -47,7 +47,9 @@ DEFAULT_CORPUS_SET: str = "dev"
 # Who produced a label and how it was sampled. Every V1 label is the researcher's
 # own (EVALUATION.md); other sources are a future design (LABELING-AT-SCALE.md).
 SAMPLE_KIND: str = "researcher"
-PASSES: tuple[str, ...] = ("initial", "self_agreement")
+PASSES: tuple[str, ...] = label_records.PASSES
+# A calibration pass re-labels only comments that already have an initial label.
+CALIBRATION_PASS: str = "calibration"
 MAX_BATCH: int = 40
 STALE_AFTER: timedelta = timedelta(days=7)
 # Post order: by publication time, or shuffled by a recorded seed. Comments
@@ -70,6 +72,32 @@ _THIN_RULE: str = "-" * 72
 
 class Quit(Exception):
     """Raised when the labeler asks to stop."""
+
+
+class Abandoned(Quit):
+    """Raised when the session stops while a comment is on screen, unsaved."""
+
+    def __init__(self, *, answered: bool) -> None:
+        """Record whether any answer had been given for the comment.
+
+        :param answered: ``True`` once a class was chosen for the comment.
+        """
+        super().__init__()
+        self.answered = answered
+
+
+class SavedThenQuit(Quit):
+    """Raised when the labeler confirms the summary with ``q``: save, then stop."""
+
+    def __init__(self, record: dict[str, Any], note: str) -> None:
+        """Carry the confirmed label to be saved before stopping.
+
+        :param record: The label record, built and valid.
+        :param note: The hard-to-label note, possibly empty.
+        """
+        super().__init__()
+        self.record = record
+        self.note = note
 
 
 class Console:
@@ -601,25 +629,32 @@ class LabelBatch:
         only_ids: set[str] | None = None,
         post_order: str = "published",
         seed: int | None = None,
+        tool: str = "terminal",
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         """Choose the batch. Nothing is written until :meth:`start`.
 
+        A calibration pass queues only comments that already have an initial
+        label (narrowed further by ``only_ids``), and never shows that label.
+
         :param snap: The run to label from.
         :param root: Repository root; outputs go under ``fixtures/labels/``.
-        :param pass_name: ``initial`` or ``self_agreement``.
+        :param pass_name: ``initial``, ``calibration``, or ``self_agreement``.
         :param corpus_version: Output directory name and label field.
         :param corpus_set: ``dev`` for historical comments, ``test`` for prospective ones.
         :param batch_size: At most :data:`MAX_BATCH`.
         :param only_ids: Restrict to these comment IDs, such as a self-agreement sample.
         :param post_order: ``published`` or ``random`` (:meth:`Snapshot.subjects`).
         :param seed: Seed for ``random``.
+        :param tool: The transport, ``terminal`` or ``browser``, recorded on the batch.
         :param now: Wall clock.
-        :raises ValueError: For an unknown pass or order, an unsafe name, a batch
-            size out of range, or ``random`` without a seed.
+        :raises ValueError: For an unknown pass, order, or tool, an unsafe name, a
+            batch size out of range, or ``random`` without a seed.
         """
         if pass_name not in PASSES:
             raise ValueError(f"unknown pass: {pass_name}")
+        if tool not in label_records.TOOLS:
+            raise ValueError(f"unknown tool: {tool}")
         if not 1 <= batch_size <= MAX_BATCH:
             raise ValueError(f"batch size must be 1 to {MAX_BATCH}")
         self.snap = snap
@@ -627,6 +662,8 @@ class LabelBatch:
         self.pass_name = pass_name
         self.post_order = post_order
         self.seed = seed if post_order == "random" else None
+        self.tool = tool
+        self.root = root
         self.corpus_version = safe_name(corpus_version)
         self.corpus_set = safe_name(corpus_set)
         out_dir = root / LABEL_ROOT / self.corpus_version
@@ -634,11 +671,14 @@ class LabelBatch:
         self.batches_path = out_dir / "batches.jsonl"
         done = _labeled_ids(self.labels_path)
         self.done_before = len(done)
+        allowed = only_ids
+        if pass_name == CALIBRATION_PASS:
+            initial = _labeled_ids(out_dir / "initial.jsonl")
+            allowed = initial if only_ids is None else initial & only_ids
         self.queue = [
             c
             for c in snap.subjects(post_order=post_order, seed=seed)
-            if c.source_object_id not in done
-            and (only_ids is None or c.source_object_id in only_ids)
+            if c.source_object_id not in done and (allowed is None or c.source_object_id in allowed)
         ]
         self.items = self.queue[:batch_size]
         self.ctx: LabelContext | None = None
@@ -673,6 +713,7 @@ class LabelBatch:
             "pass": self.pass_name,
             "snapshot_run_id": self.ctx.snapshot_run_id,
             "mode": "label",
+            "tool": self.tool,
             "planned": len(self.items),
             "post_order": self.post_order,
             "started_at": _utc(started),
@@ -722,24 +763,39 @@ class LabelBatch:
                 },
             )
 
-    def end(self, ended_by: str) -> None:
+    def end(self, ended_by: str, *, abandoned_in_progress: bool | None = None) -> None:
         """Write the batch end record, once.
 
         :param ended_by: ``complete`` or ``quit``.
+        :param abandoned_in_progress: For the terminal: whether the session stopped
+            with answers entered for the comment on screen, which were not saved.
+            ``None`` (a transport that cannot tell) leaves the field out.
         """
         if self.ended_by is not None:
             return
         self.ended_by = ended_by
-        _append_jsonl(
-            self.batches_path,
-            {
-                "event": "batch_end",
-                "batch_id": self.context().batch_id,
-                "ended_at": _utc(self.now()),
-                "labeled": self.saved,
-                "skipped": self.skipped,
-                "ended_by": ended_by,
-            },
+        record: dict[str, Any] = {
+            "event": "batch_end",
+            "batch_id": self.context().batch_id,
+            "ended_at": _utc(self.now()),
+            "labeled": self.saved,
+            "skipped": self.skipped,
+            "ended_by": ended_by,
+        }
+        if abandoned_in_progress is not None:
+            record["abandoned_in_progress"] = abandoned_in_progress
+        _append_jsonl(self.batches_path, record)
+
+    def progress(self) -> label_records.LabelProgress:
+        """Count progress for this batch's run and corpus version, from disk.
+
+        :returns: Counts from :func:`afterword.label_records.progress`.
+        """
+        eligible = {c.source_object_id for c in self.snap.subjects()}
+        return label_records.progress(
+            eligible,
+            label_records.read_labels(self.root, self.corpus_version),
+            label_records.read_batches(self.root, self.corpus_version),
         )
 
     @property
@@ -764,6 +820,10 @@ def label_one(
     """Show one comment and collect its label.
 
     The retrospective prompt appears only after the prospective grade is entered.
+    A label is written once its summary is confirmed: Enter, or ``q`` (or end of
+    input) at the ``Save?`` prompt, which saves and then stops. Stopping at any
+    earlier prompt leaves the comment unsaved, and :class:`Abandoned` says
+    whether any answer had been entered for it.
 
     :param console: Terminal.
     :param snap: The run being labeled.
@@ -773,7 +833,38 @@ def label_one(
     :param now: Wall clock for ``labeled_at``.
     :param monotonic: Clock for ``duration_seconds``.
     :returns: The label record, or ``None`` if skipped; and an optional hard-to-label note.
+    :raises SavedThenQuit: If ``q`` or end of input confirmed the summary.
+    :raises Abandoned: If the session stopped before the summary was confirmed.
     """
+    seen = _Seen()
+    try:
+        return _ask_label(
+            console, snap, c, ctx, position=position, now=now, monotonic=monotonic, seen=seen
+        )
+    except SavedThenQuit:
+        raise
+    except (Quit, KeyboardInterrupt):
+        raise Abandoned(answered=seen.answered) from None
+
+
+@dataclass
+class _Seen:
+    """Whether any answer has been entered for the comment on screen."""
+
+    answered: bool = False
+
+
+def _ask_label(
+    console: Console,
+    snap: Snapshot,
+    c: ObservedComment,
+    ctx: LabelContext,
+    *,
+    position: str,
+    now: Callable[[], datetime],
+    monotonic: Callable[[], float],
+    seen: _Seen,
+) -> tuple[dict[str, Any] | None, str]:
     started = monotonic()
     full = False
     console.say(render(snap, c, position=position, full_thread=full))
@@ -795,6 +886,7 @@ def label_one(
                 return None, ""
             if answer.isdigit() and 1 <= int(answer) <= len(CLASSES):
                 primary = CLASSES[int(answer) - 1]
+                seen.answered = True
                 break
             console.say("  Not understood, try again.")
 
@@ -832,7 +924,12 @@ def label_one(
             f"\n  {primary} | flags: {', '.join(all_flags) or 'none'} | "
             f"prospective {prospective} | retrospective {retro}"
         )
-        decision = console.ask("Save? [Enter = yes, r = redo, s = skip]: ").lower()
+        try:
+            decision = console.ask(
+                "Save? [Enter = yes, r = redo, s = skip, q = save and stop]: "
+            ).lower()
+        except Quit:
+            decision = "q"
         if decision == "r":
             continue
         if decision == "s":
@@ -851,6 +948,8 @@ def label_one(
         duration_seconds=monotonic() - started,
         labeled_at=now(),
     )
+    if decision == "q":
+        raise SavedThenQuit(record, note)
     return record, note
 
 
@@ -871,10 +970,15 @@ def run_labeling(
 ) -> int:
     """Label one batch of comments not yet labeled in this pass, in the terminal, then stop.
 
+    Every confirmed label is written before the next comment is shown. When
+    the batch ends, by completion or by ``q``, the closing lines say what
+    happened to the comment on screen and how far the pass has come, as counts
+    only (:func:`afterword.label_records.progress`).
+
     :param snap: The run to label from.
     :param console: Terminal.
     :param root: Repository root; outputs go under ``fixtures/labels/``.
-    :param pass_name: ``initial`` or ``self_agreement``.
+    :param pass_name: ``initial``, ``calibration``, or ``self_agreement``.
     :param corpus_version: Output directory name and label field.
     :param corpus_set: Label field: ``dev`` for historical comments, ``test`` for prospective ones.
     :param batch_size: At most :data:`MAX_BATCH`.
@@ -905,11 +1009,16 @@ def run_labeling(
     ctx = batch.start()
     console.say(
         f"Batch {ctx.batch_id}: {len(batch.items)} comments ({len(batch.queue)} unlabeled, "
-        f"{batch.done_before} done). q at any prompt stops; saved labels are kept."
+        f"{batch.done_before} done). q stops: at Save? it saves first; at any earlier "
+        "prompt the comment on screen is not saved. Saved labels are kept."
     )
     ended_by = "complete"
+    abandoned = False
+    closing = ""
+    current = batch.items[0]
     try:
         for i, c in enumerate(batch.items, start=1):
+            current = c
             record, note = label_one(
                 console,
                 snap,
@@ -924,14 +1033,45 @@ def run_labeling(
                 batch.skip()
                 continue
             batch.save(record)
+    except SavedThenQuit as stop:
+        batch.note(current, stop.note)
+        batch.save(stop.record)
+        ended_by = "quit"
+        closing = "The comment on screen was saved before stopping."
+    except Abandoned as stop:
+        ended_by = "quit"
+        abandoned = stop.answered
+        closing = (
+            "The comment on screen was NOT saved: the answers entered for it were discarded. "
+            "It comes back in a later batch."
+            if stop.answered
+            else "The comment on screen was not labeled. It comes back in a later batch."
+        )
     except (Quit, KeyboardInterrupt):
         ended_by = "quit"
-    batch.end(ended_by)
+    batch.end(ended_by, abandoned_in_progress=abandoned)
+    if closing:
+        console.say("\n" + closing)
     console.say(
         f"\nBatch {ctx.batch_id} ended ({ended_by}): {batch.saved} labeled, {batch.skipped} "
         f"skipped, {batch.still_unlabeled} still unlabeled in pass {pass_name}."
     )
+    console.say(progress_line(batch))
     return batch.saved
+
+
+def progress_line(batch: LabelBatch) -> str:
+    """Say how far the pass has come after a batch: totals only, no classes or grades.
+
+    :param batch: A batch that has ended.
+    :returns: Such as ``12 labeled this session, bringing the total to 162 of 438.``
+    """
+    counts = batch.progress()
+    in_pass = "" if batch.pass_name == "initial" else f" in pass {batch.pass_name}"
+    return (
+        f"{batch.saved} labeled this session, bringing the total{in_pass} to "
+        f"{counts.by_pass[batch.pass_name]} of {counts.eligible}."
+    )
 
 
 def run_chronological(
