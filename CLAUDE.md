@@ -7,6 +7,7 @@ Rules for any session working in this repository.
 - `docs/` is the source of truth. Before changing anything, read `README.md`, then `docs/` and `docs/adr/`, then `fixtures/README.md`.
 - Do not contradict an ADR. If a task seems to require it, stop and ask.
 - When evidence changes a claim, append a dated entry to `docs/CLAIMS.md`. Never rewrite the original claim.
+- Any change to the taxonomy version (`TAXONOMY.md`) or the labeling-guide version (`LABELING-GUIDE.md`) must also review `docs/LABELING-FIELD-GUIDE.md`, update it where it no longer matches, and bump its version.
 
 ## Current stage
 

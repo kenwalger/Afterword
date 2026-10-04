@@ -104,21 +104,22 @@ Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --en
 1. `docs/PROJECT-BRIEF.md`: the question and why it matters
 2. `docs/SCOPE.md`: what V1 is and is not
 3. `docs/LABELING-GUIDE.md`: what "consequential" means and how ground truth is produced
-4. `docs/TAXONOMY.md`: comment classes and flags
-5. `docs/PRIORITY-POLICY.md`: how classes become priority, and where the review threshold sits
-6. `docs/EVALUATION.md`: how the claims are tested
-7. `docs/CLAIMS.md`: what is being claimed, before evidence exists
-8. `docs/DATA-MODEL.md`
-9. `docs/PRIVACY-AND-BOUNDARIES.md`
-10. `docs/API-CAPABILITY-MATRIX.md`
-11. `docs/ROADMAP.md`
-12. `docs/WORKFLOW.md`: the operating protocol: fresh probe, timing before labeling, labeling sessions, and the weekly routine of the test period
-13. `docs/LABELING-AT-SCALE.md`: a future design note for labeling beyond V1 (not V1 scope)
-14. `docs/adr/`
-15. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
-16. `docs/FRICTION-LOG.md`: the index of the friction log, with the entries in one file per session under `docs/friction-log/`
-17. `docs/benchmarks/`: dated benchmark write-ups, informational only
-18. `docs/BRAND.md`: how the name and logo are presented
+4. `docs/LABELING-FIELD-GUIDE.md`: the practical checklist to keep beside you while labeling (the guide and the taxonomy win where they differ)
+5. `docs/TAXONOMY.md`: comment classes and flags
+6. `docs/PRIORITY-POLICY.md`: how classes become priority, and where the review threshold sits
+7. `docs/EVALUATION.md`: how the claims are tested
+8. `docs/CLAIMS.md`: what is being claimed, before evidence exists
+9. `docs/DATA-MODEL.md`
+10. `docs/PRIVACY-AND-BOUNDARIES.md`
+11. `docs/API-CAPABILITY-MATRIX.md`
+12. `docs/ROADMAP.md`
+13. `docs/WORKFLOW.md`: the operating protocol: fresh probe, timing before labeling, labeling sessions, and the weekly routine of the test period
+14. `docs/LABELING-AT-SCALE.md`: a future design note for labeling beyond V1 (not V1 scope)
+15. `docs/adr/`
+16. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
+17. `docs/FRICTION-LOG.md`: the index of the friction log, with the entries in one file per session under `docs/friction-log/`
+18. `docs/benchmarks/`: dated benchmark write-ups, informational only
+19. `docs/BRAND.md`: how the name and logo are presented
 
 ## Public deliverable
 

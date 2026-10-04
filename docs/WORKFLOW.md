@@ -53,6 +53,8 @@ Before its valid timing, neither week was to be read on DEV, in practice, or in 
 
 ## 3. Labeling sessions
 
+The practical checklist for a labeling session is `LABELING-FIELD-GUIDE.md`; keep it open beside the tool.
+
 Two tools label the same batches and write the same records: `afterword label` in the terminal and `afterword label-ui` in a local browser page. Either can continue where the other stopped.
 
 ```text

@@ -100,6 +100,8 @@ Original labels are not changed after this check. If agreement is poor, the corp
 
 ## Labeling sessions
 
+Keep `LABELING-FIELD-GUIDE.md` beside you while labeling: a practical checklist for each session and each comment. Where it and this guide or `TAXONOMY.md` disagree, this guide and the taxonomy win.
+
 - Batches of no more than 40 comments, to limit fatigue drift.
 - Record start and end times per batch.
 - The tools do both. Two transports write the same records and can continue each other's work (never run both at once):
