@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 5 (2026-10-03)
+**Version:** 6 (2026-10-03)
+
+v6 (2026-10-03, after a benchmark on synthetic data only, before any classification of a real comment) adds flag precision and flag-caused tier raises as secondary measures. The synthetic benchmark showed one candidate model setting tier-raising flags on most cases (`docs/benchmarks/2026-10-03-synthetic-local-models.md`).
 
 v5 (2026-10-03, before any label or classification existed) states that V1 measurement uses researcher labels only, and that random and targeted samples are never mixed (`LABELING-AT-SCALE.md`).
 
@@ -129,6 +131,8 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 ## Secondary measures
 
 - Per-class precision and recall.
+- **Flag precision**, per flag and per classifier: of the flags a classifier sets, how many the labels also carry. Reported with the count set and the count agreeing, never as a rate alone. `CONTAINS_CODE` and `CONTAINS_LINK` are also checked against normalization, which is exact.
+- **Flag-caused tier raises**: how many comments a classifier-set flag (`REFERENCES_SPECIFIC_CLAIM`, `NEEDS_THREAD_CONTEXT`, `POSSIBLE_INSTRUCTION_TEXT`) raised above what the class default, structural flags, and pre-check give, and how many of those the labels grade 0 or 1. Over-flagging fails safe, since flags only raise tiers, but each unneeded raise costs review reduction, so it is reported beside it.
 - Count of `UNCERTAIN` assignments.
 - Count of comments requiring thread context.
 - Stability across model or prompt versions on `dev`.

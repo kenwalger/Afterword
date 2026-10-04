@@ -21,7 +21,7 @@ Done:
 - A local browser labeling interface (`afterword label-ui`, session 5), writing the same records as `label`.
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper `pr-v0.1`; the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 
-Open: timed chronological reviews and labeling (the author). No model has classified anything yet.
+Open: timed chronological reviews and labeling (the author). No model has classified a real comment. Both local models were benchmarked on the synthetic sets only (`docs/benchmarks/`), with no model chosen.
 
 ## Quick start
 
@@ -109,6 +109,7 @@ Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --en
 14. `docs/adr/`
 15. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
 16. `docs/FRICTION-LOG.md`
+17. `docs/benchmarks/`: dated benchmark write-ups, informational only
 
 ## Public deliverable
 

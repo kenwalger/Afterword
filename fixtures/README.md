@@ -57,11 +57,11 @@ Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries 
 - `normalization_version`: the text rendering the labeler saw. `display-v0.1` is the labeling tool's display rendering, not the Stage 2 classification normalization.
 - `corpus_version`: `unfrozen` until `dev` is frozen at preregistration.
 - `corpus_set`: `dev` (the default; every historical comment) or `test` (prospective comments, labeled with `--set test`; ADR-010).
-- `sample_kind`: who produced the label and how the comment was sampled. Every V1 label is `researcher` (the author's own labeling of `dev` or `test`; `docs/EVALUATION.md`). Other sources, such as random collapsed-tier audits or targeted exercises, are a future design (`docs/LABELING-AT-SCALE.md`) and would add values, never reuse this one.
+- `sample_kind`: who produced the label and how the comment was sampled. Every V1 label is `researcher` (the author's own labeling of `dev` or `test`; `docs/EVALUATION.md`). Other sources, such as random collapsed-tier audits or targeted exercises, are a future design (`docs/LABELING-AT-SCALE.md`) and would add values, never reuse this one. Labels written before the field existed (2026-10-03, before session 5's change) have no `sample_kind`; they are researcher labels, and readers treat an absent value as `researcher`. Existing label records are never rewritten to add it.
 - `consequential_retrospective_state`: `PRESENT`, or `UNKNOWN` when the labeler skipped the retrospective grade (the grade is then `null`).
 - `context_reconstructed`: see `docs/LABELING-GUIDE.md`.
 - `replied_before_labeling`: `true` when the author's direct reply to the comment exists in the snapshot. Derived by the tool, not chosen. A prospective grade given after replying may carry hindsight.
-- `batch_id` and `duration_seconds`: the labeling batch, `b_<start time>`, with `_2`, `_3` appended when another batch already started in the same second (start and end times, and the post order with its seed when shuffled, are in `batches.jsonl`) and the time from the comment being shown to the label being saved.
+- `batch_id` and `duration_seconds`: the labeling batch, `b_<start time>`, with `_2`, `_3` appended when another batch already started in the same second (start and end times, and the post order with its seed when shuffled, are in `batches.jsonl`; a `batch_start` without `post_order` predates the option and was `published`) and the time from the comment being shown to the label being saved.
 
 ## Freezing
 
