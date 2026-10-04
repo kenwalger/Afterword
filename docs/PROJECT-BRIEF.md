@@ -1,6 +1,6 @@
 # Afterword: Project Brief
 
-**Version:** 2 (2026-10-02)
+**Version:** 3 (2026-10-02: success criterion 2 revised; header updated 2026-10-04)
 
 ## Working description
 

@@ -1,4 +1,20 @@
+# Every text file is stored and checked out with LF, on every platform, whatever
+# core.autocrlf says. Without this, core.autocrlf=true checks text out with CRLF on
+# Windows, so the working tree differs from the committed bytes.
+* text=auto eol=lf
+
 # Hashed fixtures must be byte-identical on every platform (fixtures/corpus/MANIFEST.md).
 # Without this, core.autocrlf=true checks them out with CRLF and the hashes change.
+# Kept explicit, although the rule above already covers them.
 fixtures/corpus/*.jsonl text eol=lf
 fixtures/dev-api/expected/*.json text eol=lf
+
+# Binary files: never converted or diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary

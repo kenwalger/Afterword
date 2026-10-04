@@ -8,7 +8,7 @@ Afterword asks whether AI can reduce the part of a comment stream that needs imm
 
 ## Status
 
-Stage 0 of `docs/ROADMAP.md`, in progress. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
+Stage 0 of `docs/ROADMAP.md` is open for timing and labeling, with Stage 1 to 3a groundwork built ahead and tested on synthetic data only. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
 
 Done:
 
@@ -17,7 +17,6 @@ Done:
 - The C-009 volume baseline (`afterword baseline --run <run>`): 432 comments from others across 138 posts, recent and spiky. Review time is not yet measured.
 - A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
 - The corpus targets decision: the historical corpus is `dev`, and the test set is prospective (ADR-010, amended).
-
 - A local browser labeling interface (`afterword label-ui`, session 5), writing the same records as `label`.
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper `pr-v0.1`; the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 
@@ -108,8 +107,9 @@ Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --en
 13. `docs/LABELING-AT-SCALE.md`: a future design note for labeling beyond V1 (not V1 scope)
 14. `docs/adr/`
 15. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
-16. `docs/FRICTION-LOG.md`
+16. `docs/FRICTION-LOG.md`: the index of the friction log, with the entries in one file per session under `docs/friction-log/`
 17. `docs/benchmarks/`: dated benchmark write-ups, informational only
+18. `docs/BRAND.md`: how the name and logo are presented
 
 ## Public deliverable
 

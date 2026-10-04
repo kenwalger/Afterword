@@ -89,7 +89,7 @@ The volume baseline is computed from an explicit probe run ID, recorded in the r
 There are two logs with different purposes:
 
 - **Session notes** go in `friction-delight-logs/sessionN.md` (git-ignored), one file per session, numbered sequentially. Record every surprise there at the time it happens, using the entry template from `docs/FRICTION-LOG.md`. End each session with a session summary in the same file, including a "Scope pressure" section for anything that tried to enter scope and the decision made.
-- **The public record** is `docs/FRICTION-LOG.md`. At the end of each session, copy into it the entries that matter to the experiment (API behavior, design decisions, claims or ADRs affected) plus a short session summary. These entries must contain no real comment text, names, or handles.
+- **The public record** is `docs/friction-log/session-N.md`, one file per session, indexed by `docs/FRICTION-LOG.md`. At the end of each session, copy into `docs/friction-log/session-N.md` the entries that matter to the experiment (API behavior, design decisions, claims or ADRs affected) plus a short session summary, then add the session's pointer line to the index in `docs/FRICTION-LOG.md`. These entries must contain no real comment text, names, or handles. Entries already recorded are never reworded; a correction is a new, dated entry.
 
 When unsure whether an entry belongs in the public record, include it.
 
