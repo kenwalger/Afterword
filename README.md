@@ -2,6 +2,9 @@
   <source media="(prefers-color-scheme: dark)" srcset="img/Afterword_logo_color_dark.png">
   <img alt="Afterword" src="img/Afterword_logo_color.png" width="360">
 </picture>
+
+---
+
 Assisted comment triage for technical publishing. A scoped experiment, not a product.
 
 Afterword asks whether AI can reduce the part of a comment stream that needs immediate human review without hiding the comments that matter most.
