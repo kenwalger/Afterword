@@ -141,6 +141,8 @@ Claims below were added on 2026-10-02 during scoping v2.
 
 **Status:** UNTESTED
 
+- 2026-10-07: Provisional, from 302 of 458 `dev` labels (`EVALUATION.md`, 2026-10-07 label summary). Where both grades exist (293), the consequential binary agrees in 262; 4 comments are consequential only in hindsight and 27 only prospectively. By label order: publication order (first 150) 140 of 147 agree, 3 only in hindsight, 4 only prospectively; shuffled order (next 152) 122 of 146 agree, 1 only in hindsight, 23 only prospectively. The direction named in the falsifier (consequential only in hindsight) is rare in both. The shuffled labels show more disagreement in the other direction, whose cause (sample, guide version, or labeler experience) these labels cannot separate. These are historical comments, mostly labeled after replying, so they say little about the prospective test set, where C-010 is measured.
+
 ---
 
 Claims below were added on 2026-10-03 (session 5).
@@ -170,3 +172,106 @@ Claims below were added on 2026-10-04 (session 7).
 **Status:** UNTESTED
 
 - 2026-10-04: Added after the C-009 timings (typical week 3.8 minutes, busy week 17.5 minutes, both re-reads) and the author's decision to continue as planned. Measured as a secondary analysis in `EVALUATION.md` (volume split). No evidence yet.
+
+---
+
+Claims below were added on 2026-10-07 (session 8), as proposed in `FUTURE-FEATURES.md` (v2). Each belongs to a feature gated on the Stage 3 result; none is tested in V1.
+
+## C-013: Assisted suggestions make propagation recording sustainable
+
+**Claim:** Assisted suggestions make propagation recording sustainable.
+
+**Evidence needed:** Over a defined period, the share of consequential comments with a recorded propagation outcome, with and without suggestions, and the share of suggestions the author accepts.
+
+**Would weaken/falsify:** Recording rates stay low with suggestions, or most suggestions are rejected.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 2 (propagation ledger). No evidence yet.
+
+## C-014: Rediscovery surfaces material the author judges worth revisiting
+
+**Claim:** Rediscovery surfaces material the author judges worth revisiting.
+
+**Evidence needed:** For rediscovery digests over a defined period, the share of surfaced items the author marks as worth revisiting, and how many lead to a recorded action (reply, propagation, new work).
+
+**Would weaken/falsify:** Most surfaced items are judged not worth revisiting, or none leads to action.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 3 (rediscovery). No evidence yet.
+
+## C-015: Reply context improves the author's replies
+
+**Claim:** Reply context improves the author's replies.
+
+**Evidence needed:** Over a defined period, how often the author opens the panel, how often a shown item is marked relevant, and how often the author reports that it changed or informed the reply.
+
+**Would weaken/falsify:** The panel is rarely opened, or shown items are mostly judged irrelevant.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 4 (reply context and position history). No evidence yet.
+
+## C-016: Position summaries are faithful to their sources
+
+**Claim:** Position summaries are faithful to their sources.
+
+**Evidence needed:** An audit of generated position summaries, checking every statement against its cited excerpt.
+
+**Would weaken/falsify:** Summaries contain statements not supported by their citations, or the author frequently judges them to misrepresent their views.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 4 (reply context and position history). No evidence yet.
+
+## C-017: Duplicate-question clustering reduces repeated answering at high volume
+
+**Claim:** Duplicate-question clustering reduces repeated answering at high volume.
+
+**Evidence needed:** On a high-volume account, the share of questions that fall into clusters of two or more, the author's judgment of cluster correctness on a random sample, and the reduction in separate answers written.
+
+**Would weaken/falsify:** Few questions cluster, or sampled clusters are frequently judged wrong.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 5 (duplicate-question clustering). No evidence yet.
+
+## C-018: An unanswered-questions queue reduces questions left unanswered
+
+**Claim:** An unanswered-questions queue reduces questions left unanswered.
+
+**Evidence needed:** Over a defined period, the share of questions from others that receive a reply or a handled mark, compared with a prior period without the queue.
+
+**Would weaken/falsify:** The unanswered share does not change, or the queue is rarely opened.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 6 (unanswered-questions queue). No evidence yet.
+
+## C-019: Feedback extraction captures product signal that would otherwise be lost
+
+**Claim:** Feedback extraction captures product signal that would otherwise be lost.
+
+**Evidence needed:** On a team account, the number of comments exported per period, the share of exports the team keeps (not closed as invalid), and the team's estimate of how many would have been captured by hand.
+
+**Would weaken/falsify:** Few comments qualify, most exports are closed as invalid, or the team already captures the same signal by hand.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 7 (feedback extraction through output adapters). No evidence yet.
+
+
+## Future features (docs only, no code):
+- Add docs/FUTURE-FEATURES.md (already on disk) to the README reading
+  order, after LABELING-AT-SCALE.md.
+- Append C-013 through C-016 to CLAIMS.md exactly as proposed in
+  FUTURE-FEATURES.md, in the existing format, each with status
+  "DEFERRED UNTIL STAGE 3 GATE". Do not change C-001 to C-012.
+- SCOPE.md: add one Future candidates entry pointing to
+  FUTURE-FEATURES.md (spike insurance, propagation ledger, rediscovery,
+  reply context and position history), gated on the Stage 3 result,
+  noting that grouping by commenter remains excluded without the C-005
+  ADR.
+- ROADMAP.md: add the four features to Deferred, in the suggested order
+  from FUTURE-FEATURES.md.

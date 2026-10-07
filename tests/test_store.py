@@ -228,6 +228,22 @@ def test_a_placeholder_deletes_at_once_keeping_structure_and_authorship(runs, tm
     assert b"Synthetic question about step two" not in (tmp_path / service.STORE_PATH).read_bytes()
 
 
+def test_store_status_counts_states_events_and_checks_purges(runs, tmp_path, capsys):
+    runs.ingest()
+    node = runs.node("s1a1")
+    node.update(body_html="<p>[deleted]</p>", user={})
+    for key in set(node) - {"type_of", "id_code", "created_at", "body_html", "user", "children"}:
+        del node[key]
+    runs.ingest()
+    status = service.store_status(tmp_path)
+    assert status["comments"]["PURGED others"] == 1
+    assert status["content_check"] == {"deleted_with_text": 0, "purged_with_unpurged_records": 0}
+    assert any(k.startswith("r2 ACTIVE->DELETED_UPSTREAM") for k in status["events"])
+    assert cli.main(["--root", str(tmp_path), "store-status"]) == 0
+    out = capsys.readouterr().out
+    assert "PURGED others: 1" in out and "Synthetic" not in out
+
+
 def test_a_placeholder_first_seen_has_unknown_authorship(runs, tmp_path):
     runs.fake.comments[9000003] = load("comments-with-deletion-placeholder.json")
     result = runs.ingest()

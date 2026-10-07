@@ -12,7 +12,7 @@ The logo marks the point where publishing ends and conversation begins.
 
 The wordmark treats its two halves differently, on purpose:
 
-- **After** is upright, heavy, and dark. It represents the published artifact: the article, post, or piece of work that has reached a nominally finished state.
+- **After** is upright, heavy, and dark. It represents the published artifact: the article, post, or piece of work that has reached a nominally finished state. 
 - **word** is italic, lighter, and blue. It represents what happens afterward: comments, questions, challenges, corrections, discussion, and the ideas that emerge because something was published.
 
 The contrast between the halves is the idea. Anything that removes it, such as setting both halves the same way, removes the meaning.
@@ -43,6 +43,9 @@ The two dark-mode values are proposals until the dark variant is drawn and appro
 The wordmark is artwork, not live text. Use the source files; never re-typeset the logo from a font, since spacing, weight, and the join between "r" and "w" are part of the design.
 
 The typeface family and weights used in the source artwork are recorded alongside the source files in `img/`.
+
+"After" is in IBM Plex Sans SemiBold
+"word" is in IBM Plex Sans Italic
 
 ## Variants
 

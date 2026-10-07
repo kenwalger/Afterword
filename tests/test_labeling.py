@@ -190,7 +190,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "corpus_version": "unfrozen",
         "corpus_set": "dev",
         "sample_kind": "researcher",
-        "label_guide_version": "lg-v0.3",
+        "label_guide_version": "lg-v0.4",
         "taxonomy_version": "tax-v0.2",
         "normalization_version": "display-v0.1",
         "primary_class": "TECHNICAL_QUESTION",
@@ -655,3 +655,35 @@ def test_full_runs_know_every_posts_edit_time(tmp_path, fake_dev):
     # Post one was edited on 08-10: after s1a1 (08-03), before s1a3 (08-12).
     assert not snap.context_reconstructed(snap.by_id["s1a1"])
     assert snap.context_reconstructed(snap.by_id["s1a3"])
+
+
+# Post panel (label UI) ----------------------------------------------------------
+
+
+def test_the_post_view_is_the_saved_post_as_plain_text(tmp_path, fake_dev):
+    fake_dev.article["body_html"] = (
+        '<p>Synthetic body with <a href="https://example.invalid/x">a link</a>.</p>'
+        "<script>alert(1)</script><style>p {}</style>"
+    )
+    fake_dev.article["edited_at"] = "2026-08-10T00:00:00Z"
+    snap = snapshot(tmp_path)
+    assert snap.has_post_bodies()
+    view = labeling.post_view(snap, snap.by_id["s1a1"])
+    assert view["available"] is True
+    assert "Synthetic body with a link <https://example.invalid/x>." in view["body"]
+    assert "<" not in view["body"].replace("<https://example.invalid/x>", "")
+    assert "alert" not in view["body"] and "p {}" not in view["body"]
+    # Edited on 08-10: after s1a1 (08-03), before s1a3 (08-12).
+    assert view["edited_after_comment"] is True
+    assert labeling.post_view(snap, snap.by_id["s1a3"])["edited_after_comment"] is False
+
+
+def test_the_post_view_says_when_the_run_has_no_post_body():
+    t = datetime(2026, 8, 1, tzinfo=UTC)
+    content = ObservedContent("p1", t, 1, title="Synthetic post")
+    comment = ObservedComment("p1", "c1", None, 0, t, False, body_source="<p>Hi</p>")
+    snap = labeling.Snapshot(RunObservations("syn", "all", t, [content], [comment]))
+    assert not snap.has_post_bodies()
+    view = labeling.post_view(snap, comment)
+    assert view["available"] is False
+    assert "did not capture" in view["reason"]

@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 4 (2026-10-04)
+**Version:** 5 (2026-10-07)
+
+v5 lists the future features (`FUTURE-FEATURES.md`) under Deferred in their suggested order, moves the parking-lot note on reaction counts to `FUTURE-FEATURES.md`, and records `lg-v0.4` (the label UI's post panel).
 
 v4 adds the labeler calibration exercise to Deferred (`LABELING-AT-SCALE.md`) and removes a stale "not yet recorded" note from the Stage 0 gate input, since the gate decision is recorded below it.
 
@@ -17,7 +19,7 @@ Goal: define the question before implementation changes it.
 - [x] Project brief and scope (v2)
 - [x] Provisional taxonomy (`tax-v0.1`; `tax-v0.2` from 2026-10-04, no class changes)
 - [x] Provisional priority policy (`pp-v0.1`)
-- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule)
+- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel)
 - [x] ADR-001 to ADR-013 (ADR-001 to ADR-011 with the design; ADR-012, the service layer, and ADR-013, local-first with a hosted path preserved, added 2026-10-03)
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
@@ -50,6 +52,17 @@ Goal: reliably obtain real source data.
 **Gate:** a repeatable sync reproduces the corpus, and edit and deletion behavior is known.
 
 Gate status: not evaluated. Two full probe runs returned identical results (2026-10-02), and edit and deletion behavior is known for author self-deletion only. A repeatable sync into the store, run on real data, has not been recorded.
+
+Gate evidence (2026-10-07, session 8; built on 2026-10-03, first run on real data now; counts from `afterword ingest` and `afterword store-status`):
+
+- **Two real runs ingested in order** into an empty store: `20261003T141450Z` (713 comments new, 1 deletion placeholder first seen), then `20261007T224849Z` (36 new, 524 payload changed with text unchanged, 190 unchanged). Store after both: 140 posts, 458 live comments from others (the same 458 the labeling tools count as eligible), 291 by the author, 1 placeholder.
+- **Lifecycle transitions across the two runs:** new 36; edited 0; missing 0; deleted by absence 0; placeholder 1, first seen in the first run (`DELETED_UPSTREAM`, `SOURCE_PLACEHOLDER`, authorship `UNKNOWN`, no text stored) and unchanged in the second. The 524 payload changes are DEV's AI-disclosure keys, added to every older comment between the runs; no normalized text changed, so nothing became `EDITED` or needed reclassification.
+- **Placeholder handling:** recognized in both runs once ADR-009 was amended (2026-10-07) to ignore the allowlisted platform-wide keys; before the amendment the second run's placeholder was an unexpected shape (`docs/friction-log/session-8.md`).
+- **Purge:** no comment went from live to deleted between the runs, so the purge path itself did not run on real data. Check: 0 deleted or purged comments hold text.
+- **Repeatability:** ingesting `20261007T224849Z` a second time was refused ("already ingested") and left the store unchanged (2 runs, 750 comments). Count reconciliation leaves the same 3 posts unexplained in both runs (`comments_count` one higher than the live comments observed).
+- **Not covered:** an edit observed on real data, deletion by absence, and every deletion path other than author self-deletion.
+
+Gate decision: not recorded; the author's.
 
 ## Stage 2: Normalization and local persistence
 
@@ -149,3 +162,15 @@ Cross-platform identity reconciliation, Substack, LinkedIn, additional analytics
 
 - Labeler calibration exercise (`LABELING-AT-SCALE.md`, Labeler onboarding): about 20 synthetic comments with researcher-approved reference labels and rationales, covering the boundaries that change a tier or proved hard in V1 labeling; reveal-after-answer in the label UI; agreement summarized per boundary; answers recorded as `sample_kind: calibration_exercise` and excluded from every measure. Gated on the Stage 3 result, except that a minimal version may be built earlier as an optional refresher for the author's calibration pass.
 - External interface (ADR-012): a local MCP server first, possibly an HTTP API later, over the application service layer. Gated on the Stage 3 result; see `SCOPE.md` (Future candidates) for its limits.
+- Future features (`FUTURE-FEATURES.md`), each gated on the Stage 3 result, with proposed claims C-013 to C-019 (`CLAIMS.md`). Grouping by commenter stays excluded without the C-005 evaluation and its own ADR. In the suggested order, for the author:
+  1. Spike insurance (C-012).
+  2. Propagation ledger with assisted suggestions (C-013).
+  3. Rediscovery, cheap version: no new model work (C-014).
+  4. Reply context, excerpts only: keyword retrieval over the author's own words (C-015).
+  5. Topical rediscovery and semantic reply context, after the semantic-search ADR.
+  6. Position summaries, last, and only with the grounding rules (C-016).
+- For high-volume and team accounts, after discovery conversations confirm the need (`FUTURE-FEATURES.md`):
+  1. Unanswered-questions queue (C-018).
+  2. Duplicate-question clustering, after the semantic-search ADR (C-017).
+  3. Feedback extraction: one output adapter first, plus the taxonomy-extension design (C-019).
+  4. Cross-platform aggregation, after one platform works well (Stage 6).

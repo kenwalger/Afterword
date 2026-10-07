@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 8 (2026-10-04)
+**Version:** 9 (2026-10-07)
+
+v9 (2026-10-07, ADR-009 amended) matches the deletion placeholder by its distinguishing features and ignores an allowlist of platform-wide keys. Nothing earlier is removed.
 
 v8 (2026-10-04, `tax-v0.2`) records `CONTAINS_CODE` and `CONTAINS_LINK` as structural flags in `flags_by_source`. Nothing earlier is removed.
 
@@ -123,9 +125,9 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 - **Payload changed, text unchanged:** the payload hash changes but the normalized text does not (for example, a change in the source's HTML rendering). A new SourceRecord is stored for provenance; the lifecycle state does not change and nothing is reclassified.
 - **Missing:** a comment previously observed is absent from a complete sync of its post. State becomes `MISSING_FROM_SOURCE`. One absence is not proof of deletion.
 - **Deleted upstream (absence):** absent from two consecutive complete syncs. State becomes `DELETED_UPSTREAM` with `deletion_evidence = ABSENT_TWICE`, and the purge rule in `PRIVACY-AND-BOUNDARIES.md` applies (ADR-009).
-- **Deleted upstream (placeholder):** the source returns a known comment in the exact known placeholder shape (DEV: the observed key set with `user` equal to an empty object). State becomes `DELETED_UPSTREAM` at once, with `deletion_evidence = SOURCE_PLACEHOLDER`. The node stays in the thread so replies keep their parent, and the purge rule applies.
+- **Deleted upstream (placeholder):** the source returns a known comment in the placeholder shape (DEV, ADR-009 as amended 2026-10-07: `user` equal to an empty object, the body replaced with the placeholder text, `id_code`, `created_at`, and `children` kept, and every key of the first observed placeholder present; keys on the allowlist of platform-wide fields, initially `ai_disclosure_label` and `ai_disclosure_level`, are ignored). State becomes `DELETED_UPSTREAM` at once, with `deletion_evidence = SOURCE_PLACEHOLDER`. The node stays in the thread so replies keep their parent, and the purge rule applies.
 - **Placeholder without prior observation:** create the Comment directly in `DELETED_UPSTREAM` with `deletion_evidence = SOURCE_PLACEHOLDER`, no body stored, and authorship `UNKNOWN`.
-- **Unexpected shape:** a node that is authorless in any other way, or has unknown keys, is not classified as a placeholder. The sync records a limitation, a friction entry is written, and the comment's lifecycle state is left unchanged until the shape is understood.
+- **Unexpected shape:** a node that is authorless in any other way, or has keys outside the known set and the platform-wide allowlist, is not classified as a placeholder. Adding a key to the allowlist needs evidence recorded in the friction log. The sync records a limitation, a friction entry is written, and the comment's lifecycle state is left unchanged until the shape is understood.
 - **Purged:** body text and raw payloads removed; identifiers, lifecycle history, and non-content judgments remain.
 
 #### LifecycleEvent

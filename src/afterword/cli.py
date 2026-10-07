@@ -22,7 +22,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from afterword import bench, label_ui, labeling, service
+from afterword import bench, heuristic, label_ui, labeling, policy, service
 from afterword.progress import StatusLine
 from afterword.providers import ollama
 
@@ -175,6 +175,13 @@ def _only_ids(args: argparse.Namespace, session: service.LabelingSession) -> set
     known = service.labelable_ids(session)
     print(f"--ids: {len(only_ids & known)} of {len(only_ids)} IDs are labelable in this run")
     return only_ids
+
+
+def _id_file(path: str | None) -> set[str] | None:
+    if not path:
+        return None
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return {line.strip() for line in lines if line.strip()}
 
 
 def cmd_label(args: argparse.Namespace) -> int:
@@ -342,6 +349,23 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_store_status(args: argparse.Namespace) -> int:
+    """Print a connection's comments by lifecycle state and its lifecycle events.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        status = service.store_status(Path(args.root), args.connection)
+    except service.ServiceError as exc:
+        return _fail(exc)
+    for section in ("comments", "events", "content_check"):
+        print(f"{section}:")
+        for key, n in status[section].items():
+            print(f"  {key}: {n}")
+    return 0
+
+
 def cmd_connections(args: argparse.Namespace) -> int:
     """List the store's platform connections with record counts.
 
@@ -396,6 +420,8 @@ def cmd_classify(args: argparse.Namespace) -> int:
             model=args.model,
             connection_id=args.connection,
             host=args.ollama_host,
+            heuristic_version=args.heuristic,
+            only_ids=_id_file(args.ids),
             progress=lambda done, total: status.step("classify", done, total),
         )
     except service.ServiceError as exc:
@@ -415,6 +441,63 @@ def cmd_classify(args: argparse.Namespace) -> int:
     if result.errors:
         print("errors: " + ", ".join(f"{k} {v}" for k, v in sorted(result.errors.items())))
     print("tiers: " + ", ".join(f"{k} {v}" for k, v in sorted(result.tiers.items())))
+    return 0
+
+
+def _pct(share: dict[str, Any]) -> str:
+    if share["share"] is None:
+        return f"{share['count']} of {share['of']}"
+    low, high = share["wilson95"]
+    return (
+        f"{share['count']} of {share['of']} ({100 * share['share']:.1f}%; "
+        f"Wilson {100 * low:.1f}% to {100 * high:.1f}%)"
+    )
+
+
+def cmd_evaluate(args: argparse.Namespace) -> int:
+    """Score cached classifications against the dev labels under one policy, offline.
+
+    Prints counts only. The full counts go to a git-ignored JSON report, and with
+    ``--misses`` the IDs of consequential comments collapsed go to a git-ignored
+    list for the author's own review.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        result = service.evaluate_condition(
+            Path(args.root),
+            condition=args.condition,
+            policy_version=args.policy,
+            heuristic_version=args.heuristic,
+            provider_name=args.provider,
+            model=args.model,
+            corpus_version=args.corpus_version,
+            only_ids=_id_file(args.ids),
+            connection_id=args.connection,
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    report, misses = service.write_evaluation_report(
+        Path(args.root), result, with_misses=args.misses
+    )
+    print(
+        f"{result.condition} {result.model_provider} {result.model_id} under "
+        f"{result.policy_version}: {result.scored} of {result.labels} labeled comments scored"
+        + (f" (not scored: {result.not_scored})" if result.not_scored else "")
+    )
+    for order, s in result.scores.items():
+        if not s["total"]:
+            continue
+        tiers = s["by_tier"]
+        print(
+            f"  {order}: consequential surfaced {_pct(s['consequential_recall'])}; "
+            f"collapsed {_pct(s['review_reduction'])}; "
+            f"SURFACE {tiers['SURFACE']}, QUEUE {tiers['QUEUE']}, COLLAPSED {tiers['COLLAPSED']}"
+        )
+    print(f"report: {report}")
+    if misses is not None:
+        print(f"miss list (IDs only, {len(result.missed_ids)}): {misses}")
     return 0
 
 
@@ -567,6 +650,12 @@ def build_parser() -> argparse.ArgumentParser:
     conns = sub.add_parser("connections", help="list platform connections in the store")
     conns.set_defaults(func=cmd_connections)
 
+    status = sub.add_parser(
+        "store-status", help="counts by lifecycle state and lifecycle events (counts only)"
+    )
+    status.add_argument("--connection", help="connection ID (default: the only one)")
+    status.set_defaults(func=cmd_store_status)
+
     forget = sub.add_parser("forget", help="remove all local data for one connection")
     forget.add_argument("--connection", required=True, help="connection ID")
     forget.add_argument("--yes", action="store_true", help="delete; without it, only count")
@@ -579,7 +668,37 @@ def build_parser() -> argparse.ArgumentParser:
     classify.add_argument("--model", help="model ID (B2)")
     classify.add_argument("--connection", help="connection ID; optional with one connection")
     classify.add_argument("--ollama-host", default=ollama.DEFAULT_HOST, help=host_help)
+    classify.add_argument(
+        "--heuristic",
+        choices=list(heuristic.HEURISTIC_VERSIONS),
+        default=heuristic.HEURISTIC_VERSION,
+        help="heuristic version (B1)",
+    )
+    classify.add_argument("--ids", help="file of comment IDs to restrict to, one per line")
     classify.set_defaults(func=cmd_classify)
+
+    evaluate = sub.add_parser(
+        "evaluate", help="score cached classifications against the dev labels (counts only)"
+    )
+    evaluate.add_argument("--condition", required=True, choices=service.CONDITIONS)
+    evaluate.add_argument("--policy", choices=policy.POLICY_VERSIONS, default=policy.POLICY_VERSION)
+    evaluate.add_argument(
+        "--heuristic",
+        choices=list(heuristic.HEURISTIC_VERSIONS),
+        default=heuristic.HEURISTIC_VERSION,
+        help="heuristic version (B1)",
+    )
+    evaluate.add_argument("--provider", choices=service.PROVIDERS, default="ollama")
+    evaluate.add_argument("--model", help="model ID (B2)")
+    evaluate.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
+    evaluate.add_argument("--ids", help="file of comment IDs to restrict to, one per line")
+    evaluate.add_argument("--connection", help="connection ID; optional with one connection")
+    evaluate.add_argument(
+        "--misses",
+        action="store_true",
+        help="also write the IDs of consequential comments collapsed (git-ignored)",
+    )
+    evaluate.set_defaults(func=cmd_evaluate)
 
     models = sub.add_parser("models", help="local model checks")
     models_sub = models.add_subparsers(dest="models_command", required=True)

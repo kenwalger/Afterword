@@ -1,6 +1,8 @@
 # Labeling Guide
 
-**Version:** `lg-v0.3`
+**Version:** `lg-v0.4`
+
+`lg-v0.4` (2026-10-07, with 302 `dev` labels made under `lg-v0.2` and `lg-v0.3`) lets the label UI show the post's body, on request, from the saved run (context reconstruction, "Post edits"). Grades, definitions, tests, blinding, and the passes are unchanged, so earlier labels need no change. Each batch record says whether the post panel was available (`post_panel`).
 
 `lg-v0.3` (2026-10-04, with 150 `dev` labels made under `lg-v0.2`) adds the calibration pass and the rule for which label analysis uses when a comment has more than one. Grades, definitions, tests, context reconstruction, and the initial pass are unchanged, so `lg-v0.2` labels need no change.
 
@@ -59,7 +61,8 @@ The reconstruction is partial, and the limits are known:
 - **Parent edits are undetectable.** DEV comments carry no edit timestamp, so an earlier comment that was edited later is shown with its current text, not the text the commenter replied to.
 - **Deleted comments without replies are gone.** If one preceded the labeled comment, the view cannot show it, and nothing indicates it existed.
 - **Deleted comments with replies remain as placeholders,** shown as `[deleted comment]` with no text or author.
-- **Post edits.** The post title is shown as it is now. The post body is not shown. Full probe runs from `dev-probe-0.2` on fetch every post singly, so the post's last edit time is known.
+- **Post edits.** The post title is shown as it is now. Full probe runs from `dev-probe-0.2` on fetch every post singly, so the post's last edit time is known.
+- **The post body (`lg-v0.4`, label UI only).** `afterword label-ui` can show the post's body in a collapsible panel (`p`, or "Show post"), rendered as plain text from the saved run's single fetch of the post: no comments, no profiles, no live links, nothing fetched. It is the post as of the run. When the post's last edit is later than the comment, the panel warns that the text may differ from what the commenter saw (the same condition sets `context_reconstructed: false`). Runs from before `dev-probe-0.2` have no post bodies, and the panel says so. The terminal tool does not show the body. Each batch record carries `post_panel`: `true` when the panel was available for that batch.
 
 `replied_before_labeling` is also recorded by the tool: `true` when the snapshot contains the author's direct reply to the comment. For historical comments it is usually `true`, and it lets the analysis separate grades given after replying from grades given before. For the prospective test set, label before replying where possible.
 
@@ -105,7 +108,7 @@ Keep `LABELING-FIELD-GUIDE.md` beside you while labeling: a practical checklist 
 - Batches of no more than 40 comments, to limit fatigue drift.
 - Record start and end times per batch.
 - The tools do both. Two transports write the same records and can continue each other's work (never run both at once):
-  - `uv run afterword label-ui --run <full-run-id>` (browser, the faster one) serves one page on `127.0.0.1` and opens it; the terminal prints the URL to use, `http://127.0.0.1:8765/?t=<token>`, with a new token on every launch. Keys: `1` to `9` and `0` for the class, `n r o x i` for the flags (`CONTAINS_CODE` and `CONTAINS_LINK` are set by the tool from `tax-v0.2`), Shift+`0` to `3` for the prospective grade, `g` then `0` to `3` for the retrospective grade, `e` for the reason, `w` for a note, Enter to save, `t` for the full thread, `h` for the definitions, `s` to skip, `q` to stop. Stop with `q` or Ctrl+C in the terminal; closing the tab does not stop the server. Between batches the page offers the next one.
+  - `uv run afterword label-ui --run <full-run-id>` (browser, the faster one) serves one page on `127.0.0.1` and opens it; the terminal prints the URL to use, `http://127.0.0.1:8765/?t=<token>`, with a new token on every launch. Keys: `1` to `9` and `0` for the class, `n r o x i` for the flags (`CONTAINS_CODE` and `CONTAINS_LINK` are set by the tool from `tax-v0.2`), Shift+`0` to `3` for the prospective grade, `g` then `0` to `3` for the retrospective grade, `e` for the reason, `w` for a note, Enter to save, `t` for the full thread, `p` for the post, `h` for the definitions, `s` to skip, `q` to stop. Stop with `q` or Ctrl+C in the terminal; closing the tab does not stop the server. Between batches the page offers the next one.
   - `uv run afterword label --run <full-run-id>` (terminal) labels one batch and stops. Use it for chronological timing and when no browser is available.
   - Both resume by running the command again: the next batch starts with the first unlabeled comment. Both warn when the run is more than 7 days old: run a fresh full probe first, so comments deleted upstream are not labeled (ADR-009).
   - Every shortcut and the stop and resume rules are in `docs/WORKFLOW.md`, section 3.

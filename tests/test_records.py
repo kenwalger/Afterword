@@ -80,6 +80,35 @@ def test_other_authorless_shapes_are_unexpected_not_placeholders():
         assert records.is_unexpected_shape(node)
 
 
+def test_placeholder_matching_ignores_allowlisted_platform_wide_keys():
+    (parent, _) = records.flatten_comments(load("comments-with-deletion-placeholder.json"))
+    with_disclosure = {
+        **parent.node,
+        "ai_disclosure_label": "Not Disclosed",
+        "ai_disclosure_level": "not_disclosed",
+    }
+    assert records.is_deletion_placeholder(with_disclosure)
+    assert not records.is_unexpected_shape(with_disclosure)
+
+
+def test_placeholder_with_an_unknown_key_is_still_unexpected():
+    (parent, _) = records.flatten_comments(load("comments-with-deletion-placeholder.json"))
+    for extra in ({"ai_disclosure_label": "x", "new_platform_field": 1}, {"deleted_at": "x"}):
+        node = {**parent.node, **extra}
+        assert not records.is_deletion_placeholder(node)
+        assert records.is_unexpected_shape(node)
+
+
+def test_an_authorless_node_without_the_placeholder_body_is_unexpected():
+    (parent, _) = records.flatten_comments(load("comments-with-deletion-placeholder.json"))
+    node = {**parent.node, "body_html": "<p>A full synthetic comment body, not a placeholder.</p>"}
+    assert not records.is_deletion_placeholder(node)
+    assert records.is_unexpected_shape(node)
+    missing = {k: v for k, v in parent.node.items() if k != "created_at"}
+    assert not records.is_deletion_placeholder(missing)
+    assert records.is_unexpected_shape(missing)
+
+
 def test_placeholder_like_is_a_short_body_heuristic():
     assert records.placeholder_like({"body_html": "<p>[deleted]</p>"})
     assert not records.placeholder_like({"body_html": "<p>A normal comment.</p>"})

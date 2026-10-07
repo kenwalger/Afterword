@@ -25,6 +25,11 @@ HEURISTIC_VERSION: str = "hb-v0.1"
 # Prose characters (code removed) at or above which a comment counts as long.
 LONG_THRESHOLD: int = 280
 
+# Every heuristic version and its length threshold. Versions differ only in the
+# threshold so far: `hb-v0.2` (2026-10-07) is `hb-v0.1` with the threshold tuned
+# on `dev` labels (EVALUATION.md, "B1 heuristic rules"). Tuning, not measurement.
+HEURISTIC_VERSIONS: dict[str, int] = {"hb-v0.1": LONG_THRESHOLD, "hb-v0.2": 281}
+
 # Correction and challenge markers from EVALUATION.md.
 LEXICON: tuple[str, ...] = ("actually", "doesn't work", "wrong", "error", "outdated", "breaks")
 
@@ -80,10 +85,11 @@ def prose(text: str) -> str:
     return re.sub(r"\s+", " ", _LINK.sub(lambda m: m.group(1) or " ", without_code)).strip()
 
 
-def features(normalized: NormalizedText) -> Features:
-    """Compute `hb-v0.1` features.
+def features(normalized: NormalizedText, long_threshold: int = LONG_THRESHOLD) -> Features:
+    """Compute the heuristic's features.
 
     :param normalized: The comment's normalized text and structure.
+    :param long_threshold: Prose length at or above which a comment counts as long.
     :returns: The features.
     """
     plain = prose(normalized.text)
@@ -91,14 +97,35 @@ def features(normalized: NormalizedText) -> Features:
         question="?" in plain,
         code_block=normalized.code_blocks > 0,
         link=normalized.has_link,
-        long=len(plain) >= LONG_THRESHOLD,
+        long=len(plain) >= long_threshold,
         lexicon_match=_LEXICON.search(plain) is not None,
         prose_length=len(plain),
     )
 
 
-def classify(normalized: NormalizedText) -> HeuristicResult:
-    """Classify one comment with `hb-v0.1`.
+def decide(f: Features) -> tuple[str, str]:
+    """Apply the rules to computed features.
+
+    :param f: Features, with ``long`` set by the version's threshold.
+    :returns: The class proxy and the rule that fired (see :func:`classify`).
+    """
+    if f.lexicon_match:
+        return "CORRECTION", "lexicon"
+    if f.question and (f.code_block or f.long):
+        return "TECHNICAL_QUESTION", "question_technical"
+    if f.question:
+        return "DIRECT_QUESTION", "question"
+    if f.code_block:
+        return "TECHNICAL_EXTENSION", "code_block"
+    if f.link and f.long:
+        return "TECHNICAL_EXTENSION", "link_long"
+    if f.long:
+        return "CONVERSATIONAL", "long"
+    return "LIGHTWEIGHT_ACKNOWLEDGMENT", "default"
+
+
+def classify(normalized: NormalizedText, version: str = HEURISTIC_VERSION) -> HeuristicResult:
+    """Classify one comment with a heuristic version.
 
     Rules, first match wins:
 
@@ -110,25 +137,16 @@ def classify(normalized: NormalizedText) -> HeuristicResult:
     5. otherwise: ``LIGHTWEIGHT_ACKNOWLEDGMENT``.
 
     :param normalized: The comment's normalized text and structure.
+    :param version: One of :data:`HEURISTIC_VERSIONS`.
     :returns: Class proxy, content flags, the rule that fired, and the features.
+    :raises ValueError: For an unknown version.
     """
-    f = features(normalized)
+    if version not in HEURISTIC_VERSIONS:
+        raise ValueError(f"unknown heuristic version: {version}")
+    f = features(normalized, HEURISTIC_VERSIONS[version])
     # Code and link flags are structural from tax-v0.2: the service sets them from
     # normalization for B1 and B2 alike, so the heuristic sets no flags itself.
-    flags: set[str] = set()
-
-    if f.lexicon_match:
-        primary, rule = "CORRECTION", "lexicon"
-    elif f.question and (f.code_block or f.long):
-        primary, rule = "TECHNICAL_QUESTION", "question_technical"
-    elif f.question:
-        primary, rule = "DIRECT_QUESTION", "question"
-    elif f.code_block:
-        primary, rule = "TECHNICAL_EXTENSION", "code_block"
-    elif f.link and f.long:
-        primary, rule = "TECHNICAL_EXTENSION", "link_long"
-    elif f.long:
-        primary, rule = "CONVERSATIONAL", "long"
-    else:
-        primary, rule = "LIGHTWEIGHT_ACKNOWLEDGMENT", "default"
-    return HeuristicResult(primary_class=primary, flags=frozenset(flags), rule=rule, features=f)
+    primary, rule = decide(f)
+    return HeuristicResult(
+        primary_class=primary, flags=frozenset(), rule=rule, features=f, version=version
+    )

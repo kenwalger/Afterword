@@ -474,3 +474,27 @@ def test_batches_started_in_the_same_second_get_distinct_ids(tmp_path):
         ids.append(batch.start().batch_id)
         batch.end("quit")
     assert ids == ["b_20260801T000000Z", "b_20260801T000000Z_2", "b_20260801T000000Z_3"]
+
+
+# Post panel ------------------------------------------------------------------------
+
+
+def test_the_post_panel_serves_the_current_comments_post_only(running):
+    token = running.server.token
+    assert running.request("GET", "/api/post?c=s1a1")[0] == 403
+    status, view = running.request("GET", "/api/post?c=s1a1", token=token)
+    assert status == 200 and view["available"] is True
+    assert "Synthetic body." in view["body"]
+    status, refused = running.request("GET", "/api/post?c=s1a3", token=token)
+    assert status == 409 and "no longer the current one" in refused["error"]
+
+
+def test_batch_records_say_whether_the_post_panel_was_available(tmp_path, fake_dev):
+    ui = make_ui(tmp_path)
+    ui.stop()
+    browser = [e for e in batch_events(tmp_path) if e["event"] == "batch_start"]
+    assert [(e["tool"], e["post_panel"]) for e in browser] == [("browser", True)]
+    batch = labeling.LabelBatch(ui.session.snapshot, root=tmp_path / "t")
+    batch.start()
+    (start,) = lines(tmp_path / "t" / labeling.LABEL_ROOT / "unfrozen" / "batches.jsonl")
+    assert (start["tool"], start["post_panel"]) == ("terminal", False)

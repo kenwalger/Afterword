@@ -44,7 +44,7 @@ TOKEN_HEADER: str = "X-Afterword-Token"
 
 # Keyboard: digits choose the class in TAXONOMY.md precedence order (0 is the tenth).
 CLASS_KEYS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
-# Letters toggle labeler flags. h, t, s, q, g, e, w are commands on the page.
+# Letters toggle labeler flags. h, t, p, s, q, g, e, w are commands on the page.
 # From tax-v0.2 the code and link flags are structural, so `c` and `l` are free.
 FLAG_KEYS: dict[str, str] = {
     "NEEDS_THREAD_CONTEXT": "n",
@@ -53,7 +53,7 @@ FLAG_KEYS: dict[str, str] = {
     "HOSTILE_TONE": "x",
     "POSSIBLE_INSTRUCTION_TEXT": "i",
 }
-COMMAND_KEYS: frozenset[str] = frozenset("htsqgew")
+COMMAND_KEYS: frozenset[str] = frozenset("htpsqgew")
 
 
 def taxonomy_payload() -> dict[str, Any]:
@@ -199,6 +199,15 @@ class LabelUI:
             raise RequestError("this comment is no longer the current one; reload the page")
         return self.batch
 
+    def post(self, comment_id: str) -> dict[str, Any]:
+        """Describe the post of the current comment, for the post panel.
+
+        :param comment_id: The comment the page shows; refused unless it is current.
+        :returns: JSON-ready view (:func:`afterword.service.post_view`).
+        """
+        batch = self._current(comment_id)
+        return service.post_view(batch, self.index)
+
     def submit(self, body: dict[str, Any]) -> None:
         """Save the label for the current comment and move on.
 
@@ -328,7 +337,7 @@ def make_handler(
             self._json(status, {"error": message})
 
         def do_GET(self) -> None:
-            """Serve the page or the current state."""
+            """Serve the page, the current state, or the current comment's post."""
             if not self._host_ok():
                 self._refuse(HTTPStatus.FORBIDDEN, "wrong host")
                 return
@@ -345,6 +354,17 @@ def make_handler(
                     self._refuse(HTTPStatus.FORBIDDEN, "missing session token")
                     return
                 self._json(HTTPStatus.OK, ui.state())
+                return
+            if url.path == "/api/post":
+                if self.headers.get(TOKEN_HEADER) != token:
+                    self._refuse(HTTPStatus.FORBIDDEN, "missing session token")
+                    return
+                try:
+                    view = ui.post(parse_qs(url.query).get("c", [""])[0])
+                except RequestError as exc:
+                    self._refuse(HTTPStatus.CONFLICT, str(exc))
+                    return
+                self._json(HTTPStatus.OK, view)
                 return
             self._refuse(HTTPStatus.NOT_FOUND, "not found")
 

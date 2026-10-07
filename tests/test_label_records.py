@@ -203,4 +203,12 @@ def test_the_broad_rsc_ceiling_ignores_rsc_on_tax_v0_1_labels_only():
     ceiling = lr.oracle_ceiling([old, new])
     assert ceiling["class_and_flags"]["collapsed"] == 0
     assert ceiling["class_and_flags_without_broad_rsc"]["collapsed"] == 1
+    assert ceiling["class_and_flags_without_rsc"]["collapsed"] == 2
     assert list(ceiling) == [name for name, _, _ in lr.ORACLE_VARIANTS]
+
+
+def test_wilson_interval_brackets_the_share():
+    low, high = lr.wilson(39, 150)
+    assert round(low, 3) == 0.196 and round(high, 3) == 0.336
+    assert lr.wilson(0, 0) == (0.0, 0.0)
+    assert lr.wilson(0, 10)[0] == 0.0

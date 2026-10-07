@@ -1,6 +1,8 @@
 # API Capability Matrix
 
-**Version:** 3 (2026-10-02)
+**Version:** 4 (2026-10-07)
+
+v4 records that DEV added the AI-disclosure fields to every comment node between runs `20261003T141450Z` and `20261007T224849Z`, deletion placeholders included.
 
 This document records what each platform actually exposes. `UNKNOWN` is a valid state and must not be converted into supported or unsupported without evidence.
 
@@ -34,7 +36,7 @@ Verified on 2026-10-02 by `afterword probe` (adapter `dev-probe-0.1`). Full runs
 | Comment identifier | SUPPORTED | `id_code`, string, length 3 to 5, unique across 707 comments. 33 consist only of digits and must never be treated as numbers. Retained when a comment with replies is deleted. |
 | Comment created timestamp | SUPPORTED | `created_at`, RFC 3339 with `Z`, on 707 of 707. Unchanged by edits and by deletion. |
 | Comment edited timestamp | UNSUPPORTED | No edit-related field on any comment. Editing a comment changed only `body_html`, with no key added. Edits are detectable only by payload hash. Articles do have `edited_at`. |
-| Deleted comment representation | PARTIAL | A deleted comment with no replies disappears from the tree. A deleted comment with replies stays as a placeholder: same `id_code`, `created_at`, `type_of`, and `children`, with `body_html` replaced and `user` an empty object `{}`. The placeholder persisted after its last reply was deleted. `comments_count` excludes placeholders. One sample of each case, author self-deletion only; deletion by others, moderator removal, and account deletion were not tested. Handled per ADR-009 (accepted, provisional); evidence in `docs/proposals/accepted/2026-10-02-deletion-placeholders.md`. |
+| Deleted comment representation | PARTIAL | A deleted comment with no replies disappears from the tree. A deleted comment with replies stays as a placeholder: same `id_code`, `created_at`, `type_of`, and `children`, with `body_html` replaced and `user` an empty object `{}`. The placeholder persisted after its last reply was deleted. `comments_count` excludes placeholders. From run `20261007T224849Z` DEV adds `ai_disclosure_label` and `ai_disclosure_level` to every comment node, the placeholder included; they are allowlisted as platform-wide keys (ADR-009, amended 2026-10-07). One sample of each case, author self-deletion only; deletion by others, moderator removal, and account deletion were not tested. Handled per ADR-009 (accepted, provisional); evidence in `docs/proposals/accepted/2026-10-02-deletion-placeholders.md`. |
 | Thread parent/child relationships | PARTIAL | Only by nesting in `children`; there is no explicit parent ID field. Nesting reached depth 34. A reply keeps its position under a deleted parent's placeholder. |
 | Comment author fields | SUPPORTED | Embedded `user`: `name`, `username`, `user_id` (int, always present), `twitter_username`, `github_username`, `website_url`, `profile_image`, `profile_image_90`. Empty object on deletion placeholders. |
 | Comment AI disclosure fields | PARTIAL | Undocumented `ai_disclosure_label` and `ai_disclosure_level` on 179 of 707 comments. The only observed values are `Not Disclosed` / `not_disclosed`, always paired. When they appear is not explained by date. Recorded only; not a V1 priority input. |

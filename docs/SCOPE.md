@@ -1,6 +1,8 @@
 # Scope
 
-**Version:** 4 (2026-10-03)
+**Version:** 5 (2026-10-07)
+
+v5 adds the future features note (`FUTURE-FEATURES.md`) as a future candidate, gated on the Stage 3 result.
 
 v4 adds labeling at scale as a future candidate (`LABELING-AT-SCALE.md`), gated on the Stage 3 result.
 
@@ -125,6 +127,7 @@ If V1 produces useful evidence, later stages may investigate:
 - Validation with a second, higher-volume author.
 - An external interface over the application service layer (ADR-012): first a local MCP server (stdio), possibly an HTTP API later. Gated on the Stage 3 result. Candidate first capabilities, in order: propagation queries ("which comments caused a change to one of my projects?"), then the attention queue as computed by the priority policy. Read-only first; writes need per-action human confirmation.
 - Labeling at scale: random collapsed-tier audits for miss-rate measurement, targeted and in-app labeling exercises for improvement, and judgment-drift handling. See `docs/LABELING-AT-SCALE.md`. Gated on the Stage 3 result.
+- Future features: see `docs/FUTURE-FEATURES.md` (spike insurance, a propagation ledger with assisted suggestions, rediscovery, reply context and position history, and, for high-volume and team accounts, duplicate-question clustering, an unanswered-questions queue, and feedback extraction through output adapters), with their proposed claims C-013 to C-019 in `CLAIMS.md`. Gated on the Stage 3 result. Grouping or retrieving material by commenter remains excluded without the C-005 evaluation and its own ADR.
 - Person-scoped queries ("what has this commenter said about X?") are explicitly not covered by the external interface above. They depend on C-005, require a reputation-bias evaluation, and need their own ADR. Topic queries implying semantic search also need their own ADR (a new model boundary).
 
 These must not justify V1 architectural complexity unless V1 demonstrably requires it.

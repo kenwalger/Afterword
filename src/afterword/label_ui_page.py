@@ -128,6 +128,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .pending { outline: 2px dashed var(--accent); }
 .hidden { display: none !important; }
 .center { max-width: 640px; margin: 48px auto; }
+.post-body { max-height: 60vh; overflow-y: auto; border-top: 1px solid var(--line);
+  margin-top: 8px; padding-top: 8px; }
 </style>
 </head>
 <body>
@@ -149,6 +151,8 @@ let form = null;
 let full = false;
 let gPending = false;
 let busy = false;
+let postOpen = false;
+let postData = null;
 
 function blankForm() {
   return {cls: null, flags: new Set(), pro: null, retro: null};
@@ -203,6 +207,7 @@ function show(data) {
   const id = data.comment ? data.comment.comment_id : null;
   if (id !== shownId) {
     shownId = id;
+    postData = null;
     form = blankForm();
     full = false;
     gPending = false;
@@ -284,6 +289,42 @@ function contextCard(c) {
       + "in this snapshot (replied_before_labeling). Grade as of when it was posted."}));
   }
   return card;
+}
+
+function postCard(c) {
+  const card = el("div", {class: "card"});
+  card.append(el("div", {class: "row"}, el("button", {
+    text: (postOpen ? "Hide post" : "Show post") + " (p)", onclick: togglePost})));
+  if (!postOpen) return card;
+  const d = postData && postData.id === c.comment_id ? postData.view : null;
+  if (!d) {
+    card.append(el("div", {class: "muted", text: "Loading the post from the saved run..."}));
+    return card;
+  }
+  if (!d.available) {
+    card.append(el("div", {class: "status warn", text: d.reason}));
+    return card;
+  }
+  card.append(el("div", {class: "muted", text: "The post as saved in this run: published "
+    + d.published + (d.edited ? ", last edited " + d.edited : "")
+    + ". Plain text, no links are live."}));
+  if (d.edited_after_comment) {
+    card.append(el("div", {class: "status warn", text: "The post was edited after this "
+      + "comment was posted. Its text may differ from what the commenter saw."}));
+  }
+  card.append(el("div", {class: "body post-body", text: d.body}));
+  return card;
+}
+
+async function togglePost() {
+  postOpen = !postOpen;
+  render();
+  const id = shownId;
+  if (!postOpen || !id || (postData && postData.id === id)) return;
+  try {
+    const view = await api("/api/post?c=" + encodeURIComponent(id));
+    if (shownId === id) { postData = {id: id, view: view}; render(); }
+  } catch (e) { say(e.message); }
 }
 
 function threadCard(c) {
@@ -372,7 +413,7 @@ function formCard(c) {
     "1-9, 0: class    letters: flags (keys shown)",
     "Shift+0..3: prospective grade    g then 0..3: retrospective (g - clears)",
     "e: reason    w: note    Esc: leave a text field    Enter: save",
-    "t: full thread    h: definitions    s: skip    q: stop"]) {
+    "t: full thread    p: post    h: definitions    s: skip    q: stop"]) {
     legend.append(el("div", {class: "mono", text: line}));
   }
   box.append(legend);
@@ -391,7 +432,7 @@ function labelScreen() {
     : {reason: "", note: "", focus: null};
   if (!same && document.activeElement) document.activeElement.blur();
   const main = el("main", {},
-    el("div", {id: "left"}, contextCard(c), threadCard(c)), formCard(c));
+    el("div", {id: "left"}, contextCard(c), postCard(c), threadCard(c)), formCard(c));
   setTimeout(() => {
     setValue("reason", keep.reason);
     setValue("note", keep.note);
@@ -521,6 +562,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (k === "h" || e.key === "?") { toggleHelp(); return; }
   if (k === "t") { full = !full; render(); return; }
+  if (k === "p") { togglePost(); return; }
   if (k === "s") { skip(); return; }
   if (k === "q") { stop(); return; }
   if (k === "g" && form.pro !== null) { gPending = true; render(); return; }

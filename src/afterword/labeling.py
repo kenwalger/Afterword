@@ -39,7 +39,7 @@ from afterword.observations import ObservedComment, ObservedContent, RunObservat
 LABEL_ROOT: Path = label_records.LABEL_ROOT
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
-LABEL_GUIDE_VERSION: str = "lg-v0.3"
+LABEL_GUIDE_VERSION: str = "lg-v0.4"
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
@@ -67,6 +67,10 @@ LABELER_FLAGS: tuple[str, ...] = tuple(
 )
 
 _SAFE_NAME: re.Pattern[str] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# Elements whose content is not post text: dropped before the display rendering.
+_NON_TEXT: re.Pattern[str] = re.compile(
+    r"<(script|style|template|noscript)\b[^>]*>.*?</\1\s*>", re.IGNORECASE | re.DOTALL
+)
 _MAX_INDENT: int = 8
 _RULE: str = "=" * 72
 _THIN_RULE: str = "-" * 72
@@ -265,6 +269,13 @@ class Snapshot:
             for ref in posts
             for c in sorted(by_post[ref], key=lambda c: (c.created_at or floor, c.source_object_id))
         ]
+
+    def has_post_bodies(self) -> bool:
+        """Report whether the run captured any post body, for the label UI's post panel.
+
+        :returns: ``True`` when at least one post's body was loaded.
+        """
+        return any(c.body_source is not None for c in self.contents.values())
 
     def excluded_counts(self) -> dict[str, int]:
         """Count comments that are never labeled, by reason.
@@ -631,6 +642,39 @@ def comment_view(snap: Snapshot, c: ObservedComment) -> dict[str, Any]:
     }
 
 
+def post_view(snap: Snapshot, c: ObservedComment) -> dict[str, Any]:
+    """Describe the post a comment was left on, for the label UI's post panel.
+
+    The body comes from the saved run's single fetch of the post, rendered with
+    the display rendering as plain text, so it carries no live links, images,
+    or scripts. It is the post as of the run, which may differ from what the
+    commenter saw if the post was edited after the comment. No comments, no
+    profiles, nothing fetched.
+
+    :param snap: The run being labeled.
+    :param c: The comment whose post to show.
+    :returns: JSON-ready fields: ``available``, and when available the title,
+        publication and edit times, ``edited_after_comment``, and the body text;
+        otherwise ``reason``.
+    """
+    content = snap.contents.get(c.content_ref)
+    if content is None or content.body_source is None:
+        return {
+            "available": False,
+            "reason": "This run did not capture the post's body (only runs from "
+            "dev-probe-0.2 on fetch every post singly). Run a fresh full probe.",
+        }
+    edited_after = bool(content.edited_at and c.created_at and content.edited_at > c.created_at)
+    return {
+        "available": True,
+        "title": strip_controls(content.title) if content.title else None,
+        "published": _shown_time(content.published_at),
+        "edited": _shown_time(content.edited_at) if content.edited_at else None,
+        "edited_after_comment": edited_after,
+        "body": html_to_display_text(_NON_TEXT.sub("", content.body_source)) or "(empty)",
+    }
+
+
 class LabelBatch:
     """One labeling batch: what to label, and its records under ``fixtures/labels/``.
 
@@ -653,6 +697,7 @@ class LabelBatch:
         post_order: str = "published",
         seed: int | None = None,
         tool: str = "terminal",
+        post_panel: bool = False,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         """Choose the batch. Nothing is written until :meth:`start`.
@@ -670,6 +715,8 @@ class LabelBatch:
         :param post_order: ``published`` or ``random`` (:meth:`Snapshot.subjects`).
         :param seed: Seed for ``random``.
         :param tool: The transport, ``terminal`` or ``browser``, recorded on the batch.
+        :param post_panel: Whether the transport can show the post's body (the label
+            UI's post panel, when the run captured post bodies), recorded on the batch.
         :param now: Wall clock.
         :raises ValueError: For an unknown pass, order, or tool, an unsafe name, a
             batch size out of range, or ``random`` without a seed.
@@ -686,6 +733,7 @@ class LabelBatch:
         self.post_order = post_order
         self.seed = seed if post_order == "random" else None
         self.tool = tool
+        self.post_panel = post_panel
         self.root = root
         self.corpus_version = safe_name(corpus_version)
         self.corpus_set = safe_name(corpus_set)
@@ -737,6 +785,7 @@ class LabelBatch:
             "snapshot_run_id": self.ctx.snapshot_run_id,
             "mode": "label",
             "tool": self.tool,
+            "post_panel": self.post_panel,
             "planned": len(self.items),
             "post_order": self.post_order,
             "started_at": _utc(started),

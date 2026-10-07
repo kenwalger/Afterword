@@ -1,6 +1,8 @@
 # Workflow
 
-**Version:** 3 (2026-10-04)
+**Version:** 4 (2026-10-07)
+
+v4 adds the label UI's post panel (section 3) and, under the rules that apply throughout, keeping the machine awake during long runs.
 
 v3 records both chronological timings as done (section 2), and adds to section 3 the terminal tool's save-on-quit rule, `afterword label status`, and the calibration pass.
 
@@ -16,6 +18,7 @@ Commands assume the setup in the README's Quick start. Commands that call DEV re
 - Never compute the baseline or label from a scoped run (`--article`) or from a run that includes hand-test comments.
 - Practice is allowed, but it is never evidence. A timing run not confirmed as valid is saved under `reports/timing/practice/` and is ignored by every report.
 - Label and timing outputs (`fixtures/labels/`, `reports/timing/`) are opened only by the author. Probe and baseline console output contains counts, statuses, and IDs only, and is safe to share.
+- Keep the machine awake during long runs (a full probe, a benchmark, a model pass over `dev`): disable sleep for the duration, or keep it plugged in with the lid open. A machine that sleeps mid-request turns a slow answer into a timeout, recorded as `failed:timeout`, and stretches the measured time beyond any client timeout (benchmark 2026-10-04, adv-102).
 
 ## 1. Fresh probe first
 
@@ -88,7 +91,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 
 ### The screen
 
-- **Left:** the post title, when the comment was posted, the context status, and the thread as it stood when the comment was posted (later comments hidden). The context status says whether any known gap exists (a deleted earlier comment, a post edited after the comment), whether the comment replies to you (`REPLY_TO_AUTHOR` is then set automatically), and whether your reply already exists in the snapshot (`replied_before_labeling`). By default only the reply chain is shown; `t` shows every earlier comment in the thread.
+- **Left:** the post title, when the comment was posted, the context status, a "Show post" panel, and the thread as it stood when the comment was posted (later comments hidden). The context status says whether any known gap exists (a deleted earlier comment, a post edited after the comment), whether the comment replies to you (`REPLY_TO_AUTHOR` is then set automatically), and whether your reply already exists in the snapshot (`replied_before_labeling`). By default only the reply chain is shown; `t` shows every earlier comment in the thread. `p` opens the post panel: the post's body as saved in the run, as plain text with no live links, with a warning when the post was edited after the comment (`LABELING-GUIDE.md`, `lg-v0.4`). Runs from before `dev-probe-0.2` have no post bodies, and the panel says so.
 - **Right:** the class (radio buttons), flags (checkboxes), the prospective grade, the retrospective grade (shown only after the prospective grade is set), the reason, a hard-to-label note, and the shortcut legend. Hovering a class or flag shows its definition; `h` shows all of them.
 - **Header:** pass, batch, position in the batch, labels saved this session, and comments still unlabeled in the pass. A badge on the right shows the totals for the run: comments labeled (initial pass), relabeled (calibration pass), and eligible. It never shows classes or grades.
 
@@ -109,6 +112,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 | Esc | Leave a text field; close the definitions |
 | Enter | Save the label and show the next comment (also from inside a text field) |
 | `t` | Toggle the reply chain and the full thread as of the comment |
+| `p` | Show or hide the post (from the saved run) |
 | `h` or `?` | Show or hide every class and flag with its definition |
 | `s` | Skip this comment without a label (a typed note is kept) |
 | `q` | Stop the session (asks to confirm while a comment is open) |

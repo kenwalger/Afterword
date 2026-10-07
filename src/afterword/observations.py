@@ -27,6 +27,10 @@ class ObservedContent:
     title: str | None = None
     # Last edit of the post, when the run captured it (not every run does).
     edited_at: datetime | None = None
+    # The post body as the source supplied it, loaded only with text and only
+    # when the run fetched the post singly (not every run does).
+    body_source: str | None = None
+    body_source_format: str | None = None
 
 
 @dataclass(frozen=True)

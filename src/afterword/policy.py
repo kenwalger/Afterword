@@ -1,4 +1,4 @@
-"""Priority policy `pp-v0.1` (`docs/PRIORITY-POLICY.md`, ADR-007).
+"""Priority policy `pp-v0.1`, and the candidate `pp-v0.2` (`docs/PRIORITY-POLICY.md`, ADR-007).
 
 A pure function from a classification (or its absence) and structural signals
 to a tier. The model never chooses priority. Overrides only raise a tier.
@@ -19,6 +19,17 @@ from enum import IntEnum
 from afterword import taxonomy
 
 POLICY_VERSION: str = "pp-v0.1"
+# Policy versions that can be applied. `pp-v0.2` is a candidate evaluated offline
+# on `dev` (EVALUATION.md, "Model-set flags only raise tiers", design (b)); the
+# version applied when classifying stays POLICY_VERSION until one is chosen.
+POLICY_VERSIONS: tuple[str, ...] = ("pp-v0.1", "pp-v0.2")
+# Judgment flags that are informational under each version: recorded and shown,
+# never raising a tier. Only a classifier (a model, or a labeler in an oracle
+# ceiling) sets these two flags; structure and the pre-check never do.
+INFORMATIONAL_FLAGS: dict[str, frozenset[str]] = {
+    "pp-v0.1": frozenset(),
+    "pp-v0.2": frozenset({"NEEDS_THREAD_CONTEXT", "REFERENCES_SPECIFIC_CLAIM"}),
+}
 
 
 class Tier(IntEnum):
@@ -100,18 +111,29 @@ def _below_floor(confidence: str | None, floor: str | None) -> bool:
 
 
 def assign(
-    item: PolicyInput, *, confidence_floor: str | None = CONFIDENCE_FLOOR
+    item: PolicyInput,
+    *,
+    confidence_floor: str | None = CONFIDENCE_FLOOR,
+    policy_version: str = POLICY_VERSION,
 ) -> PriorityDecision:
-    """Compute the tier for one comment under `pp-v0.1`.
+    """Compute the tier for one comment under `pp-v0.1` or the candidate `pp-v0.2`.
+
+    `pp-v0.2` differs in one way: ``NEEDS_THREAD_CONTEXT`` and
+    ``REFERENCES_SPECIFIC_CLAIM`` are informational and never raise a tier. The
+    flags stay on the classification; their rules neither fire nor decide.
 
     :param item: The classification outcome, class, flags, confidence, and edit state.
     :param confidence_floor: Confidence level below which a class is treated as
-        ``UNCERTAIN``. ``None`` (the `pp-v0.1` value) disables the rule. Tests
-        pass a level to exercise the rule ahead of `pp-v0.2`.
+        ``UNCERTAIN``. ``None`` (the value in both versions) disables the rule.
+        Tests pass a level to exercise it.
+    :param policy_version: One of :data:`POLICY_VERSIONS`.
     :returns: The tier, the deciding rule, and every rule that fired.
-    :raises ValueError: If the outcome, class, confidence, or a flag is unknown,
-        or an ``OK`` classification has no class.
+    :raises ValueError: If the policy version, outcome, class, confidence, or a
+        flag is unknown, or an ``OK`` classification has no class.
     """
+    if policy_version not in POLICY_VERSIONS:
+        raise ValueError(f"unknown policy version: {policy_version}")
+    informational = INFORMATIONAL_FLAGS[policy_version]
     if item.outcome is not None and item.outcome not in OUTCOMES:
         raise ValueError(f"unknown outcome: {item.outcome}")
     unknown = item.flags - set(taxonomy.FLAGS)
@@ -136,7 +158,11 @@ def assign(
         fired.append((RULE_LOW_CONFIDENCE, CLASS_DEFAULTS["UNCERTAIN"]))
     if item.edited_since_review:
         fired.append((RULE_EDITED, Tier.QUEUE))
-    fired += [(rule, tier) for rule, tier, flag in _FLAG_OVERRIDES if flag in item.flags]
+    fired += [
+        (rule, tier)
+        for rule, tier, flag in _FLAG_OVERRIDES
+        if flag in item.flags and flag not in informational
+    ]
 
     if failed:
         tier = max(t for _, t in fired)
@@ -151,4 +177,5 @@ def assign(
         tier=tier,
         rule_applied=rule_applied,
         rules_fired=tuple(rule for rule, _ in fired),
+        policy_version=policy_version,
     )

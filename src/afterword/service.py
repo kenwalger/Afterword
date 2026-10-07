@@ -18,7 +18,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -35,6 +35,7 @@ from afterword import (
     normalize,
     policy,
     precheck,
+    scoring,
     taxonomy,
     timing,
 )
@@ -385,7 +386,8 @@ def start_label_batch(
     """Choose and start one labeling batch, for a transport other than the terminal.
 
     The batch, its order, and its records are the same as ``afterword label``;
-    its batch record names the transport as ``browser``.
+    its batch record names the transport as ``browser`` and records whether the
+    post panel was available (the run captured post bodies).
 
     :param session: An opened run.
     :param root: Repository root.
@@ -409,6 +411,7 @@ def start_label_batch(
         post_order=post_order,
         seed=seed,
         tool="browser",
+        post_panel=session.snapshot.has_post_bodies(),
     )
     if not batch.items:
         return None
@@ -424,6 +427,16 @@ def label_view(batch: labeling.LabelBatch, index: int) -> dict[str, Any]:
     :returns: JSON-ready view (:func:`afterword.labeling.comment_view`).
     """
     return labeling.comment_view(batch.snap, batch.items[index])
+
+
+def post_view(batch: labeling.LabelBatch, index: int) -> dict[str, Any]:
+    """Describe the post of one comment of a batch, for the label UI's post panel.
+
+    :param batch: A started batch.
+    :param index: Position in the batch, from 0.
+    :returns: JSON-ready view (:func:`afterword.labeling.post_view`).
+    """
+    return labeling.post_view(batch.snap, batch.items[index])
 
 
 def save_label(
@@ -618,6 +631,22 @@ def list_connections(root: Path) -> list[ConnectionSummary]:
         repo.close()
 
 
+def store_status(root: Path, connection_id: str | None = None) -> dict[str, dict[str, int]]:
+    """Count a connection's comments by lifecycle state and its lifecycle events.
+
+    :param root: Repository root.
+    :param connection_id: Connection ID; ``None`` when the store has exactly one.
+    :returns: Counts only (:meth:`afterword.repository.Repository.lifecycle_counts`).
+        An unknown or ambiguous connection raises :class:`ServiceError`.
+    """
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        return repo.lifecycle_counts(cid)
+    finally:
+        repo.close()
+
+
 def forget_connection(root: Path, connection_id: str, *, confirm: bool) -> dict[str, int]:
     """Remove all local data for one connection (``PRIVACY-AND-BOUNDARIES.md``).
 
@@ -770,6 +799,61 @@ def structural_flags(c: domain.Comment, *, reply_to_author: bool) -> list[str]:
     return [f for f in taxonomy.FLAGS if f in found]
 
 
+@dataclass(frozen=True)
+class _Subject:
+    """A comment from others to classify, with exactly what its classifiers receive."""
+
+    comment: domain.Comment
+    inp: classifier.ClassifierInput
+    extra: dict[str, list[str]]
+
+
+def _subjects(repo: Repository, cid: str) -> list[_Subject]:
+    """List the live comments from others with their classifier input and fixed flags.
+
+    Author comments, deleted comments, and placeholders are never subjects
+    (ADR-011, ADR-009). ``extra`` holds the structural flags and the pre-check's
+    flag, the same for B1 and B2.
+    """
+    comments = repo.comments(cid)
+    contents = repo.contents(cid)
+    out = []
+    for c in comments.values():
+        if not (
+            c.is_content_author is False
+            and c.lifecycle_state in (domain.ACTIVE, domain.EDITED)
+            and c.body_text is not None
+        ):
+            continue
+        parent = comments.get(c.parent_comment_id) if c.parent_comment_id else None
+        parent_text = None
+        if c.parent_comment_id is not None:
+            parent_text = (parent.body_text if parent else None) or ""
+        reply_to_author = bool(
+            parent and parent.is_content_author and parent.is_content_author_state == domain.PRESENT
+        )
+        content = contents.get(c.content_id)
+        inp = classifier.build_input(
+            post_title=content.title if content else None,
+            comment=c.body_text or "",
+            parent=parent_text,
+            reply_to_author=reply_to_author,
+        )
+        pre = precheck.precheck(inp.comment)
+        extra = {
+            "structure": structural_flags(c, reply_to_author=reply_to_author),
+            "precheck": [taxonomy.POSSIBLE_INSTRUCTION_TEXT] if pre.flagged else [],
+        }
+        out.append(_Subject(c, inp, extra))
+    return out
+
+
+def _b1_hash(inp: classifier.ClassifierInput) -> str:
+    # B1 sees the comment only, so only the comment is in its key.
+    canonical = json.dumps({"comment": inp.comment}, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _b1(
     cid: str,
     c: domain.Comment,
@@ -778,7 +862,7 @@ def _b1(
     now: datetime,
 ) -> domain.Classification:
     normalized = normalize.normalize(c.body_source, c.body_source_format or "HTML")
-    result = heuristic.classify(normalized)
+    result = heuristic.classify(normalized, key.model_id)
     by_source = {"heuristic": sorted(result.flags)} | extra
     return domain.Classification(
         classification_id=domain.new_id(),
@@ -884,6 +968,8 @@ def classify_comments(
     model: str | None = None,
     connection_id: str | None = None,
     host: str = ollama.DEFAULT_HOST,
+    heuristic_version: str = heuristic.HEURISTIC_VERSION,
+    only_ids: set[str] | None = None,
     progress: Callable[[int, int], None] | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> ClassifyResult:
@@ -901,14 +987,19 @@ def classify_comments(
     :param model: Model ID for ``b2``.
     :param connection_id: Connection; may be omitted when the store has exactly one.
     :param host: Ollama base URL (loopback only).
+    :param heuristic_version: Heuristic version for ``b1``.
+    :param only_ids: Restrict to these comment IDs, such as a fixed dev subset.
     :param progress: Called with the number done and the total.
     :param now: Wall clock.
     :returns: Counts of reuse, outcomes, errors, and tiers.
-    :raises ServiceError: For an unknown condition, an unsigned boundary path, a
-        model that fails verification, or an ambiguous connection.
+    :raises ServiceError: For an unknown condition or heuristic version, an
+        unsigned boundary path, a model that fails verification, or an
+        ambiguous connection.
     """
     if condition not in CONDITIONS:
         raise ServiceError(f"unknown condition: {condition}")
+    if heuristic_version not in heuristic.HEURISTIC_VERSIONS:
+        raise ServiceError(f"unknown heuristic version: {heuristic_version}")
     provider: Provider | None = None
     if condition == "b2":
         if provider_name not in SIGNED_OFF_PATHS:
@@ -924,46 +1015,18 @@ def classify_comments(
             identity = _verify(provider)
             prompt_version: str | None = classifier.PROMPT_VERSION
         else:
-            identity = ModelIdentity(
-                "afterword", heuristic.HEURISTIC_VERSION, None, domain.NOT_EXPOSED
-            )
+            identity = ModelIdentity("afterword", heuristic_version, None, domain.NOT_EXPOSED)
             prompt_version = None
-        comments = repo.comments(cid)
-        contents = repo.contents(cid)
         subjects = [
-            c
-            for c in comments.values()
-            if c.is_content_author is False
-            and c.lifecycle_state in (domain.ACTIVE, domain.EDITED)
-            and c.body_text is not None
+            s for s in _subjects(repo, cid) if only_ids is None or s.comment.comment_id in only_ids
         ]
         reused = 0
         outcomes: Counter[str] = Counter()
         errors: Counter[str] = Counter()
         tiers: Counter[str] = Counter()
-        for i, c in enumerate(subjects, start=1):
-            parent = comments.get(c.parent_comment_id) if c.parent_comment_id else None
-            parent_text = None
-            if c.parent_comment_id is not None:
-                parent_text = (parent.body_text if parent else None) or ""
-            reply_to_author = bool(
-                parent
-                and parent.is_content_author
-                and parent.is_content_author_state == domain.PRESENT
-            )
-            content = contents.get(c.content_id)
-            inp = classifier.build_input(
-                post_title=content.title if content else None,
-                comment=c.body_text or "",
-                parent=parent_text,
-                reply_to_author=reply_to_author,
-            )
-            if provider is None:
-                # B1 sees the comment only, so only the comment is in its key.
-                canonical = json.dumps({"comment": inp.comment}, ensure_ascii=False)
-                hashed = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-            else:
-                hashed = inp.input_hash
+        for i, s in enumerate(subjects, start=1):
+            c, inp, extra = s.comment, s.inp, s.extra
+            hashed = _b1_hash(inp) if provider is None else inp.input_hash
             key = domain.CacheKey(
                 hashed,
                 identity.provider,
@@ -972,11 +1035,6 @@ def classify_comments(
                 prompt_version,
                 taxonomy.TAXONOMY_VERSION,
             )
-            pre = precheck.precheck(inp.comment)
-            extra = {
-                "structure": structural_flags(c, reply_to_author=reply_to_author),
-                "precheck": [taxonomy.POSSIBLE_INSTRUCTION_TEXT] if pre.flagged else [],
-            }
             k = repo.find_classification(cid, c.comment_id, key, (domain.OK, domain.MALFORMED))
             if k is not None:
                 reused += 1
@@ -1010,6 +1068,293 @@ def classify_comments(
         errors=dict(errors),
         tiers=dict(tiers),
     )
+
+
+# Evaluation on dev labels (Stage 3a) -------------------------------------------------
+
+EVAL_ROOT: Path = REPORT_ROOT / "eval"
+
+
+@dataclass(frozen=True)
+class EvaluationResult:
+    """One condition scored against the analysis labels under one policy. Counts only.
+
+    ``missed_ids`` are for :func:`write_miss_report` alone and are never printed.
+    """
+
+    condition: str
+    model_provider: str
+    model_id: str
+    model_digests: tuple[str, ...]
+    prompt_version: str | None
+    policy_version: str
+    labels: int
+    calibration_labels: int
+    scored: int
+    not_scored: dict[str, int]
+    scores: dict[str, dict[str, Any]]
+    oracle: dict[str, dict[str, Any]]
+    missed_ids: list[str]
+
+    def report(self) -> dict[str, Any]:
+        """Return everything but the missed IDs, for a counts-only JSON report.
+
+        :returns: JSON-ready counts and versions.
+        """
+        out = {k: v for k, v in self.__dict__.items() if k != "missed_ids"}
+        out["model_digests"] = list(self.model_digests)
+        return out
+
+
+def _labels_with_content_flags(
+    root: Path, corpus_version: str, subjects: dict[str, _Subject]
+) -> tuple[dict[str, dict[str, Any]], dict[str, str], int]:
+    labels = label_records.read_labels(root, labeling.safe_name(corpus_version))
+    batches = label_records.read_batches(root, corpus_version)
+    chosen = label_records.analysis_labels(labels)
+    orders = label_records.batch_post_orders(batches)
+    out: dict[str, dict[str, Any]] = {}
+    order_of: dict[str, str] = {}
+    for comment_id, record in chosen.items():
+        s = subjects.get(comment_id)
+        flags = s.extra["structure"] if s is not None else []
+        out[comment_id] = label_records.with_content_flags(record, flags)
+        order_of[comment_id] = orders.get(str(record.get("batch_id")), label_records.UNKNOWN_ORDER)
+    calibration = sum(1 for r in chosen.values() if r.get("pass") == "calibration")
+    return out, order_of, calibration
+
+
+def _cached(
+    repo: Repository, cid: str, s: _Subject, identity: tuple[str, str, str | None], b1: bool
+) -> domain.Classification | None:
+    provider, model_id, prompt_version = identity
+    wanted = _b1_hash(s.inp) if b1 else s.inp.input_hash
+    matches = [
+        k
+        for k in repo.classifications(cid, s.comment.comment_id)
+        if k.key.input_hash == wanted
+        and k.key.model_provider == provider
+        and k.key.model_id == model_id
+        and k.key.prompt_version == prompt_version
+        and k.key.taxonomy_version == taxonomy.TAXONOMY_VERSION
+    ]
+    kept = [k for k in matches if k.outcome in (domain.OK, domain.MALFORMED)]
+    pool = kept or matches
+    return pool[-1] if pool else None
+
+
+def _decide(
+    outcome: str,
+    primary_class: str | None,
+    flags: frozenset[str],
+    c: domain.Comment,
+    policy_version: str,
+) -> str:
+    ok = outcome == domain.OK
+    return policy.assign(
+        policy.PolicyInput(
+            outcome=outcome,
+            primary_class=primary_class if ok else None,
+            flags=flags,
+            confidence=None,
+            edited_since_review=c.lifecycle_state == domain.EDITED,
+        ),
+        policy_version=policy_version,
+    ).tier.name
+
+
+def evaluate_condition(
+    root: Path,
+    *,
+    condition: str,
+    policy_version: str = policy.POLICY_VERSION,
+    heuristic_version: str = heuristic.HEURISTIC_VERSION,
+    provider_name: str = ollama.PROVIDER,
+    model: str | None = None,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    only_ids: set[str] | None = None,
+    connection_id: str | None = None,
+) -> EvaluationResult:
+    """Score cached classifications of labeled comments against the labels, offline.
+
+    No model runs: each labeled comment's classification is looked up by its
+    current input hash and the classifier's identity, and the policy version is
+    applied afresh, so any policy can be compared on any cached classifications.
+    Comments without a cached classification are counted, not scored. Confidence
+    is not passed to the policy (the floor is unset in every version).
+
+    :param root: Repository root.
+    :param condition: ``b1`` or ``b2``.
+    :param policy_version: One of :data:`afterword.policy.POLICY_VERSIONS`.
+    :param heuristic_version: Heuristic version, for ``b1``.
+    :param provider_name: Model provider, for ``b2``.
+    :param model: Model ID, required for ``b2``.
+    :param corpus_version: Label directory.
+    :param only_ids: Restrict to these comment IDs, such as a fixed dev subset.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :returns: Scores for all labels and for each post order, the oracle ceilings
+        under the same policy, and the consequential comments collapsed.
+    :raises ServiceError: For an unknown condition, policy, or heuristic version,
+        or ``b2`` without a model.
+    """
+    if condition not in CONDITIONS:
+        raise ServiceError(f"unknown condition: {condition}")
+    if policy_version not in policy.POLICY_VERSIONS:
+        raise ServiceError(f"unknown policy version: {policy_version}")
+    if condition == "b1":
+        if heuristic_version not in heuristic.HEURISTIC_VERSIONS:
+            raise ServiceError(f"unknown heuristic version: {heuristic_version}")
+        identity: tuple[str, str, str | None] = ("afterword", heuristic_version, None)
+        source = "heuristic"
+    else:
+        if model is None:
+            raise ServiceError("b2 needs --model")
+        identity = (provider_name, model, classifier.PROMPT_VERSION)
+        source = "model"
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = {s.comment.comment_id: s for s in _subjects(repo, cid)}
+        labels, order_of, calibration = _labels_with_content_flags(root, corpus_version, subjects)
+        wanted = [i for i in labels if only_ids is None or i in only_ids]
+        not_scored: Counter[str] = Counter()
+        items: list[scoring.Scored] = []
+        digests: set[str] = set()
+        for comment_id in sorted(wanted):
+            s = subjects.get(comment_id)
+            if s is None:
+                not_scored["not_a_live_subject_in_store"] += 1
+                continue
+            k = _cached(repo, cid, s, identity, condition == "b1")
+            if k is None:
+                not_scored["not_classified"] += 1
+                continue
+            if k.key.model_digest:
+                digests.add(k.key.model_digest)
+            own = frozenset(k.flags_by_source.get(source, [])) & frozenset(taxonomy.FLAGS)
+            fixed = frozenset(f for v in s.extra.values() for f in v)
+            items.append(
+                scoring.Scored(
+                    comment_id=comment_id,
+                    label=labels[comment_id],
+                    post_order=order_of[comment_id],
+                    outcome=k.outcome,
+                    primary_class=k.primary_class,
+                    classifier_flags=own,
+                    tier=_decide(
+                        k.outcome, k.primary_class, own | fixed, s.comment, policy_version
+                    ),
+                    base_tier=_decide(k.outcome, k.primary_class, fixed, s.comment, policy_version),
+                )
+            )
+    finally:
+        repo.close()
+    scored = scoring.score_by_post_order(items)
+    scored_labels = [i.label for i in items]
+    return EvaluationResult(
+        condition=condition,
+        model_provider=identity[0],
+        model_id=identity[1],
+        model_digests=tuple(sorted(digests)),
+        prompt_version=identity[2],
+        policy_version=policy_version,
+        labels=len(wanted),
+        calibration_labels=calibration,
+        scored=len(items),
+        not_scored=dict(not_scored),
+        scores={k: v.counts for k, v in scored.items()},
+        oracle=label_records.oracle_ceiling(scored_labels, policy_version=policy_version),
+        missed_ids=scored["all"].missed_ids,
+    )
+
+
+def tune_b1_threshold(
+    root: Path,
+    thresholds: Iterable[int],
+    *,
+    policy_version: str = policy.POLICY_VERSION,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    connection_id: str | None = None,
+) -> dict[int, dict[str, dict[str, Any]]]:
+    """Score B1's rules at each length threshold on the labeled comments, in memory.
+
+    Tuning on `dev`, not measurement: nothing is stored, and the chosen threshold
+    becomes a new heuristic version.
+
+    :param root: Repository root.
+    :param thresholds: Prose lengths to try.
+    :param policy_version: Policy to apply.
+    :param corpus_version: Label directory.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :returns: Per threshold, :func:`afterword.scoring.score_by_post_order` counts.
+    """
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = {s.comment.comment_id: s for s in _subjects(repo, cid)}
+    finally:
+        repo.close()
+    labels, order_of, _ = _labels_with_content_flags(root, corpus_version, subjects)
+    base = {
+        i: heuristic.features(
+            normalize.normalize(s.comment.body_source, s.comment.body_source_format or "HTML")
+        )
+        for i, s in subjects.items()
+        if i in labels
+    }
+    out: dict[int, dict[str, dict[str, Any]]] = {}
+    for t in thresholds:
+        items = []
+        for comment_id, f in sorted(base.items()):
+            s = subjects[comment_id]
+            primary, _ = heuristic.decide(replace(f, long=f.prose_length >= t))
+            fixed = frozenset(x for v in s.extra.values() for x in v)
+            tier = _decide(domain.OK, primary, fixed, s.comment, policy_version)
+            items.append(
+                scoring.Scored(
+                    comment_id=comment_id,
+                    label=labels[comment_id],
+                    post_order=order_of[comment_id],
+                    outcome=domain.OK,
+                    primary_class=primary,
+                    classifier_flags=frozenset(),
+                    tier=tier,
+                    base_tier=tier,
+                )
+            )
+        out[t] = {k: v.counts for k, v in scoring.score_by_post_order(items).items()}
+    return out
+
+
+def write_evaluation_report(
+    root: Path,
+    result: EvaluationResult,
+    *,
+    with_misses: bool,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> tuple[Path, Path | None]:
+    """Write an evaluation's counts, and optionally its miss list, under ``reports/eval/``.
+
+    Both files are git-ignored. The miss list holds comment IDs only, one per
+    line, for the author to review in a local view; no text is written.
+
+    :param root: Repository root.
+    :param result: The evaluation.
+    :param with_misses: Also write the IDs of consequential comments collapsed.
+    :param now: Wall clock, for the file names.
+    :returns: The report path and the miss list path (``None`` when not written).
+    """
+    stamp = now().astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", f"{result.model_id}-{result.policy_version}")
+    out = root / EVAL_ROOT
+    out.mkdir(parents=True, exist_ok=True)
+    report = out / f"{stamp}-{result.condition}-{name}.json"
+    report.write_text(json.dumps(result.report(), indent=2) + "\n", encoding="utf-8")
+    misses = None
+    if with_misses:
+        misses = out / f"{stamp}-{result.condition}-{name}-misses.txt"
+        misses.write_text("".join(f"{i}\n" for i in result.missed_ids), encoding="utf-8")
+    return report, misses
 
 
 # Benchmark (synthetic only) -------------------------------------------------------------

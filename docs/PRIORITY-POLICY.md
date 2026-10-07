@@ -88,6 +88,14 @@ Comments written by the post's author are not assigned a tier. They are context 
 
 Every tier assignment records which rule produced it: class default or the specific override. The UI shows this alongside the model's explanation, so the human can tell a policy decision from a model judgment.
 
+## Candidate: `pp-v0.2` (2026-10-07, not adopted)
+
+Design (b) of `EVALUATION.md` ("Model-set flags only raise tiers"), implemented so it can be evaluated on `dev`; `pp-v0.1` remains the policy applied when classifying.
+
+- `NEEDS_THREAD_CONTEXT` and `REFERENCES_SPECIFIC_CLAIM` are **informational**: recorded on the classification and shown, but they never raise a tier, and their rules neither fire nor decide. Only a classifier sets these two flags; structure and the pre-check never do.
+- Everything else is as in `pp-v0.1`: class defaults, the failed-classification and `POSSIBLE_INSTRUCTION_TEXT` overrides, `REPLY_TO_AUTHOR`, the edit rule, and the unset confidence floor.
+- Its cost is any consequential comment that only those flags would have raised out of `COLLAPSED`. It is scored offline against cached classifications (`afterword evaluate --policy pp-v0.2`), and chosen or rejected before preregistration.
+
 ## Change control
 
 Any change to tiers, defaults, overrides, or thresholds produces a new policy version. Policy versions are fixed before the sealed test set is opened (ADR-010).

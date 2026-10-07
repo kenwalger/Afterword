@@ -1,6 +1,10 @@
 # Evaluation Plan
 
-**Version:** 10 (2026-10-04)
+**Version:** 12 (2026-10-07)
+
+v12 (2026-10-07, later the same day, after the first ingest of real data and before any model classified a real comment) records B1 on `dev` (`hb-v0.1`, and `hb-v0.2` with its length threshold tuned on `dev`), the candidate policy `pp-v0.2`, and how both are scored offline. Nothing registered changes.
+
+v11 (2026-10-07, with 302 `dev` labels and before any classification of a real comment) records a second provisional accrual estimate and oracle ceiling, reported for all 302 labels and separately for the 150 in publication order and the 152 in shuffled order, with a ceiling without any `REFERENCES_SPECIFIC_CLAIM` raises. Nothing registered changes.
 
 v10 (2026-10-04, after the `pr-v0.2` synthetic benchmark, before any classification of a real comment) records that model-set flags which can only raise tiers each erode review reduction, two candidate designs to evaluate on `dev`, and the duplicate-flag decision left for preregistration. No policy or prompt changes.
 
@@ -80,6 +84,19 @@ Once `dev` labeling is complete, recompute this estimate with the observed conse
   - **Small sample.** One labeler, 150 comments, a 14-point-wide interval.
 - **What would change it:** the share on the full `dev` set. If it falls below about 20%, the consequential target binds again and the estimate lengthens (8 to 10 weeks at 15%, mean rate).
 
+**2026-10-07, PROVISIONAL (302 of 458 `dev` comments labeled; superseded when `dev` labeling is complete).**
+
+| Labels | Graded 2 or 3 | Share (Wilson 95%) |
+| --- | --- | --- |
+| All 302 | 84 | 27.8% (23.1% to 33.1%) |
+| First 150, publication order | 39 | 26.0% (19.6% to 33.6%) |
+| Next 152, shuffled posts (`--posts random --seed 20261004`) | 45 | 29.6% (22.9% to 37.3%) |
+
+- **Accrual:** at every share in the table, including each interval's low end (23.1% for all 302, 22.9% for the shuffled 152), 20 consequential comments need fewer than 100 comments, so the 100-comment target binds. That is about 6 weeks at the trailing-13-week mean rate (17.0 per week, run `20261002T171152Z`) and about 14 weeks at the median rate (7 per week), both inside the 16-week cap. A replay of the trailing 13 weeks' actual counts, starting at each of the 13 weeks in turn and wrapping around, reaches 100 comments in 3 to 10 weeks (median 7). The 2026-10-04 entry gave 3 / 7 / 11; its replay method was not recorded, so the two replays are not compared.
+- **The shuffled labels are the better estimate of the share**, because their posts are a seeded random order rather than the earliest-published posts. Their share is 3.6 points above the publication-order share, well inside both intervals.
+- **Hindsight:** 192 of the 302 (63.6%) were labeled after the author had replied (`replied_before_labeling`): 108 of 150 (72.0%) in publication order, 84 of 152 (55.3%) shuffled.
+- **Still provisional:** one labeler, 302 of 458 comments, prospective grades of historical comments made with hindsight available.
+
 ### Risks to accrual
 
 - **Publishing cadence.** About 91% of comments arrive within a week of a post. Accrual therefore depends on the author's DEV publishing cadence during the test period. A quiet stretch (July 2026: 11 posts, 7 comments from others) can end accrual at the 16-week cap with one or both targets unmet.
@@ -100,6 +117,8 @@ Once `dev` labeling is complete, recompute this estimate with the observed conse
 Candidate features: question mark present, code block present, link present, `REPLY_TO_AUTHOR`, length above a threshold, and a small lexicon of correction and challenge markers ("actually", "doesn't work", "wrong", "error", "outdated", "breaks"). Rules assign a primary class proxy that the priority policy consumes unchanged.
 
 The marginal value of the model is B2 minus B1. If B1 is close to B2, that is a reportable result, not a failure to hide.
+
+**`hb-v0.2` (2026-10-07):** `hb-v0.1` with the length threshold at 281 prose characters instead of 280, chosen on the 302 `dev` labels by a rule fixed before the sweep (below, "B1 on `dev`"). Rules and lexicon unchanged. This is tuning on `dev`, not measurement.
 
 B1 and B2 receive the same normalized text (`norm-v0.1` or its successor), the same structural flags (`REPLY_TO_AUTHOR`, and from `tax-v0.2` `CONTAINS_CODE` and `CONTAINS_LINK`, set from normalization), and the same deterministic `POSSIBLE_INSTRUCTION_TEXT` pre-check, and both feed the same priority policy. The comparison therefore isolates classification. `hb-v0.1` starts as a draft written before any labels existed; its thresholds and lexicon are tuned on `dev`, and each change is a new heuristic version.
 
@@ -190,6 +209,83 @@ The third row ignores `REFERENCES_SPECIFIC_CLAIM` on these labels, all `tax-v0.1
 - **Recall is not the constraint here; reduction is.** Only acknowledgments and spam collapse by default, and they are 27 of these 150. Perfect classification would therefore leave at least 82% of comments within the review threshold.
 - **Flags lower the ceiling further.** With the labeled flags applied, 8 acknowledgments leave `COLLAPSED`: 5 on the structural `REPLY_TO_AUTHOR`, 2 on `NEEDS_THREAD_CONTEXT`, 1 on `REFERENCES_SPECIFIC_CLAIM`. None of the 8 is graded consequential. The author set `REFERENCES_SPECIFIC_CLAIM` on 82 of the 150 labels and `NEEDS_THREAD_CONTEXT` on 50.
 - **What this does not say:** anything about a classifier. It bounds what `pp-v0.1` can deliver on these labels. Whether the policy should change (a new policy version, chosen on `dev`) is a Stage 3a question, recomputed on the full set.
+
+### Label summary and oracle ceiling, 302 labels (2026-10-07, provisional)
+
+The same analysis on the 302 analysis labels (none from a calibration pass), computed with `afterword.label_records` (counts only). Code and link flags are the deterministic ones from normalization for every label (`TAXONOMY.md`). The 150 publication-order labels are reported again so the shuffled 152 can be read beside them; analyses of partial labels report the two orders apart.
+
+| Primary class | All 302 | Publication order (150) | Shuffled (152) | Default tier |
+| --- | --- | --- | --- | --- |
+| `CORRECTION` | 2 | 2 | 0 | `SURFACE` |
+| `CHALLENGE_OR_COUNTEREXAMPLE` | 4 | 2 | 2 | `SURFACE` |
+| `TECHNICAL_QUESTION` | 46 | 23 | 23 | `SURFACE` |
+| `OPPORTUNITY` | 1 | 0 | 1 | `SURFACE` |
+| `DIRECT_QUESTION` | 5 | 5 | 0 | `QUEUE` |
+| `TECHNICAL_EXTENSION` | 100 | 49 | 51 | `QUEUE` |
+| `CONVERSATIONAL` | 86 | 42 | 44 | `QUEUE` |
+| `LIGHTWEIGHT_ACKNOWLEDGMENT` | 40 | 19 | 21 | `COLLAPSED` |
+| `LIKELY_SPAM_OR_NOISE` | 17 | 8 | 9 | `COLLAPSED` |
+| `UNCERTAIN` | 1 | 0 | 1 | `SURFACE` |
+
+| Prospective grade | All 302 | Publication order | Shuffled |
+| --- | --- | --- | --- |
+| 0 | 103 | 53 | 50 |
+| 1 | 115 | 58 | 57 |
+| 2 | 68 | 34 | 34 |
+| 3 | 16 | 5 | 11 |
+| 2 or 3 | 84 (27.8%; Wilson 23.1% to 33.1%) | 39 (26.0%; 19.6% to 33.6%) | 45 (29.6%; 22.9% to 37.3%) |
+
+Where the consequential comments sit by class (all 302): `TECHNICAL_EXTENSION` 49, `TECHNICAL_QUESTION` 24, `CONVERSATIONAL` 4, `CHALLENGE_OR_COUNTEREXAMPLE` 3, `CORRECTION` 2, `OPPORTUNITY` 1, `DIRECT_QUESTION` 1; none among acknowledgments, spam, or `UNCERTAIN`.
+
+**Prospective against retrospective (C-010),** where both grades exist:
+
+| | All | Publication order | Shuffled |
+| --- | --- | --- | --- |
+| Both grades present | 293 | 147 | 146 |
+| Same grade | 232 | 135 | 97 |
+| Same consequential binary | 262 | 140 | 122 |
+| Consequential only in hindsight | 4 | 3 | 1 |
+| Consequential only prospectively | 27 | 4 | 23 |
+
+The two orders differ sharply here: in the shuffled labels, 23 comments graded consequential prospectively were graded below 2 with hindsight, against 4 in the publication-order labels. The orders also differ in labeling date, guide version (`lg-v0.2` against `lg-v0.3`), taxonomy version, and the labeler's experience, so the cause cannot be separated from these labels.
+
+**`REFERENCES_SPECIFIC_CLAIM` usage by taxonomy version:** `tax-v0.1` 82 of 150 labels (54.7%); `tax-v0.2` 18 of 152 (11.8%). Every `tax-v0.1` label is in publication order and every `tax-v0.2` label is shuffled, so the drop mixes the stricter test with a different sample of posts. `NEEDS_THREAD_CONTEXT`: 50 of 150 and 30 of 152.
+
+**Oracle ceiling of `pp-v0.1`:**
+
+| Ceiling | All 302: collapsed (review reduction) | Publication order (150) | Shuffled (152) | Consequential surfaced |
+| --- | --- | --- | --- | --- |
+| Class defaults only | 57 (18.9%; Wilson 14.9% to 23.7%) | 27 (18.0%) | 30 (19.7%) | 84 of 84 |
+| Class and labeled flags | 44 (14.6%; 11.0% to 19.0%) | 19 (12.7%) | 25 (16.4%) | 84 of 84 |
+| Class and labeled flags, without `tax-v0.1` `REFERENCES_SPECIFIC_CLAIM` raises | 45 (14.9%; 11.3% to 19.4%) | 20 (13.3%) | 25 (16.4%) | 84 of 84 |
+| Class and labeled flags, without any `REFERENCES_SPECIFIC_CLAIM` raises | 49 (16.2%; 12.5% to 20.8%) | 20 (13.3%) | 29 (19.1%) | 84 of 84 |
+
+- **Tiers (all 302):** class defaults only, 54 `SURFACE`, 191 `QUEUE`, 57 `COLLAPSED`; with labeled flags, 55, 203, 44. The 84 consequential comments sit 30 at `SURFACE` and 54 at `QUEUE` under every ceiling; none collapses.
+- **The 2026-10-04 reading holds on twice the labels:** recall is not the constraint, reduction is. Perfect classification under `pp-v0.1` collapses at most about 19% of comments, and the labeled flags take that to about 15%.
+- **`REFERENCES_SPECIFIC_CLAIM` costs 5 collapses of 302** at the oracle (44 against 49), 4 of them in the shuffled labels, none consequential. This bounds what the flag can cost when it is applied as the labeler applies it; a model that over-applies it (benchmark 2026-10-04) can cost more, which is what `pp-v0.2` (B3, session 8) is evaluated against on `dev`.
+- **What this does not say:** anything about a classifier, as above.
+
+### B1 on `dev` (2026-10-07, provisional; tuning, not measurement)
+
+B1 classified all 458 stored comments from others (`afterword classify --condition b1`) and was scored against the 302 analysis labels (`afterword evaluate`), counts only. Same caveats as above: historical comments, labels made with hindsight and mostly after replying, the first 150 in publication order, and for `hb-v0.2` tuning and scoring on the same labels.
+
+| Condition, policy | Consequential surfaced | Collapsed (review reduction) | SURFACE | QUEUE |
+| --- | --- | --- | --- | --- |
+| `hb-v0.1`, `pp-v0.1` | 81 of 84 (96.4%; Wilson 90.0% to 98.8%) | 44 of 302 (14.6%; 11.0% to 19.0%) | 126 | 132 |
+| `hb-v0.2`, `pp-v0.1` | 81 of 84 | 45 of 302 (14.9%; 11.3% to 19.4%) | 126 | 131 |
+| `hb-v0.1` or `hb-v0.2`, `pp-v0.2` | identical to `pp-v0.1` | | | |
+| Oracle, labeled class and flags, `pp-v0.1` | 84 of 84 | 44 | 55 | 203 |
+| Oracle, labeled class and flags, `pp-v0.2` | 84 of 84 | 51 (16.9%) | 55 | 196 |
+
+- **By post order (`hb-v0.1`):** publication order 36 of 39 surfaced, 24 of 150 collapsed; shuffled 45 of 45, 20 of 152. All 3 misses are in the publication-order labels, and they are the same 3 comments under both heuristic versions.
+- **B1 matches the oracle's reduction but not its shape.** It collapses as many comments as perfect classes and flags would under `pp-v0.1`, while surfacing 126 at `SURFACE` against the oracle's 55. The lexicon rule calls 83 comments `CORRECTION` (2 agree with the labels; "error" and "actually" are common in ordinary technical prose), which is what fills `SURFACE`.
+- **Per class (`hb-v0.1`, predicted / agreeing with the label):** `CORRECTION` 83 / 2, `TECHNICAL_QUESTION` 42 / 18 (46 labeled), `DIRECT_QUESTION` 9 / 1, `TECHNICAL_EXTENSION` 19 / 6 (100 labeled), `CONVERSATIONAL` 79 / 28 (86 labeled), `LIGHTWEIGHT_ACKNOWLEDGMENT` 70 / 22 (40 labeled). B1 never predicts challenge, opportunity, spam, or `UNCERTAIN`. Of its 70 acknowledgments, 26 are raised out of `COLLAPSED` by `REPLY_TO_AUTHOR` or the pre-check.
+- **`pp-v0.2` changes nothing for B1,** which sets no judgment flags. The comparison matters for B2, whose flags it neutralizes; at the oracle it collapses 7 more comments of 302 than `pp-v0.1`, none consequential.
+- **Tuning the length threshold.** Rule, fixed before the sweep: the largest review reduction among thresholds whose consequential misses on all 302 labels do not exceed `hb-v0.1`'s 3; ties go to the smaller threshold. Swept 0 to 1000 in steps of 10, then 280 to 300 in steps of 1 (`afterword.service.tune_b1_threshold`, in memory). Result: 281 (45 collapsed, 3 misses). The curve is flat near the draft value: misses stay 0 up to a threshold of 80 (12 collapsed), reach 1 at 90 (15), 3 at 240 (36), and 4 at 293 (46). The threshold barely moves B1; its errors come from the lexicon and the question rules.
+
+### Scoring offline (2026-10-07)
+
+`afterword evaluate --condition b1|b2 [--heuristic V | --model M] --policy pp-v0.1|pp-v0.2` scores cached classifications against the analysis labels without running a model: each labeled comment's classification is found by its current input hash and the classifier's identity (provider, model ID, prompt version, taxonomy version), and the chosen policy is applied in memory. Any cached B2 run can therefore be re-scored under any policy version. Comments without a cached classification are counted, not scored. Reports go to `reports/eval/` (git-ignored, counts only); `--misses` adds a git-ignored list of the IDs of consequential comments collapsed, for the author's own review.
 
 ## Adversarial set
 

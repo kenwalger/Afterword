@@ -329,6 +329,56 @@ class SqliteRepository:
             for table in _TABLES
         }
 
+    def lifecycle_counts(self, connection_id: str) -> dict[str, dict[str, int]]:
+        """Count a connection's comments and lifecycle events, for a status report.
+
+        :param connection_id: Connection ID.
+        :returns: See :meth:`afterword.repository.Repository.lifecycle_counts`.
+        """
+        who = (
+            "CASE WHEN is_content_author IS NULL THEN 'unknown' "
+            "WHEN is_content_author = 1 THEN 'author' ELSE 'others' END"
+        )
+        comments = {
+            f"{state} {kind}": int(n)
+            for state, kind, n in self.db.execute(
+                f"SELECT lifecycle_state, {who}, COUNT(*) FROM comments "
+                "WHERE connection_id = ? GROUP BY 1, 2 ORDER BY 1, 2",
+                (connection_id,),
+            )
+        }
+        events = {
+            f"{run} {before or '(none)'}->{after} {reason}": int(n)
+            for run, before, after, reason, n in self.db.execute(
+                "SELECT sync_run_id, from_state, to_state, reason, COUNT(*) FROM lifecycle_events "
+                "WHERE connection_id = ? GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4",
+                (connection_id,),
+            )
+        }
+        deleted = (domain.DELETED_UPSTREAM, domain.PURGED)
+        with_text = self.db.execute(
+            "SELECT COUNT(*) FROM comments WHERE connection_id = ? AND lifecycle_state IN (?, ?) "
+            "AND (body_source IS NOT NULL OR body_text IS NOT NULL)",
+            (connection_id, *deleted),
+        ).fetchone()[0]
+        unpurged = self.db.execute(
+            "SELECT COUNT(*) FROM source_records r JOIN comments c "
+            "ON c.connection_id = r.connection_id AND c.comment_id = r.source_object_id "
+            "WHERE r.connection_id = ? AND r.source_type = 'comment' "
+            "AND c.lifecycle_state = ? AND r.raw_payload IS NOT NULL "
+            # A placeholder's own payload holds no commenter content and is kept.
+            "AND NOT (c.deletion_evidence = ? AND r.source_record_id = c.current_source_record_id)",
+            (connection_id, domain.PURGED, domain.SOURCE_PLACEHOLDER),
+        ).fetchone()[0]
+        return {
+            "comments": comments,
+            "events": events,
+            "content_check": {
+                "deleted_with_text": int(with_text),
+                "purged_with_unpurged_records": int(unpurged),
+            },
+        }
+
     def forget_connection(self, connection_id: str) -> dict[str, int]:
         """Delete every record of a connection, the connection included.
 

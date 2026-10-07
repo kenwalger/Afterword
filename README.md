@@ -27,7 +27,7 @@ Done:
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 - `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
 
-Open: labeling the `dev` corpus (the author). No model has classified a real comment. Both local models were benchmarked on the synthetic sets only (`docs/benchmarks/`), with no model chosen.
+Open: labeling the `dev` corpus (the author; 302 of 458 on 2026-10-07). Both real probe runs are ingested into the local store, and B1 has been scored against the labels on `dev` (`docs/EVALUATION.md`). No model has classified a real comment. Both local models were benchmarked on the synthetic sets only (`docs/benchmarks/`), with no model chosen.
 
 ## Quick start
 
@@ -59,7 +59,7 @@ uv run afterword label --run <run-id>
 
 - `probe` is read-only (GET only). It saves raw payloads under git-ignored `fixtures/dev-api/source/real/<run-id>/` and value-free findings under `reports/probe/<run-id>/`. Its console output is counts and IDs only, safe to share.
 - `--mode chronological` times a plain oldest-first read of one week (C-009) and asks at the end whether to record it as a valid timing.
-- `label-ui` is the faster way to label. It serves one page on 127.0.0.1 and opens it in your browser; if the browser does not open, use the `open: http://127.0.0.1:8765/?t=<token>` line it prints (the whole URL, token included; it changes on every launch). Keys: `1` to `9` and `0` choose the class, letters toggle flags, Shift+`0` to `3` sets the prospective grade, `g` then `0` to `3` the retrospective grade, `e` types the reason, Enter saves, `h` shows the definitions, `s` skips, `q` stops. Each Enter writes the label at once. Stop with `q` in the page or Ctrl+C in the terminal (closing the tab leaves the server running); run the command again to resume with the next unlabeled comment.
+- `label-ui` is the faster way to label. It serves one page on 127.0.0.1 and opens it in your browser; if the browser does not open, use the `open: http://127.0.0.1:8765/?t=<token>` line it prints (the whole URL, token included; it changes on every launch). Keys: `1` to `9` and `0` choose the class, letters toggle flags, Shift+`0` to `3` sets the prospective grade, `g` then `0` to `3` the retrospective grade, `e` types the reason, Enter saves, `p` shows the post, `h` shows the definitions, `s` skips, `q` stops. Each Enter writes the label at once. Stop with `q` in the page or Ctrl+C in the terminal (closing the tab leaves the server running); run the command again to resume with the next unlabeled comment.
 - `label` labels the same batches in the terminal, one batch of at most 40 comments, then stops; run it again to continue. Use it for `--mode chronological` (timing exists only there) or without a browser. The two write the same records and can continue each other's work, but never run both at once. In the terminal, `q` at the `Save?` prompt saves the label, then stops; `q` at an earlier prompt leaves the comment on screen unsaved, and the tool says so.
 - `uv run afterword label status --run <run-id>` prints labeling progress for the run: labeled, remaining, and labels by pass, by tool, and by post order (publication order or shuffled). Counts only, never classes or grades.
 - `--pass calibration` (either tool) re-labels comments that already have an initial label, from scratch, with the earlier label hidden; `--ids <file>` picks which. Nothing is overwritten (`docs/LABELING-GUIDE.md`).
@@ -67,20 +67,24 @@ uv run afterword label --run <run-id>
 - The full labeling routine, including every shortcut, is in `docs/WORKFLOW.md` (section 3).
 - `uv run afterword baseline --run <run-id>` writes the C-009 volume report under `reports/`.
 
-The store and classifiers (Stage 1 to 3a groundwork; tested on synthetic fixtures only):
+The store and classifiers (Stage 1 to 3a groundwork; the store and B1 have run on real data since 2026-10-07, B2 on synthetic fixtures only):
 
 ```text
 uv run afterword ingest --run <run-id>
 uv run afterword connections
+uv run afterword store-status
 uv run afterword forget --connection <connection-id> --yes
-uv run afterword classify --condition b1
+uv run afterword classify --condition b1 --heuristic hb-v0.2
 uv run afterword classify --condition b2 --model qwen3:4b-instruct-2507-q4_K_M
+uv run afterword evaluate --condition b1 --heuristic hb-v0.2 --policy pp-v0.2
 uv run afterword models verify
 uv run afterword bench --synthetic --model <ollama-model>
 ```
 
 - `ingest` reads a saved probe run into the local SQLite store (`data/`, git-ignored), oldest run first, applying the lifecycle rules and the ADR-009 purge. `forget` removes every record of one connection; without `--yes` it only counts.
 - `classify` runs B1 (heuristic) or B2 (a local model through Ollama, whose model-boundary path is signed off) over stored comments from others, incrementally, and applies the priority policy. It refuses a provider whose path is not signed off and a model whose digest differs from its pin.
+- `store-status` prints the store's comments by lifecycle state and its lifecycle events, counts only.
+- `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.1`, or the candidate `pp-v0.2`), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.
 - `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.
 
 `label` and `label-ui` show comment text only on your own machine (terminal or local page) and need no key. In what order to run these, and why, is in `docs/WORKFLOW.md`.
@@ -115,11 +119,12 @@ Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --en
 12. `docs/ROADMAP.md`
 13. `docs/WORKFLOW.md`: the operating protocol: fresh probe, timing before labeling, labeling sessions, and the weekly routine of the test period
 14. `docs/LABELING-AT-SCALE.md`: a future design note for labeling beyond V1 (not V1 scope)
-15. `docs/adr/`
-16. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
-17. `docs/FRICTION-LOG.md`: the index of the friction log, with the entries in one file per session under `docs/friction-log/`
-18. `docs/benchmarks/`: dated benchmark write-ups, informational only
-19. `docs/BRAND.md`: how the name and logo are presented
+15. `docs/FUTURE-FEATURES.md`: candidate features after the Stage 3 gate, each with a proposed claim (not V1 scope)
+16. `docs/adr/`
+17. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
+18. `docs/FRICTION-LOG.md`: the index of the friction log, with the entries in one file per session under `docs/friction-log/`
+19. `docs/benchmarks/`: dated benchmark write-ups, informational only
+20. `docs/BRAND.md`: how the name and logo are presented
 
 ## Public deliverable
 

@@ -241,10 +241,18 @@ def ai_disclosure_distribution(
     return out
 
 
+# The keys of DEV's deletion placeholder as first observed (2026-10-02): every
+# one must be present for a node to be a placeholder (ADR-009).
 PLACEHOLDER_KEYS: frozenset[str] = frozenset(
     {"type_of", "id_code", "created_at", "body_html", "user", "children"}
 )
-COMMENT_KEYS: frozenset[str] = PLACEHOLDER_KEYS | {"ai_disclosure_label", "ai_disclosure_level"}
+# Platform-wide fields: keys DEV adds to every comment node, placeholders
+# included, that say nothing about deletion. Ignored when matching the
+# placeholder shape (ADR-009, amended 2026-10-07). Adding a key here needs
+# evidence recorded in the friction log: the ai_disclosure keys are on 750 of
+# 750 nodes in run 20261007T224849Z, the deletion placeholder included.
+PLATFORM_WIDE_KEYS: frozenset[str] = frozenset({"ai_disclosure_label", "ai_disclosure_level"})
+COMMENT_KEYS: frozenset[str] = PLACEHOLDER_KEYS | PLATFORM_WIDE_KEYS
 REQUIRED_USER_KEYS: frozenset[str] = frozenset({"user_id"})
 
 
@@ -256,13 +264,22 @@ def is_deletion_placeholder(node: dict[str, Any]) -> bool:
     ``created_at``, ``type_of``, and ``children``; ``body_html`` replaced with a short
     placeholder; ``user`` an empty object. A deleted leaf disappears entirely.
 
-    Only that exact shape qualifies (ADR-009). Anything else authorless is an
-    unexpected shape, never silently treated as a placeholder.
+    A node qualifies by those distinguishing features (ADR-009, amended
+    2026-10-07): ``user`` is ``{}``, the body is the short placeholder text
+    (:func:`placeholder_like`), and every key of :data:`PLACEHOLDER_KEYS` is
+    present. Keys in :data:`PLATFORM_WIDE_KEYS` are ignored; any other key makes
+    the node an unexpected shape, never silently a placeholder.
 
     :param node: Comment payload.
-    :returns: ``True`` for the exact placeholder shape.
+    :returns: ``True`` for the placeholder shape.
     """
-    return set(node) == PLACEHOLDER_KEYS and node.get("user") == {}
+    keys = set(node)
+    return (
+        node.get("user") == {}
+        and keys >= PLACEHOLDER_KEYS
+        and keys - PLACEHOLDER_KEYS <= PLATFORM_WIDE_KEYS
+        and placeholder_like(node)
+    )
 
 
 def is_unexpected_shape(node: dict[str, Any]) -> bool:
@@ -403,6 +420,16 @@ def _edited_at(run_dir: Path, article_id: int, article: dict[str, Any]) -> datet
     return edited
 
 
+def _post_body(run_dir: Path, article_id: int) -> str | None:
+    # List items carry no body; only a single-article fetch does (dev-probe-0.2 on).
+    single = run_dir / article_file(article_id)
+    if not single.exists():
+        return None
+    body = read_body(single)
+    html = body.get("body_html") if isinstance(body, dict) else None
+    return html if isinstance(html, str) else None
+
+
 def _author_ref(node: dict[str, Any]) -> str | None:
     user = node.get("user")
     if isinstance(user, dict) and user.get("user_id") is not None:
@@ -414,7 +441,7 @@ def load_run(run_dir: Path, *, include_text: bool = False) -> RunObservations:
     """Load source-neutral observations for a saved run.
 
     :param run_dir: Raw run directory.
-    :param include_text: Also load titles, comment bodies, and author references.
+    :param include_text: Also load titles, post and comment bodies, and author references.
     :returns: The run's contents and comments.
     """
     run = json.loads((run_dir / RUN_FILE).read_text(encoding="utf-8"))
@@ -426,6 +453,7 @@ def load_run(run_dir: Path, *, include_text: bool = False) -> RunObservations:
     for article_id, article in articles.items():
         count = article.get("comments_count")
         title = article.get("title") if include_text else None
+        post_body = _post_body(run_dir, article_id) if include_text else None
         contents.append(
             ObservedContent(
                 content_ref=str(article_id),
@@ -433,6 +461,8 @@ def load_run(run_dir: Path, *, include_text: bool = False) -> RunObservations:
                 reported_comment_count=count if isinstance(count, int) else None,
                 title=title if isinstance(title, str) else None,
                 edited_at=_edited_at(run_dir, article_id, article),
+                body_source=post_body,
+                body_source_format="HTML" if post_body is not None else None,
             )
         )
 

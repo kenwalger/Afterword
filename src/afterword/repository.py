@@ -80,6 +80,18 @@ class Repository(Protocol):
         """
         ...
 
+    def lifecycle_counts(self, connection_id: str) -> dict[str, dict[str, int]]:
+        """Count a connection's comments and lifecycle events, for a status report.
+
+        :param connection_id: Connection ID.
+        :returns: Counts only, under ``comments`` (keyed ``<state> <who>``, who being
+            ``others``, ``author``, or ``unknown``), ``events`` (keyed
+            ``<run> <from>-><to> <reason>``), and ``content_check`` (deleted or
+            purged comments still holding text, and unpurged source records of
+            purged comments; both should be 0).
+        """
+        ...
+
     # Sync runs ---------------------------------------------------------------
 
     def get_sync_run(self, connection_id: str, sync_run_id: str) -> domain.SyncRun | None:
@@ -189,6 +201,15 @@ class Repository(Protocol):
         :param key: Cache key.
         :param outcomes: Acceptable outcomes (``OK`` and ``MALFORMED`` are reused).
         :returns: The classification, or ``None``.
+        """
+        ...
+
+    def classifications(self, connection_id: str, comment_id: str) -> list[domain.Classification]:
+        """List a comment's classifications, oldest first.
+
+        :param connection_id: Connection ID.
+        :param comment_id: Comment ID.
+        :returns: Classifications.
         """
         ...
 

@@ -230,6 +230,26 @@ def _is_consequential(grade: Any) -> bool:
     return isinstance(grade, int) and grade >= CONSEQUENTIAL_FROM
 
 
+def wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Return the Wilson score interval for a proportion.
+
+    Reported beside small-sample shares (``EVALUATION.md``: counts first, then a
+    percentage with a Wilson interval).
+
+    :param successes: Count of successes.
+    :param n: Sample size.
+    :param z: Normal quantile; 1.96 gives a 95% interval.
+    :returns: Lower and upper bounds as fractions; ``(0.0, 0.0)`` when ``n`` is 0.
+    """
+    if n == 0:
+        return (0.0, 0.0)
+    p = successes / n
+    denominator = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denominator
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / denominator
+    return (max(0.0, centre - half), min(1.0, centre + half))
+
+
 def summarize(labels: Iterable[dict[str, Any]]) -> dict[str, Any]:
     """Count labels by class and grade, for analysis (never while labeling).
 
@@ -344,11 +364,16 @@ def class_crosstab(labels: Iterable[dict[str, Any]]) -> dict[str, dict[str, int]
 # stricter test (TAXONOMY.md): tax-v0.1 labels applied it more broadly.
 BROAD_RSC_VERSIONS: frozenset[str] = frozenset({"tax-v0.1"})
 RSC: str = "REFERENCES_SPECIFIC_CLAIM"
-# The oracle ceilings, in report order: (name, use labeled flags, drop broad RSC).
-ORACLE_VARIANTS: tuple[tuple[str, bool, bool], ...] = (
-    ("class_only", False, False),
-    ("class_and_flags", True, False),
-    ("class_and_flags_without_broad_rsc", True, True),
+# Which labeled REFERENCES_SPECIFIC_CLAIM flags an oracle ceiling ignores.
+RSC_KEEP: str = "keep"
+RSC_DROP_BROAD: str = "broad"
+RSC_DROP_ALL: str = "all"
+# The oracle ceilings, in report order: (name, use labeled flags, RSC handling).
+ORACLE_VARIANTS: tuple[tuple[str, bool, str], ...] = (
+    ("class_only", False, RSC_KEEP),
+    ("class_and_flags", True, RSC_KEEP),
+    ("class_and_flags_without_broad_rsc", True, RSC_DROP_BROAD),
+    ("class_and_flags_without_rsc", True, RSC_DROP_ALL),
 )
 
 
@@ -373,9 +398,12 @@ def with_content_flags(record: dict[str, Any], content_flags: Iterable[str]) -> 
     return record | {"flags": head + added + rest}
 
 
-def _oracle_tier(record: dict[str, Any], *, with_flags: bool, drop_broad_rsc: bool) -> policy.Tier:
+def _oracle_tier(
+    record: dict[str, Any], *, with_flags: bool, rsc: str, policy_version: str
+) -> policy.Tier:
     flags = set(record.get("flags", [])) if with_flags else set()
-    if drop_broad_rsc and record.get("taxonomy_version") in BROAD_RSC_VERSIONS:
+    broad = record.get("taxonomy_version") in BROAD_RSC_VERSIONS
+    if rsc == RSC_DROP_ALL or (rsc == RSC_DROP_BROAD and broad):
         flags.discard(RSC)
     decision = policy.assign(
         policy.PolicyInput(
@@ -384,33 +412,41 @@ def _oracle_tier(record: dict[str, Any], *, with_flags: bool, drop_broad_rsc: bo
             flags=frozenset(flags) & frozenset(taxonomy.FLAGS),
             confidence=None,
             edited_since_review=False,
-        )
+        ),
+        policy_version=policy_version,
     )
     return decision.tier
 
 
-def oracle_ceiling(labels: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def oracle_ceiling(
+    labels: Iterable[dict[str, Any]], *, policy_version: str = policy.POLICY_VERSION
+) -> dict[str, dict[str, Any]]:
     """Apply the policy to the labels themselves: what perfect classification would give.
 
-    Three ceilings (:data:`ORACLE_VARIANTS`): ``class_only`` uses the labeled
+    Four ceilings (:data:`ORACLE_VARIANTS`): ``class_only`` uses the labeled
     class alone (class defaults); ``class_and_flags`` adds the labeled flags, so
     structural and judgment flags raise tiers as policy says;
     ``class_and_flags_without_broad_rsc`` does the same but ignores
     ``REFERENCES_SPECIFIC_CLAIM`` on labels from :data:`BROAD_RSC_VERSIONS`,
-    whose use of the flag is not comparable with `tax-v0.2`.
+    whose use of the flag is not comparable with `tax-v0.2`; and
+    ``class_and_flags_without_rsc`` ignores it on every label, so no tier is
+    raised by ``REFERENCES_SPECIFIC_CLAIM`` at all.
 
     :param labels: The labels to score, usually :func:`analysis_labels` values.
+    :param policy_version: The policy to apply (:data:`afterword.policy.POLICY_VERSIONS`).
     :returns: Per ceiling: comments by tier, consequential (prospective 2 or 3)
         comments by tier, the collapsed count (review reduction), and the
         consequential comments surfaced (``SURFACE`` or ``QUEUE``). Counts only.
     """
     records = list(labels)
     out: dict[str, dict[str, Any]] = {}
-    for name, with_flags, drop_broad_rsc in ORACLE_VARIANTS:
+    for name, with_flags, rsc in ORACLE_VARIANTS:
         tiers: Counter[str] = Counter()
         consequential: Counter[str] = Counter()
         for record in records:
-            tier = _oracle_tier(record, with_flags=with_flags, drop_broad_rsc=drop_broad_rsc)
+            tier = _oracle_tier(
+                record, with_flags=with_flags, rsc=rsc, policy_version=policy_version
+            )
             tiers[tier.name] += 1
             if _is_consequential(record.get("consequential_prospective")):
                 consequential[tier.name] += 1
