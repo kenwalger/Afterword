@@ -102,6 +102,7 @@ Claims below were added on 2026-10-02 during scoping v2.
 **Status:** UNTESTED
 
 - 2026-10-02: Measured on the prospective `test` set (ADR-010 amended), where B1 and B2 run in shadow mode with sealed outputs. No evidence yet.
+- 2026-10-08: Provisional, from `dev` (302 labels; tuning set, not the test set). B1 under `pp-v0.1` already matches the oracle ceiling on review reduction (44 of 302 collapsed, as with perfect classes and flags) and surfaces 81 of 84 consequential comments against the oracle's 84. On the claim's two named measures, the room left for B2 to beat B1 on `dev` is therefore at most 3 consequential comments, or reduction beyond the oracle's under `pp-v0.1`, which only a policy change could give. Where B1 is weak is `SURFACE`: 126 comments, 50 of them graded 2 or 3 (39.7%), against the oracle's 55 and 30 of 55. A proposal (`docs/proposals/2026-10-08-surface-co-primary.md`, not yet approved) would make SURFACE size and precision co-primary measures, which would change what "materially better" in this claim is measured on. The claim text is unchanged.
 
 ## C-009: The problem exists at this author's volume
 

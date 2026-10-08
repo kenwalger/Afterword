@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 5 (2026-10-07)
+**Version:** 6 (2026-10-08)
+
+v6 records the Stage 1 gate decision (passed, with a caveat) and adds a read-only ID-list viewer to the Stage 3a backlog.
 
 v5 lists the future features (`FUTURE-FEATURES.md`) under Deferred in their suggested order, moves the parking-lot note on reaction counts to `FUTURE-FEATURES.md`, and records `lg-v0.4` (the label UI's post panel).
 
@@ -37,7 +39,7 @@ Gate input (2026-10-04): the typical week's read took under 4 minutes, which mee
 
 Gate decision (2026-10-04, the author): **continue as planned.** The cost of chronological review is concentrated in busy weeks; whether assisted triage pays off mainly there is recorded as C-012 and measured on the test period.
 
-## Stage 1: DEV ingestion
+## Stage 1: DEV ingestion (gate passed 2026-10-08, with a caveat)
 
 Goal: reliably obtain real source data.
 
@@ -62,7 +64,7 @@ Gate evidence (2026-10-07, session 8; built on 2026-10-03, first run on real dat
 - **Repeatability:** ingesting `20261007T224849Z` a second time was refused ("already ingested") and left the store unchanged (2 runs, 750 comments). Count reconciliation leaves the same 3 posts unexplained in both runs (`comments_count` one higher than the live comments observed).
 - **Not covered:** an edit observed on real data, deletion by absence, and every deletion path other than author self-deletion.
 
-Gate decision: not recorded; the author's.
+Gate decision (2026-10-08, the author): **passed, with a caveat.** Repeatable sync and idempotent ingest are shown on two real runs. Deletion behavior is known only for author self-deletion, so ADR-009 stays provisional.
 
 ## Stage 2: Normalization and local persistence
 
@@ -88,7 +90,8 @@ Goal: determine whether assisted triage is useful before building a large UI.
 - [x] Implement taxonomy prompt with schema-constrained output. (2026-10-03: classifier `pr-v0.1` with an incremental cache, `pr-v0.2` from 2026-10-04 without the code and link flags; Ollama provider, path signed off; Anthropic provider, path not signed off, tested against mocked HTTP only.)
 - [x] Implement priority policy. (2026-10-03: `pp-v0.1` as pure, tested code, recording `rule_applied` and `rules_fired`.)
 - [x] Implement heuristic baseline (B1). (2026-10-03: `hb-v0.1`, a draft until tuned on `dev`.)
-- [ ] Iterate on `dev` only. (Needs `dev` labels.)
+- [ ] Iterate on `dev` only. (Started 2026-10-07: B1 scored and `hb-v0.2` tuned on 302 labels; candidate `pp-v0.2`; `afterword evaluate`.)
+- [ ] Backlog: a read-only viewer that opens the comments in an ID list (such as an `afterword evaluate --misses` list) in the label UI, with no labeling controls and no records written. For the author's own miss review.
 - [ ] Run the adversarial set; fix injection handling. (2026-10-03: run once on both local models, synthetic sets only, `docs/benchmarks/2026-10-03-synthetic-local-models.md`. Rerun 2026-10-04 under `pr-v0.2`: injection tiers unchanged, 8 of 10 for both. The pre-check `pc-v0.1` has two known gaps, adv-109 and adv-110, not yet fixed.)
 
 ### 3b: Preregistration

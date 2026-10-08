@@ -80,7 +80,8 @@ def score(items: Iterable[Scored]) -> Score:
 
     :param items: The joined records.
     :returns: Consequential recall (``SURFACE`` or ``QUEUE``), review reduction
-        (share ``COLLAPSED``), tier sizes, outcomes, per-class precision and
+        (share ``COLLAPSED``), tier sizes, ``SURFACE`` precision (the share of
+        ``SURFACE`` comments graded 2 or 3), outcomes, per-class precision and
         recall, judgment-flag precision (``REFERENCES_SPECIFIC_CLAIM`` also by
         the label's taxonomy version), flag-caused raises, and the IDs of
         consequential comments collapsed.
@@ -126,6 +127,8 @@ def score(items: Iterable[Scored]) -> Score:
         "outcomes": dict(sorted(Counter(r.outcome for r in rows).items())),
         "by_tier": by_tier,
         "surface_size": by_tier["SURFACE"],
+        # Of the comments at SURFACE, how many are graded 2 or 3 (proposed co-primary).
+        "surface_precision": _share(cons_tier["SURFACE"], by_tier["SURFACE"]),
         "review_reduction": _share(by_tier[COLLAPSED], n),
         "consequential": len(consequential),
         "consequential_by_tier": {t: cons_tier[t] for t in TIERS},

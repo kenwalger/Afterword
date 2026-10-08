@@ -343,3 +343,80 @@ Times are UTC. No comment text, names, or handles: every figure below is a count
 **Consequence:** Stopped for the author to commit before Part C. No model has classified a real comment.
 
 **Follow-up:** Part C: the commands for the author's model runs.
+
+## Session 8: decisions after Part B, and Part C1 (2026-10-08)
+
+### 2026-10-08 01:10 - Recall and reduction miss what SURFACE holds
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** The author's reading of the B1 results, before preregistration: whether the primary measures can tell a useful "review first" tier from a noisy one.
+
+**Expectation:** The primary measures (consequential recall, review reduction) separate a weak heuristic from the oracle ceiling.
+
+**Observation:**
+- B1 (`hb-v0.1`, `pp-v0.1`) matches the oracle on review reduction (44 of 302 collapsed, as with perfect classes and flags) and comes within 3 on recall (81 of 84 against 84 of 84).
+- Its `SURFACE` tier holds 126 comments against the oracle's 55. SURFACE precision, the share of `SURFACE` comments graded 2 or 3: B1 50 of 126 (39.7%; Wilson 31.6% to 48.4%), oracle 30 of 55 (54.5%; 41.5% to 67.0%).
+- The oracle's own precision is far from 100%, because every `TECHNICAL_QUESTION` defaults to `SURFACE` and 22 of the 46 labeled are graded 1. And B1 holds more consequential comments at `SURFACE` (50) than the oracle (30), because it surfaces more of everything, so precision alone would mislead too.
+
+**Evidence:** `afterword evaluate` reports (counts only); `afterword.scoring` now reports `surface_precision` for every condition, and `oracle_ceiling` the same for the oracle.
+
+**Workaround:** None.
+
+**Consequence:** A proposal (`docs/proposals/2026-10-08-surface-co-primary.md`) would make SURFACE size and SURFACE precision co-primary with recall and reduction, each read against the oracle. Not applied until the author approves. A dated C-008 entry notes that on recall and reduction alone the room for B2 to beat B1 on `dev` is at most 3 consequential comments. C2 reports SURFACE size and precision for every condition, the author's instruction.
+
+**Follow-up:** The author's decision on the proposal, before preregistration.
+
+### 2026-10-08 01:15 - Decisions recorded: Stage 1 gate, ingestion rule, backlog
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** Record the author's decisions after the Part B commit.
+
+**Expectation:** None.
+
+**Observation:**
+- Stage 1 gate: passed, with a caveat. Repeatable sync and idempotent ingest are shown on two real runs; deletion behavior is known only for author self-deletion, so ADR-009 stays provisional. `ROADMAP.md` v6.
+- CLAUDE.md: Claude may ingest saved probe runs into the local store when a session prompt asks; Claude never reads real comment text and reports counts and aggregates only. The dev subset selector, listed as out of scope "until labels exist", is now in scope.
+- Backlog (`ROADMAP.md`, Stage 3a): a read-only viewer that opens the comments of an ID list in the label UI, with no labeling controls and no records written.
+
+**Evidence:** `ROADMAP.md`, CLAUDE.md.
+
+**Workaround:** None.
+
+**Consequence:** None beyond the records.
+
+**Follow-up:** None.
+
+### 2026-10-08 01:25 - A fixed dev subset for the first real model runs
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** C1: a seeded, class-balanced subset of 40 to 60 labeled comments, so both models can be compared quickly before full passes.
+
+**Expectation:** None.
+
+**Observation:**
+- Selection (`afterword dev-subset --size 50 --seed 20261008`): the labeled comments that are live in the store, grouped by analysis-label class; quotas filled evenly across classes, with classes smaller than their share giving all they have; within a class, sorted IDs shuffled by one `random.Random(20261008)` taken through the classes in taxonomy order. Deterministic for the same labels, store, size, and seed.
+- Result: 50 comments. By class: `CORRECTION` 2, `CHALLENGE_OR_COUNTEREXAMPLE` 4, `TECHNICAL_QUESTION` 8, `OPPORTUNITY` 1, `DIRECT_QUESTION` 5, `TECHNICAL_EXTENSION` 8, `CONVERSATIONAL` 7, `LIGHTWEIGHT_ACKNOWLEDGMENT` 7, `LIKELY_SPAM_OR_NOISE` 7, `UNCERTAIN` 1. Graded 2 or 3: 16. Post order: 25 publication order, 25 shuffled.
+- The ID list is git-ignored (`reports/eval/dev-subset-s20261008-n50.txt`).
+
+**Evidence:** `afterword dev-subset` output (counts only).
+
+**Workaround:** None.
+
+**Consequence:** The subset is class-balanced, not natural-rate, so its recall and reduction are not estimates of the full set's: it is for comparing the two models' behavior and speed, and for catching problems before the overnight passes. `classify` and `evaluate` take `--ids`.
+
+**Follow-up:** The author runs both models on it, then the full passes (Part C1 commands).

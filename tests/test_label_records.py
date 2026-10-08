@@ -113,6 +113,7 @@ def test_oracle_ceiling_applies_the_policy_to_the_labels():
         "COLLAPSED": 1,
     }
     assert ceiling["class_only"]["consequential_surfaced"] == 1
+    assert ceiling["class_only"]["surface_precision"] == [1, 1]
     assert ceiling["class_and_flags"]["collapsed"] == 1
     table = lr.class_crosstab(labels)
     assert table["CORRECTION"] == {"0": 0, "1": 0, "2": 0, "3": 1, "total": 1, "tier": "SURFACE"}

@@ -501,6 +501,29 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dev_subset(args: argparse.Namespace) -> int:
+    """Choose a seeded, class-balanced subset of labeled dev comments and write its IDs.
+
+    Prints counts only; the IDs go to a git-ignored file for ``--ids``.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        subset = service.select_dev_subset(
+            Path(args.root), size=args.size, seed=args.seed, corpus_version=args.corpus_version
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    path = service.write_dev_subset(Path(args.root), subset)
+    classes = ", ".join(f"{k} {v}" for k, v in subset.by_class.items() if v)
+    print(f"dev subset: {subset.size} labeled comments, seed {subset.seed}")
+    print(f"by class: {classes}")
+    print(f"graded 2 or 3: {subset.consequential}; by post order: {subset.by_post_order}")
+    print(f"IDs: {path}")
+    return 0
+
+
 def cmd_models_verify(args: argparse.Namespace) -> int:
     """Check each approved local model's installed digest against its pin.
 
@@ -699,6 +722,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="also write the IDs of consequential comments collapsed (git-ignored)",
     )
     evaluate.set_defaults(func=cmd_evaluate)
+
+    subset = sub.add_parser(
+        "dev-subset", help="seeded, class-balanced subset of labeled dev comments (IDs to a file)"
+    )
+    subset.add_argument("--size", type=int, default=50, help="40 to 60")
+    subset.add_argument("--seed", type=int, required=True)
+    subset.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
+    subset.set_defaults(func=cmd_dev_subset)
 
     models = sub.add_parser("models", help="local model checks")
     models_sub = models.add_subparsers(dest="models_command", required=True)

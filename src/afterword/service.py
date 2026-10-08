@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import re
 from collections import Counter
 from collections.abc import Callable, Iterable
@@ -1266,6 +1267,110 @@ def evaluate_condition(
         oracle=label_records.oracle_ceiling(scored_labels, policy_version=policy_version),
         missed_ids=scored["all"].missed_ids,
     )
+
+
+SUBSET_MIN: int = 40
+SUBSET_MAX: int = 60
+
+
+@dataclass(frozen=True)
+class DevSubset:
+    """A fixed, seeded, class-balanced subset of labeled `dev` comments. Counts only.
+
+    ``ids`` are for the git-ignored ID file alone and are never printed.
+    """
+
+    seed: int
+    size: int
+    by_class: dict[str, int]
+    consequential: int
+    by_post_order: dict[str, int]
+    ids: list[str]
+
+
+def select_dev_subset(
+    root: Path,
+    *,
+    size: int,
+    seed: int,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    connection_id: str | None = None,
+) -> DevSubset:
+    """Choose a class-balanced subset of labeled comments for a short model run.
+
+    Selection: the labeled comments that are live subjects in the store, grouped
+    by their analysis label's class. Quotas are filled evenly across classes
+    (classes with fewer labels than their share give all they have, and the rest
+    is spread over the others, in taxonomy order). Within a class, IDs are sorted
+    and shuffled by one ``random.Random(seed)`` taken through the classes in
+    taxonomy order, and the first ones are taken. The same labels, store, size,
+    and seed always give the same subset.
+
+    :param root: Repository root.
+    :param size: Number of comments, :data:`SUBSET_MIN` to :data:`SUBSET_MAX`.
+    :param seed: Seed for the shuffle.
+    :param corpus_version: Label directory.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :returns: The subset, with counts by class, consequential, and post order.
+    :raises ServiceError: For a size out of range or fewer labeled comments than asked.
+    """
+    if not SUBSET_MIN <= size <= SUBSET_MAX:
+        raise ServiceError(f"subset size must be {SUBSET_MIN} to {SUBSET_MAX}")
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = {s.comment.comment_id: s for s in _subjects(repo, cid)}
+    finally:
+        repo.close()
+    labels, order_of, _ = _labels_with_content_flags(root, corpus_version, subjects)
+    live = {i: r for i, r in labels.items() if i in subjects}
+    if len(live) < size:
+        raise ServiceError(f"only {len(live)} labeled comments are live in the store")
+    rng = random.Random(seed)
+    pools: dict[str, list[str]] = {}
+    for name in taxonomy.CLASSES:
+        ids = sorted(i for i, r in live.items() if r.get("primary_class") == name)
+        rng.shuffle(ids)
+        pools[name] = ids
+    quota = dict.fromkeys(taxonomy.CLASSES, 0)
+    remaining = size
+    active = [c for c in taxonomy.CLASSES if pools[c]]
+    while remaining and active:
+        share = max(1, remaining // len(active))
+        for name in list(active):
+            take = min(share, len(pools[name]) - quota[name], remaining)
+            quota[name] += take
+            remaining -= take
+            if quota[name] == len(pools[name]):
+                active.remove(name)
+            if not remaining:
+                break
+    chosen = sorted(i for name in taxonomy.CLASSES for i in pools[name][: quota[name]])
+    grades = [live[i].get("consequential_prospective") for i in chosen]
+    return DevSubset(
+        seed=seed,
+        size=len(chosen),
+        by_class={name: quota[name] for name in taxonomy.CLASSES},
+        consequential=sum(
+            1 for g in grades if isinstance(g, int) and g >= label_records.CONSEQUENTIAL_FROM
+        ),
+        by_post_order=dict(Counter(order_of[i] for i in chosen)),
+        ids=chosen,
+    )
+
+
+def write_dev_subset(root: Path, subset: DevSubset) -> Path:
+    """Write a subset's IDs, one per line, under ``reports/eval/`` (git-ignored).
+
+    :param root: Repository root.
+    :param subset: The subset.
+    :returns: The file, named by seed and size so it can be recreated and named in a command.
+    """
+    out = root / EVAL_ROOT
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"dev-subset-s{subset.seed}-n{subset.size}.txt"
+    path.write_text("".join(f"{i}\n" for i in subset.ids), encoding="utf-8")
+    return path
 
 
 def tune_b1_threshold(

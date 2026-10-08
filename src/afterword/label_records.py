@@ -435,8 +435,10 @@ def oracle_ceiling(
     :param labels: The labels to score, usually :func:`analysis_labels` values.
     :param policy_version: The policy to apply (:data:`afterword.policy.POLICY_VERSIONS`).
     :returns: Per ceiling: comments by tier, consequential (prospective 2 or 3)
-        comments by tier, the collapsed count (review reduction), and the
-        consequential comments surfaced (``SURFACE`` or ``QUEUE``). Counts only.
+        comments by tier, the collapsed count (review reduction), the
+        consequential comments surfaced (``SURFACE`` or ``QUEUE``), and
+        ``surface_precision`` as [consequential at ``SURFACE``, all at
+        ``SURFACE``]. Counts only.
     """
     records = list(labels)
     out: dict[str, dict[str, Any]] = {}
@@ -459,6 +461,10 @@ def oracle_ceiling(
             "consequential": sum(consequential.values()),
             "consequential_surfaced": sum(consequential.values())
             - consequential[policy.Tier.COLLAPSED.name],
+            "surface_precision": [
+                consequential[policy.Tier.SURFACE.name],
+                tiers[policy.Tier.SURFACE.name],
+            ],
         }
     return out
 

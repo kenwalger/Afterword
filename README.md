@@ -77,6 +77,7 @@ uv run afterword forget --connection <connection-id> --yes
 uv run afterword classify --condition b1 --heuristic hb-v0.2
 uv run afterword classify --condition b2 --model qwen3:4b-instruct-2507-q4_K_M
 uv run afterword evaluate --condition b1 --heuristic hb-v0.2 --policy pp-v0.2
+uv run afterword dev-subset --size 50 --seed 20261008
 uv run afterword models verify
 uv run afterword bench --synthetic --model <ollama-model>
 ```
@@ -85,6 +86,7 @@ uv run afterword bench --synthetic --model <ollama-model>
 - `classify` runs B1 (heuristic) or B2 (a local model through Ollama, whose model-boundary path is signed off) over stored comments from others, incrementally, and applies the priority policy. It refuses a provider whose path is not signed off and a model whose digest differs from its pin.
 - `store-status` prints the store's comments by lifecycle state and its lifecycle events, counts only.
 - `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.1`, or the candidate `pp-v0.2`), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.
+- `dev-subset` draws a seeded, class-balanced subset of labeled `dev` comments and writes its IDs to a git-ignored file, for `classify --ids` and `evaluate --ids`. It prints counts only.
 - `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.
 
 `label` and `label-ui` show comment text only on your own machine (terminal or local page) and need no key. In what order to run these, and why, is in `docs/WORKFLOW.md`.

@@ -30,9 +30,11 @@ Rules for any session working in this repository.
 
 Orientation checks open items at their source, not in earlier session summaries: count the valid timing records under `reports/timing/` (`afterword.timing.load_valid`, aggregates only) and the label records under `fixtures/labels/` (`afterword.label_records`, counts only). Never print record contents. A summary that lists an item as open can be out of date.
 
-Model calls, local or remote, run only on synthetic data. No real comment data goes to any model, and no real data is ingested into the store by Claude, until the author says so and the model-boundary record for that path is signed off.
+Model calls, local or remote, run only on synthetic data. No real comment data goes to any model until the author says so and the model-boundary record for that path is signed off; the author runs real model passes in their own terminal. Claude may ingest saved probe runs into the local store when a session prompt asks for it (from 2026-10-07). Claude never reads real comment text, and reports counts and aggregates only.
 
-Still out of scope: shadow mode and sealing (Stage 3b/3c), `--set test` selection, the dev subset selector (needs labels), review state, overrides, dispositions, any UI, and any write call to DEV.
+The seeded, class-balanced dev subset for model runs (session 8, Part C) is in scope now that labels exist.
+
+Still out of scope: shadow mode and sealing (Stage 3b/3c), `--set test` selection, review state, overrides, dispositions, any UI, and any write call to DEV.
 
 The volume baseline is computed from an explicit probe run ID, recorded in the report. Never compute it from a run that includes test comments.
 

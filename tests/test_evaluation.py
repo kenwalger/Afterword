@@ -140,6 +140,7 @@ def test_score_counts_recall_reduction_classes_flags_and_raises():
     c = out.counts
     assert c["consequential_recall"]["count"] == 1 and c["consequential_recall"]["of"] == 2
     assert c["review_reduction"]["count"] == 2 and c["surface_size"] == 1
+    assert (c["surface_precision"]["count"], c["surface_precision"]["of"]) == (1, 1)
     assert out.missed_ids == ["b"]
     assert c["per_class"]["CONVERSATIONAL"] == {"predicted": 3, "labeled": 4, "agree": 3}
     assert c["flag_precision"]["REFERENCES_SPECIFIC_CLAIM"] == {"set": 1, "agree": 0, "labeled": 0}
@@ -232,3 +233,19 @@ def test_evaluation_refuses_unknown_versions_and_b2_without_a_model(labeled, tmp
         service.evaluate_condition(tmp_path, condition="b1", heuristic_version="hb-v9")
     with pytest.raises(service.ServiceError):
         service.evaluate_condition(tmp_path, condition="b2")
+
+
+def test_the_dev_subset_is_seeded_balanced_and_bounded(labeled, tmp_path, monkeypatch):
+    monkeypatch.setattr(service, "SUBSET_MIN", 2)
+    first = service.select_dev_subset(tmp_path, size=3, seed=7)
+    again = service.select_dev_subset(tmp_path, size=3, seed=7)
+    assert first.ids == again.ids and len(first.ids) == 3
+    # Three classes are labeled (2, 1, 1 comments): one each before any class gets two.
+    assert sorted(v for v in first.by_class.values() if v) == [1, 1, 1]
+    path = service.write_dev_subset(tmp_path, first)
+    assert path.read_text(encoding="utf-8").split() == first.ids
+    with pytest.raises(service.ServiceError):
+        service.select_dev_subset(tmp_path, size=5, seed=7)
+    monkeypatch.setattr(service, "SUBSET_MIN", 40)
+    with pytest.raises(service.ServiceError):
+        service.select_dev_subset(tmp_path, size=3, seed=7)
