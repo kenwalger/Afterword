@@ -16,6 +16,9 @@ reports/
 friction-delight-logs/
 commit-message.txt
 
+# Content generated for the write-up
+blog_posts/
+
 # Python and tooling
 .venv/
 __pycache__/
@@ -27,3 +30,4 @@ build/
 
 # IDE
 .idea/
+

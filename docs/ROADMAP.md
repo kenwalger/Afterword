@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 8 (2026-10-08)
+**Version:** 9 (2026-10-08)
+
+v9 takes over the status log from the README (section "Status" below), unchanged, so the README can serve as a front door.
 
 v8 records `lg-v0.6` (`ai_self_disclosed`).
 
@@ -17,6 +19,26 @@ v3 records the Stage 1, 2, and 3a groundwork built ahead of Stage 0's end, separ
 Each stage ends at a gate. A gate can return **continue**, **reframe**, or **stop**. Reframe and stop are recorded in `CLAIMS.md` and the friction log, not treated as failure.
 
 **Built is not a passed gate.** Stage 1 to 3a groundwork that needs no labels and no real comment data was built ahead, in sessions 4 and 5, while Stage 0 is still open. In those stages a checked item is built and tested; unless it says otherwise, tested on synthetic fixtures only. A gate is passed only when it is evaluated on real data and the result recorded. As of v3, no gate after Stage 0's has been evaluated, and no model has classified a real comment.
+
+## Status
+
+Moved from the README on 2026-10-08, unchanged except for this note and the first sentence's reference to this file. Updated here from now on.
+
+Stage 0 of this roadmap is open for labeling, with Stage 1 to 3a groundwork built ahead and tested on synthetic data only. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
+
+Done:
+
+- Experiment design (docs and ADRs), committed before any code.
+- A read-only DEV probe (`afterword probe`) that verified the capability matrix, including edit and deletion behavior.
+- The C-009 volume baseline (`afterword baseline --run <run>`): 432 comments from others across 138 posts, recent and spiky.
+- The C-009 chronological timings (2026-10-03): a typical week (7 comments) read in 3.8 minutes, a busy week (44) in 17.5 minutes. Both are re-reads, so lower bounds, and cover reading only. The typical week meets C-009's falsification condition; the author's Stage 0 gate decision (2026-10-04) is to continue as planned, with the volume question carried as C-012 (`docs/CLAIMS.md`).
+- A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
+- The corpus targets decision: the historical corpus is `dev`, and the test set is prospective (ADR-010, amended).
+- A local browser labeling interface (`afterword label-ui`, session 5), writing the same records as `label`.
+- Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
+- `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
+
+Open: labeling the `dev` corpus (the author; 302 of 458 on 2026-10-07). Both real probe runs are ingested into the local store, and B1 has been scored against the labels on `dev` (`docs/EVALUATION.md`). The author ran both local models on a 50-comment `dev` subset and Llama over all 458 stored comments from others, on their own machine; the dev-set evaluation of B1 and Llama under `pp-v0.1` and `pp-v0.2` is in `docs/benchmarks/2026-10-08-dev-set-evaluation.md`. No model or policy is chosen.
 
 ## Stage 0: Freeze the experiment
 

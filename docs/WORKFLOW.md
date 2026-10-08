@@ -1,6 +1,8 @@
 # Workflow
 
-**Version:** 4 (2026-10-07)
+**Version:** 5 (2026-10-08)
+
+v5 adds the commands that keep a machine awake on Windows, macOS, and Linux, says that every `afterword` command is the same on all three, and points the setup to the README's new "Try it on your own account" section and to `COMMANDS.md`.
 
 v4 adds the label UI's post panel (section 3) and, under the rules that apply throughout, keeping the machine awake during long runs.
 
@@ -10,7 +12,7 @@ v2 adds the browser labeling tool (`afterword label-ui`) and the `--posts random
 
 The operating protocol: what to run, in what order, and what never to do, so that each measurement means what the other documents say it means. `LABELING-GUIDE.md` defines how to label; `EVALUATION.md` defines what is measured. This document is the routine that keeps both honest.
 
-Commands assume the setup in the README's Quick start. Commands that call DEV read the key from `.env`; from a Claude Code session, the author runs them with a `!` prefix (`! uv run --env-file .env afterword probe`), so the key never enters the session.
+Commands assume the setup in the README, under "Try it on your own account"; every command and option is listed in `COMMANDS.md`. The `afterword` commands are the same on Windows, macOS, and Linux, in any shell; where a step needs an operating-system command, all three are given. Commands that call DEV read the key from `.env`; from a Claude Code session, the author runs them with a `!` prefix (`! uv run --env-file .env afterword probe`), so the key never enters the session.
 
 ## Rules that apply throughout
 
@@ -19,6 +21,21 @@ Commands assume the setup in the README's Quick start. Commands that call DEV re
 - Practice is allowed, but it is never evidence. A timing run not confirmed as valid is saved under `reports/timing/practice/` and is ignored by every report.
 - Label and timing outputs (`fixtures/labels/`, `reports/timing/`) are opened only by the author. Probe and baseline console output contains counts, statuses, and IDs only, and is safe to share.
 - Keep the machine awake during long runs (a full probe, a benchmark, a model pass over `dev`): disable sleep for the duration, or keep it plugged in with the lid open. A machine that sleeps mid-request turns a slow answer into a timeout, recorded as `failed:timeout`, and stretches the measured time beyond any client timeout (benchmark 2026-10-04, adv-102).
+
+  ```text
+  # macOS: keeps the machine awake while the command runs
+  caffeinate -i uv run afterword <command>
+
+  # Linux (systemd): blocks idle sleep while the command runs
+  systemd-inhibit --what=idle:sleep uv run afterword <command>
+
+  # Windows (PowerShell): turn off sleep on mains power, then restore it afterwards
+  powercfg /change standby-timeout-ac 0
+  uv run afterword <command>
+  powercfg /change standby-timeout-ac 30
+  ```
+
+  `30` is an example: note your current setting first (Settings, System, Power) and restore that. On a laptop, closing the lid can still sleep the machine on every platform, whatever these commands say.
 
 ## 1. Fresh probe first
 

@@ -5,134 +5,109 @@
 
 ---
 
-Assisted comment triage for technical publishing. A scoped experiment, not a product.
+Afterword is an experiment in comment triage for writers. It copies the comments on your DEV posts to your own machine, sorts them by how likely each one is to need your attention, and measures whether that sorting can spare you the routine comments without losing the ones that matter.
 
-Afterword asks whether AI can reduce the part of a comment stream that needs immediate human review without hiding the comments that matter most.
+**The core boundary:** Afterword may organize your attention. It never decides whose voice you get to hear: every comment stays reachable, and nothing is hidden, deleted, or answered for you.
 
-**Core boundary:** the system may organize attention. It does not decide whose voice the author is permitted to hear.
+## What it has found so far
 
-## Status
+So far it has been tested on the project author's own DEV history: 302 past comments, each labeled by hand for whether it mattered. A simple rule-based sorter and a small AI model running locally both kept almost every comment that mattered (81 and 84 of 84), but both flagged more than 40% of all comments for immediate attention, where sorting that matched the writer's own judgment would flag about 18%, and the model's three extra catches came at the cost of setting far fewer routine comments aside. These are early numbers on old comments, with every caveat spelled out in [the evaluation](docs/benchmarks/2026-10-08-dev-set-evaluation.md); the real test runs on new comments as they arrive.
 
-Stage 0 of `docs/ROADMAP.md` is open for labeling, with Stage 1 to 3a groundwork built ahead and tested on synthetic data only. V1 is DEV-only; other platforms are deferred until the primary experiment produces evidence.
+The article: _link to come._
 
-Done:
+## Try it on your own account
 
-- Experiment design (docs and ADRs), committed before any code.
-- A read-only DEV probe (`afterword probe`) that verified the capability matrix, including edit and deletion behavior.
-- The C-009 volume baseline (`afterword baseline --run <run>`): 432 comments from others across 138 posts, recent and spiky.
-- The C-009 chronological timings (2026-10-03): a typical week (7 comments) read in 3.8 minutes, a busy week (44) in 17.5 minutes. Both are re-reads, so lower bounds, and cover reading only. The typical week meets C-009's falsification condition; the author's Stage 0 gate decision (2026-10-04) is to continue as planned, with the volume question carried as C-012 (`docs/CLAIMS.md`).
-- A local labeling tool (`afterword label`), including a chronological timing mode for C-009.
-- The corpus targets decision: the historical corpus is `dev`, and the test set is prospective (ADR-010, amended).
-- A local browser labeling interface (`afterword label-ui`, session 5), writing the same records as `label`.
-- Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
-- `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
+See what your own comment section looks like in numbers: how many comments you get from others, per post and per week, and how concentrated they are. This is read-only, uses no AI model, and takes about five minutes.
 
-Open: labeling the `dev` corpus (the author; 302 of 458 on 2026-10-07). Both real probe runs are ingested into the local store, and B1 has been scored against the labels on `dev` (`docs/EVALUATION.md`). The author ran both local models on a 50-comment `dev` subset and Llama over all 458 stored comments from others, on their own machine; the dev-set evaluation of B1 and Llama under `pp-v0.1` and `pp-v0.2` is in `docs/benchmarks/2026-10-08-dev-set-evaluation.md`. No model or policy is chosen.
+**Before you start, read [what Afterword does with your data](docs/USING-AFTERWORD-ON-YOUR-ACCOUNT.md):** what it collects, where it is stored, and how to delete all of it.
 
-## Quick start
+You need [git](https://git-scm.com/) and [uv](https://docs.astral.sh/uv/). uv installs a suitable Python (3.12 or later) if needed. The commands below are the same on macOS, Linux, and Windows.
 
-Requires git and [uv](https://docs.astral.sh/uv/). uv installs a suitable Python (3.12 or later) if needed.
+1. **Get the code.**
+
+   ```text
+   git clone https://github.com/kenwalger/Afterword.git afterword
+   cd afterword
+   uv sync
+   ```
+
+2. **Add your DEV API key.** Create a key in your DEV settings, under Extensions. In the `afterword` folder, create a file named `.env` (no other extension; some editors add `.txt`) containing one line:
+
+   ```text
+   DEV_API_KEY=<your DEV API key>
+   ```
+
+   The file is ignored by git, and Afterword never prints or saves the key.
+
+3. **Read your comments from DEV.**
+
+   ```text
+   uv run --env-file .env afterword probe
+   ```
+
+   This reads your published posts and the comments on them, one request per second, so it takes about four minutes per hundred posts. It only reads: it never posts, reacts, or deletes. When it finishes it prints a run ID such as `20261008T141450Z`. If it says `DEV_API_KEY is not set`, check the `.env` file; if it reports `/api/users/me returned 401`, DEV did not accept the key.
+
+4. **Count them.**
+
+   ```text
+   uv run afterword baseline --run <run-id>
+   ```
+
+   This prints totals and writes a report to `reports/baseline-<run-id>.md`, which opens in any Markdown viewer.
+
+Everything is saved inside your clone, in folders git ignores. To remove it, delete `fixtures/dev-api/source/real/` and `reports/`, and revoke the key on DEV.
+
+## Status and expectations
+
+- **An experiment, not a product.** It exists to answer one question with evidence: can assisted triage reduce how much of a comment stream needs immediate reading without missing what matters? A negative or reframed answer is a valid outcome and will be published as one.
+- **DEV only.** Other platforms wait until the experiment has a result.
+- **Expect change.** There is no installer and no review interface yet, and commands and documents change between commits.
+- **Issues and findings are welcome,** especially from running the steps above on your own account: API surprises, counts that look wrong, or anything that assumed the author's machine. Please share counts and descriptions, never other people's comments.
+- **Pull requests:** _policy to come._
+
+## For contributors
+
+Install the commit hooks once per clone (git does not carry this setting in a clone):
 
 ```text
-git clone https://github.com/kenwalger/Afterword.git afterword
-cd afterword
-uv sync
 git config core.hooksPath scripts/hooks
 ```
 
-The last line installs the commit hooks; git does not carry it in a clone, so every fresh clone needs it once.
+The `pre-commit` hook rejects staged files containing em-dashes or bidi control characters, then runs the identity scan (`scripts/check_committable.py`), ruff, ruff format, mypy, and pydoclint. The `commit-msg` hook rejects em-dashes and bidi control characters in the commit message.
 
-Commands that call DEV read a DEV API key (DEV Settings, Extensions) from `DEV_API_KEY`. Put it in a `.env` file at the repository root, which is git-ignored:
-
-```text
-DEV_API_KEY=<your DEV API key>
-```
-
-Then, one example of each command (run IDs are UTC timestamps printed by the probe):
-
-```text
-uv run --env-file .env afterword probe
-uv run afterword label --run <run-id> --mode chronological --week 2026-09-07
-uv run afterword label-ui --run <run-id>
-uv run afterword label --run <run-id>
-```
-
-- `probe` is read-only (GET only). It saves raw payloads under git-ignored `fixtures/dev-api/source/real/<run-id>/` and value-free findings under `reports/probe/<run-id>/`. Its console output is counts and IDs only, safe to share.
-- `--mode chronological` times a plain oldest-first read of one week (C-009) and asks at the end whether to record it as a valid timing.
-- `label-ui` is the faster way to label. It serves one page on 127.0.0.1 and opens it in your browser; if the browser does not open, use the `open: http://127.0.0.1:8765/?t=<token>` line it prints (the whole URL, token included; it changes on every launch). Keys: `1` to `9` and `0` choose the class, letters toggle flags, Shift+`0` to `3` sets the prospective grade, `g` then `0` to `3` the retrospective grade, `e` types the reason, Enter saves, `p` shows the post, `h` shows the definitions, `s` skips, `q` stops. Each Enter writes the label at once. Stop with `q` in the page or Ctrl+C in the terminal (closing the tab leaves the server running); run the command again to resume with the next unlabeled comment.
-- `label` labels the same batches in the terminal, one batch of at most 40 comments, then stops; run it again to continue. Use it for `--mode chronological` (timing exists only there) or without a browser. The two write the same records and can continue each other's work, but never run both at once. In the terminal, `q` at the `Save?` prompt saves the label, then stops; `q` at an earlier prompt leaves the comment on screen unsaved, and the tool says so.
-- `uv run afterword label status --run <run-id>` prints labeling progress for the run: labeled, remaining, and labels by pass, by tool, and by post order (publication order or shuffled). Counts only, never classes or grades.
-- `--pass calibration` (either tool) re-labels comments that already have an initial label, from scratch, with the earlier label hidden; `--ids <file>` picks which. Nothing is overwritten (`docs/LABELING-GUIDE.md`).
-- Either tool takes `--posts random --seed N`, which shuffles the order of posts reproducibly; comments within a post stay oldest first. Keep the same seed for a whole pass.
-- The full labeling routine, including every shortcut, is in `docs/WORKFLOW.md` (section 3).
-- `uv run afterword baseline --run <run-id>` writes the C-009 volume report under `reports/`.
-
-The store and classifiers (Stage 1 to 3a groundwork; the store and B1 have run on real data since 2026-10-07, B2 on synthetic fixtures only):
-
-```text
-uv run afterword ingest --run <run-id>
-uv run afterword connections
-uv run afterword store-status
-uv run afterword forget --connection <connection-id> --yes
-uv run afterword classify --condition b1 --heuristic hb-v0.2
-uv run afterword classify --condition b2 --model qwen3:4b-instruct-2507-q4_K_M
-uv run afterword evaluate --condition b1 --heuristic hb-v0.2 --policy pp-v0.2
-uv run afterword dev-subset --size 50 --seed 20261008
-uv run afterword dev-analysis --model <ollama-model>
-uv run afterword models verify
-uv run afterword bench --synthetic --model <ollama-model>
-```
-
-- `ingest` reads a saved probe run into the local SQLite store (`data/`, git-ignored), oldest run first, applying the lifecycle rules and the ADR-009 purge. `forget` removes every record of one connection; without `--yes` it only counts.
-- `classify` runs B1 (heuristic) or B2 (a local model through Ollama, whose model-boundary path is signed off) over stored comments from others, incrementally, and applies the priority policy. It refuses a provider whose path is not signed off and a model whose digest differs from its pin.
-- `store-status` prints the store's comments by lifecycle state and its lifecycle events, counts only.
-- `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.1`, or the candidate `pp-v0.2`), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.
-- `dev-subset` draws a seeded, class-balanced subset of labeled `dev` comments and writes its IDs to a git-ignored file, for `classify --ids` and `evaluate --ids`. It prints counts only.
-- `dev-analysis` counts, offline, which rule decided each tier for B1 and B2 under each policy, how often the pre-check fired and on what labels, B2's class against your labels, and comments by detected language; counts only, to a git-ignored report.
-- `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.
-
-`label` and `label-ui` show comment text only on your own machine (terminal or local page) and need no key. In what order to run these, and why, is in `docs/WORKFLOW.md`.
-
-## Development
-
-The hooks are installed by `git config core.hooksPath scripts/hooks` (see Quick start). The `pre-commit` hook rejects staged files containing em-dashes or bidi control characters, then runs the identity scan (`scripts/check_committable.py`), ruff, ruff format, mypy, and pydoclint. The `commit-msg` hook rejects em-dashes and bidi control characters in the commit message. The full check list, including tests on both supported Pythons, is in `CLAUDE.md`:
+Every check must pass before a commit, including the tests on both supported Pythons. Run them one line at a time (Windows PowerShell 5.1 does not support `&&`):
 
 ```text
 uv sync
-uv run ruff check . && uv run ruff format --check .
-uv run mypy && uv run pydoclint src scripts
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run pydoclint src scripts
 uv run pytest
 uv run --isolated --python 3.12 pytest
 ```
 
-Commands that call DEV read the key from `DEV_API_KEY` (for example `uv run --env-file .env afterword probe`). Real payloads, reports, and labels are written only to git-ignored paths.
+Tests never call DEV or a model. The project's rules, including privacy, credentials, and the adapter boundary, are in `CLAUDE.md`. Real payloads, reports, and labels are written only to git-ignored paths.
 
-## Reading order
+## The full picture
 
-1. `docs/PROJECT-BRIEF.md`: the question and why it matters
-2. `docs/SCOPE.md`: what V1 is and is not
-3. `docs/LABELING-GUIDE.md`: what "consequential" means and how ground truth is produced
-4. `docs/LABELING-FIELD-GUIDE.md`: the practical checklist to keep beside you while labeling (the guide and the taxonomy win where they differ)
-5. `docs/TAXONOMY.md`: comment classes and flags
-6. `docs/PRIORITY-POLICY.md`: how classes become priority, and where the review threshold sits
-7. `docs/EVALUATION.md`: how the claims are tested
-8. `docs/CLAIMS.md`: what is being claimed, before evidence exists
-9. `docs/DATA-MODEL.md`
-10. `docs/PRIVACY-AND-BOUNDARIES.md`
-11. `docs/API-CAPABILITY-MATRIX.md`
-12. `docs/ROADMAP.md`
-13. `docs/WORKFLOW.md`: the operating protocol: fresh probe, timing before labeling, labeling sessions, and the weekly routine of the test period
-14. `docs/LABELING-AT-SCALE.md`: a future design note for labeling beyond V1 (not V1 scope)
-15. `docs/FUTURE-FEATURES.md`: candidate features after the Stage 3 gate, each with a proposed claim (not V1 scope)
-16. `docs/adr/`
-17. `docs/proposals/`: changes under discussion, and accepted ones with their evidence
-18. `docs/FRICTION-LOG.md`: the index of the friction log, with the entries in one file per session under `docs/friction-log/`
-19. `docs/benchmarks/`: dated benchmark write-ups, informational only
-20. `docs/BRAND.md`: how the name and logo are presented
+The experiment was designed in documents before any code was written, and the documents remain the source of truth. A short reading order:
 
-## Public deliverable
+1. [`docs/PROJECT-BRIEF.md`](docs/PROJECT-BRIEF.md): the question and why it matters.
+2. [`docs/SCOPE.md`](docs/SCOPE.md): what V1 is and is not.
+3. [`docs/EVALUATION.md`](docs/EVALUATION.md): how the claims are tested.
+4. [`docs/CLAIMS.md`](docs/CLAIMS.md): what is claimed, written before the evidence, with every later change dated.
+5. [`docs/adr/`](docs/adr/): the architecture decisions, including the boundaries above.
 
-The primary public artifact is the evaluation write-up: what was claimed, how it was measured, what the classifier missed and why. A negative or reframed result is a valid outcome and will be published as one.
+Then, for the work itself:
+
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): the stages, their gates, and the current status.
+- [`docs/WORKFLOW.md`](docs/WORKFLOW.md): the labeling and classification routine, in order, and why.
+- [`docs/COMMANDS.md`](docs/COMMANDS.md): every command, with what it reads and writes.
+- [`docs/PRIVACY-AND-BOUNDARIES.md`](docs/PRIVACY-AND-BOUNDARIES.md): the privacy rules and the model-boundary records.
+- [`docs/FRICTION-LOG.md`](docs/FRICTION-LOG.md): what surprised the project, session by session.
+
+The full list, in reading order, is in [`docs/README.md`](docs/README.md).
 
 ## Name
 

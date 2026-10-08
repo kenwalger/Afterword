@@ -1,6 +1,8 @@
 # Privacy and Boundaries
 
-**Version:** 7 (2026-10-08)
+**Version:** 8 (2026-10-08)
+
+v8 points "External testing" to the statement it requires, `USING-AFTERWORD-ON-YOUR-ACCOUNT.md`. No rule changes.
 
 v7 records the author's amended acceptance of the disclosure proposal: the labeler records `ai_self_disclosed` when a comment says explicitly that an AI wrote it; automated detection, even of explicit self-disclosure text, is deferred; the platform fields stay a dormant source.
 
@@ -166,3 +168,5 @@ Before another author uses the application, provide a clear statement of:
 - what is sent to AI providers
 - what actions the application can perform
 - how to disconnect and delete local data
+
+That statement is `docs/USING-AFTERWORD-ON-YOUR-ACCOUNT.md` (2026-10-08). It describes the code as of that date.
