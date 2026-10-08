@@ -39,7 +39,7 @@ from afterword.observations import ObservedComment, ObservedContent, RunObservat
 LABEL_ROOT: Path = label_records.LABEL_ROOT
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
-LABEL_GUIDE_VERSION: str = "lg-v0.5"
+LABEL_GUIDE_VERSION: str = "lg-v0.6"
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
@@ -542,6 +542,7 @@ def make_label(
     duration_seconds: float,
     labeled_at: datetime,
     read_via_translation: bool = False,
+    ai_self_disclosed: bool = False,
 ) -> dict[str, Any]:
     """Build one label record, the same for every transport (terminal or browser).
 
@@ -561,6 +562,8 @@ def make_label(
     :param labeled_at: Wall-clock time of saving.
     :param read_via_translation: The labeler read the comment through a
         translation (any tool), not in its original language.
+    :param ai_self_disclosed: The comment says explicitly that it was written by
+        an AI. Never set from how the comment reads.
     :returns: The record, per the schema in ``fixtures/README.md``.
     :raises ValueError: For an unknown class or flag, a grade outside 0 to 3, or a
         missing reason on a consequential grade.
@@ -596,6 +599,7 @@ def make_label(
         "context_reconstructed": snap.context_reconstructed(c),
         "replied_before_labeling": snap.author_replied(c),
         "read_via_translation": bool(read_via_translation),
+        "ai_self_disclosed": bool(ai_self_disclosed),
         "reason": reason,
         "pass": ctx.pass_name,
         "batch_id": ctx.batch_id,
@@ -1002,7 +1006,8 @@ def _ask_label(
         )
         try:
             decision = console.ask(
-                "Save? [Enter = yes, v = yes, read via a translation, "
+                "Save? [Enter = yes; v = yes, read via a translation; "
+                "a = yes, says it was written by an AI (va for both); "
                 "r = redo, s = skip, q = save and stop]: "
             ).lower()
         except Quit:
@@ -1024,11 +1029,22 @@ def _ask_label(
         reason=reason,
         duration_seconds=monotonic() - started,
         labeled_at=now(),
-        read_via_translation=decision == "v",
+        read_via_translation=_marks(decision) is not None and "v" in decision,
+        ai_self_disclosed=_marks(decision) is not None and "a" in decision,
     )
     if decision == "q":
         raise SavedThenQuit(record, note)
     return record, note
+
+
+def _marks(decision: str) -> set[str] | None:
+    """Return the marks typed at the ``Save?`` prompt (``v``, ``a``, or both).
+
+    :param decision: The answer, lower case.
+    :returns: The marks, or ``None`` when the answer is not made of marks only.
+    """
+    marks = set(decision)
+    return marks if decision and marks <= {"v", "a"} else None
 
 
 def run_labeling(

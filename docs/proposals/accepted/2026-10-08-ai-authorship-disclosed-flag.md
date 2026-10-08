@@ -1,6 +1,17 @@
 # Proposal: a structural, informational `AI_AUTHORSHIP_DISCLOSED` flag
 
-**Status:** proposed 2026-10-08 (session 8, Part C2). Not accepted, not implemented. A new flag is a taxonomy change (`tax-v0.3`) and needs the author's approval first; the rule against inferring AI authorship is adopted now in `PRIVACY-AND-BOUNDARIES.md` (v6), independently of this proposal.
+**Status:** accepted, amended, by the author on 2026-10-08 (session 8, after Part C2). The amendment below replaces the structural flag with a labeler-recorded field for now. The proposal as first written is kept unchanged below it.
+
+## Amendment (2026-10-08, the author's decision)
+
+DEV's disclosure fields describe posts, and every stored comment reads `not_disclosed`, so a structural flag would have no platform source today. Instead:
+
+1. **`ai_self_disclosed` (boolean) on the label record**, set by the labeler in either tool when a comment says explicitly that it was written by an AI (`LABELING-GUIDE.md` `lg-v0.6`). It records what the comment states, not how it reads. It is not a taxonomy flag, so the taxonomy version does not change, and it has no tier effect.
+2. **Automated detection is deferred, including detection of explicit self-disclosure text.** No rule, pattern, model, or heuristic sets anything about AI authorship. The never-infer rule (`PRIVACY-AND-BOUNDARIES.md`, "AI authorship") stands.
+3. **The platform fields stay wired as a dormant source.** The DEV adapter maps `ai_disclosure_level` to a source-neutral value on each observed comment (`platform_ai_disclosure`: `NOT_EXPOSED`, `NOT_DISCLOSED`, `DISCLOSED_NONE`, `DISCLOSED_SOME`, `DISCLOSED_FULL`, or `UNEXPECTED`). Nothing stores, shows, or uses it, so if DEV extends disclosure to comments the source is already there. Using it is a later decision.
+4. `AI_AUTHORSHIP_DISCLOSED` as a structural flag is not adopted. It can be proposed again if a platform source starts carrying values other than `not_disclosed` for comments.
+
+## Proposal as first written (2026-10-08)
 
 ## The question
 

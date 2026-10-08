@@ -190,7 +190,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "corpus_version": "unfrozen",
         "corpus_set": "dev",
         "sample_kind": "researcher",
-        "label_guide_version": "lg-v0.5",
+        "label_guide_version": "lg-v0.6",
         "taxonomy_version": "tax-v0.2",
         "normalization_version": "display-v0.1",
         "primary_class": "TECHNICAL_QUESTION",
@@ -201,6 +201,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "context_reconstructed": True,
         "replied_before_labeling": True,
         "read_via_translation": False,
+        "ai_self_disclosed": False,
         "reason": "needs an answer",
         "pass": "initial",
         "batch_id": "b_20261009T180000Z",
@@ -699,3 +700,22 @@ def test_v_at_the_save_prompt_records_a_reading_via_translation(tmp_path, fake_d
     first, second = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")[:2]
     assert first["read_via_translation"] is True and second["read_via_translation"] is False
     assert "v = yes, read via a translation" in script.prompts[6]
+
+
+def test_a_at_the_save_prompt_records_an_explicit_ai_self_disclosure(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    first, second, third = label_answers(), label_answers(), label_answers()
+    first[-1], second[-1] = "a", "va"
+    run(snap, tmp_path, Script([*first, *second, *third]))
+    a, b, c = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")[:3]
+    assert (a["ai_self_disclosed"], a["read_via_translation"]) == (True, False)
+    assert (b["ai_self_disclosed"], b["read_via_translation"]) == (True, True)
+    assert (c["ai_self_disclosed"], c["read_via_translation"]) == (False, False)
+
+
+def test_observations_carry_the_dormant_platform_disclosure(tmp_path, fake_dev):
+    from afterword import observations as obs
+
+    snap = snapshot(tmp_path)
+    values = {c.platform_ai_disclosure for c in snap.obs.comments}
+    assert values and values <= set(obs.AI_DISCLOSURES)

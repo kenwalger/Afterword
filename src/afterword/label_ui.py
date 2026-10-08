@@ -53,7 +53,7 @@ FLAG_KEYS: dict[str, str] = {
     "HOSTILE_TONE": "x",
     "POSSIBLE_INSTRUCTION_TEXT": "i",
 }
-COMMAND_KEYS: frozenset[str] = frozenset("htpsqgewv")
+COMMAND_KEYS: frozenset[str] = frozenset("htpsqgewva")
 
 
 def taxonomy_payload() -> dict[str, Any]:
@@ -222,6 +222,7 @@ class LabelUI:
         reason = body.get("reason", "")
         note = body.get("note", "")
         translated = body.get("read_via_translation", False)
+        self_disclosed = body.get("ai_self_disclosed", False)
         if not isinstance(primary, str):
             raise RequestError("choose a class")
         if not isinstance(flags, list) or not all(isinstance(f, str) for f in flags):
@@ -236,6 +237,8 @@ class LabelUI:
             raise RequestError("reason and note must be text")
         if not isinstance(translated, bool):
             raise RequestError("read_via_translation must be true or false")
+        if not isinstance(self_disclosed, bool):
+            raise RequestError("ai_self_disclosed must be true or false")
         started = self.shown_at if self.shown_at is not None else self.monotonic()
         try:
             service.save_label(
@@ -249,6 +252,7 @@ class LabelUI:
                 note=note,
                 duration_seconds=self.monotonic() - started,
                 read_via_translation=translated,
+                ai_self_disclosed=self_disclosed,
             )
         except service.ServiceError as exc:
             raise RequestError(str(exc)) from None

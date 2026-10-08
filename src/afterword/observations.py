@@ -16,6 +16,25 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+# A platform's own AI-authorship disclosure for a comment, in source-neutral
+# terms (PRIVACY-AND-BOUNDARIES.md, "AI authorship"). Dormant: recorded on the
+# observation, never stored, shown, or used by any policy. On DEV every comment
+# so far reads NOT_DISCLOSED, and DEV documents disclosure for posts only.
+AI_DISCLOSURE_NOT_EXPOSED: str = "NOT_EXPOSED"
+AI_DISCLOSURE_NOT_DISCLOSED: str = "NOT_DISCLOSED"
+AI_DISCLOSURE_NONE: str = "DISCLOSED_NONE"
+AI_DISCLOSURE_SOME: str = "DISCLOSED_SOME"
+AI_DISCLOSURE_FULL: str = "DISCLOSED_FULL"
+AI_DISCLOSURE_UNEXPECTED: str = "UNEXPECTED"
+AI_DISCLOSURES: tuple[str, ...] = (
+    AI_DISCLOSURE_NOT_EXPOSED,
+    AI_DISCLOSURE_NOT_DISCLOSED,
+    AI_DISCLOSURE_NONE,
+    AI_DISCLOSURE_SOME,
+    AI_DISCLOSURE_FULL,
+    AI_DISCLOSURE_UNEXPECTED,
+)
+
 
 @dataclass(frozen=True)
 class ObservedContent:
@@ -53,6 +72,8 @@ class ObservedComment:
     author_ref: str | None = None
     body_source: str | None = None
     body_source_format: str | None = None
+    # The platform's AI-authorship disclosure (AI_DISCLOSURES); dormant.
+    platform_ai_disclosure: str = AI_DISCLOSURE_NOT_EXPOSED
 
 
 @dataclass(frozen=True)

@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from afterword import observations
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
 
 # Raw file names inside one probe run directory.
@@ -202,6 +203,35 @@ def enum_distribution(nodes: list[dict[str, Any]], key: str) -> dict[str, int]:
         else:
             counts["<non-enum value>"] += 1
     return dict(sorted(counts.items()))
+
+
+# DEV's documented `ai_disclosure_level` values (Forem OpenAPI, articles; checked
+# 2026-10-08), mapped to source-neutral terms. Comments carry the same field.
+_AI_DISCLOSURE_LEVELS: dict[str, str] = {
+    "not_disclosed": observations.AI_DISCLOSURE_NOT_DISCLOSED,
+    "no_ai": observations.AI_DISCLOSURE_NONE,
+    "some_ai": observations.AI_DISCLOSURE_SOME,
+    "fully_autonomous": observations.AI_DISCLOSURE_FULL,
+}
+
+
+def ai_disclosure(node: dict[str, Any]) -> str:
+    """Map a comment's AI-disclosure level to a source-neutral value.
+
+    A dormant source (``PRIVACY-AND-BOUNDARIES.md``, "AI authorship"): it says
+    only what the commenter declared, never what the text looks like. An absent
+    field is ``NOT_EXPOSED``; a value outside the documented set is
+    ``UNEXPECTED``, a signal to investigate.
+
+    :param node: A comment node.
+    :returns: One of :data:`afterword.observations.AI_DISCLOSURES`.
+    """
+    if AI_DISCLOSURE_KEYS[1] not in node:
+        return observations.AI_DISCLOSURE_NOT_EXPOSED
+    value = node[AI_DISCLOSURE_KEYS[1]]
+    if not isinstance(value, str):
+        return observations.AI_DISCLOSURE_UNEXPECTED
+    return _AI_DISCLOSURE_LEVELS.get(value, observations.AI_DISCLOSURE_UNEXPECTED)
 
 
 def ai_disclosure_distribution(
@@ -484,6 +514,7 @@ def load_run(run_dir: Path, *, include_text: bool = False) -> RunObservations:
                     author_ref=_author_ref(n.node) if include_text else None,
                     body_source=body if isinstance(body, str) else None,
                     body_source_format="HTML" if isinstance(body, str) else None,
+                    platform_ai_disclosure=ai_disclosure(n.node),
                 )
             )
     return RunObservations(

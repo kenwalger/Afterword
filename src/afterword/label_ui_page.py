@@ -155,7 +155,8 @@ let postOpen = false;
 let postData = null;
 
 function blankForm() {
-  return {cls: null, flags: new Set(), pro: null, retro: null, translated: false};
+  return {cls: null, flags: new Set(), pro: null, retro: null,
+    translated: false, selfDisclosed: false};
 }
 
 function el(tag, attrs, ...kids) {
@@ -399,10 +400,14 @@ function formCard(c) {
   box.append(el("h2", {text: needs ? "Reason (required for 2 or 3)" : "Reason (optional)"}));
   box.append(el("input", {type: "text", id: "reason", autocomplete: "off",
     placeholder: "e key to type, Enter saves"}));
-  box.append(el("h2", {text: "Language"}));
+  box.append(el("h2", {text: "Language and disclosure"}));
   box.append(option("checkbox", form.translated, "v", "Read via a translation", () => {
     form.translated = !form.translated; render();
   }, "Check when you read this comment through a translation, not in its original language."));
+  box.append(option("checkbox", form.selfDisclosed, "a", "Says it was written by an AI", () => {
+    form.selfDisclosed = !form.selfDisclosed; render();
+  }, "Check only when the comment states explicitly that an AI wrote it. "
+    + "Never from how it reads."));
   box.append(el("h2", {text: "Hard to label? Note (batch record only)"}));
   box.append(el("input", {type: "text", id: "note", autocomplete: "off",
     placeholder: "w key to type"}));
@@ -416,7 +421,7 @@ function formCard(c) {
   for (const line of [
     "1-9, 0: class    letters: flags (keys shown)",
     "Shift+0..3: prospective grade    g then 0..3: retrospective (g - clears)",
-    "e: reason    w: note    v: read via a translation    Esc: leave a field    Enter: save",
+    "e: reason    w: note    v: via translation    a: says AI wrote it    Enter: save",
     "t: full thread    p: post    h: definitions    s: skip    q: stop"]) {
     legend.append(el("div", {class: "mono", text: line}));
   }
@@ -497,7 +502,8 @@ function submit() {
   post("/api/label", {
     comment_id: st.comment.comment_id, primary_class: form.cls,
     flags: Array.from(form.flags), prospective: form.pro, retrospective: form.retro,
-    reason: reason, note: valueOf("note"), read_via_translation: form.translated});
+    reason: reason, note: valueOf("note"), read_via_translation: form.translated,
+    ai_self_disclosed: form.selfDisclosed});
 }
 
 function skip() {
@@ -568,6 +574,7 @@ document.addEventListener("keydown", (e) => {
   if (k === "t") { full = !full; render(); return; }
   if (k === "p") { togglePost(); return; }
   if (k === "v") { form.translated = !form.translated; render(); return; }
+  if (k === "a") { form.selfDisclosed = !form.selfDisclosed; render(); return; }
   if (k === "s") { skip(); return; }
   if (k === "q") { stop(); return; }
   if (k === "g" && form.pro !== null) { gPending = true; render(); return; }

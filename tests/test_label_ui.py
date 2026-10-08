@@ -518,3 +518,15 @@ def test_a_label_can_record_that_it_was_read_via_a_translation(running, tmp_path
 def test_the_page_offers_the_translation_toggle():
     assert "Read via a translation" in PAGE and 'k === "v"' in PAGE
     assert "read_via_translation: form.translated" in PAGE
+
+
+def test_a_label_can_record_an_explicit_ai_self_disclosure(running, tmp_path):
+    token = running.server.token
+    body = answer(running.ui, ai_self_disclosed=1)
+    status, refused = running.request("POST", "/api/label", body, token=token)
+    assert status == 409 and "ai_self_disclosed" in refused["error"]
+    body = answer(running.ui, ai_self_disclosed=True)
+    assert running.request("POST", "/api/label", body, token=token)[0] == 200
+    (label,) = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")
+    assert label["ai_self_disclosed"] is True and label["read_via_translation"] is False
+    assert 'k === "a"' in PAGE and "Says it was written by an AI" in PAGE

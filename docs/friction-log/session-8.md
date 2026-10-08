@@ -830,3 +830,130 @@ Times are UTC. No comment text, names, or handles: every figure below is a count
 - Choosing B2 or a policy: not done, as agreed.
 
 **Next smallest useful step:** Session 9: how consequence should reach the tier, weighed against ADR-007, using section 2's evidence; then the B2 and policy choices before preregistration. The author: finish labeling `dev` (156 left) and decide on the AI-authorship proposal.
+
+## Session 8: decisions after Part C2 (2026-10-08)
+
+### 2026-10-08 14:40 - AI-authorship proposal accepted, amended: a label field, not a flag
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** Apply the author's decision on the `AI_AUTHORSHIP_DISCLOSED` proposal.
+
+**Expectation:** A structural flag from the platform's disclosure fields.
+
+**Observation:** DEV's disclosure fields describe posts, and every stored comment reads `not_disclosed`, so a structural flag would have no source. The author's amendment:
+- `ai_self_disclosed` (boolean) on the label record, set by the labeler in either tool only when a comment says explicitly that an AI wrote it (`a` in the label UI; `a`, or `va` with a translation, at the terminal's `Save?` prompt). Not a taxonomy flag, no tier effect.
+- Automated detection is deferred, including detection of explicit self-disclosure text. The never-infer rule stands.
+- The platform fields stay wired as a dormant source: the DEV adapter maps `ai_disclosure_level` to a source-neutral `platform_ai_disclosure` on each observed comment, with `UNEXPECTED` for an undocumented value. Nothing stores, shows, or uses it.
+
+**Evidence:** `docs/proposals/accepted/2026-10-08-ai-authorship-disclosed-flag.md` (amendment at the top, the original kept below); tests in `test_records.py`, `test_labeling.py`, `test_label_ui.py`.
+
+**Workaround:** None.
+
+**Consequence:** `lg-v0.6`, field guide v4, `PRIVACY-AND-BOUNDARIES.md` v7, `DATA-MODEL` v12, `fixtures/README.md`, `WORKFLOW.md`. The proposal moved to `docs/proposals/accepted/`; the friction entries above that name its earlier path are left as recorded.
+
+**Follow-up:** Revisit the structural flag if a platform starts returning disclosure values other than `not_disclosed` for comments.
+
+### 2026-10-08 14:40 - The pre-check hypothesis is refuted
+
+**Platform:** DEV
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** Record the outcome of the author's hypothesis that comments about prompts and models trip `pc-v0.1` and inflate `SURFACE`.
+
+**Expectation:** The hypothesis, stated before C2.
+
+**Observation:** `pc-v0.1` fired on 3 of 458 real comments; on its own it raised at most 2 to `SURFACE`. `SURFACE` inflation comes from class assignment: 137 of Llama's 142 labeled `SURFACE` comments are there by class default, and 124 of B1's 126.
+
+**Evidence:** The 13:50 and 13:55 entries above; `docs/benchmarks/2026-10-08-dev-set-evaluation.md`, sections 1 and 2.
+
+**Workaround:** None.
+
+**Consequence:** Recorded as refuted in `EVALUATION.md` v15.
+
+**Follow-up:** None.
+
+### 2026-10-08 14:45 - Session 9 input: TECHNICAL_EXTENSION may mix substantive and passing comments
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** Record the extension-called-challenge observation for the session 9 design question.
+
+**Expectation:** None.
+
+**Observation:** Of 100 labeled extensions, the 49 Llama called a challenge hold 28 consequential (57%; Wilson 43.3% to 70.0%), the other 51 hold 21 (41%; 28.8% to 54.8%). The intervals overlap.
+
+**Evidence:** `afterword dev-analysis` (counts only).
+
+**Workaround:** None.
+
+**Consequence:** `EVALUATION.md` v15 records it as an observation, with the directions it points at (a split of `TECHNICAL_EXTENSION`, or an auditable "pushes on a claim" signal) and why it is not evidence for a design.
+
+**Follow-up:** Session 9.
+
+### 2026-10-08 14:45 - The stale to-do note in CLAIMS.md is gone
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** Delete the author's old "Future features (docs only, no code)" note at the end of `CLAIMS.md`, as the author asked.
+
+**Expectation:** A note, not a claim.
+
+**Observation:** The block held no claim heading; it was removed whole. C-001 to C-020 are unchanged.
+
+**Evidence:** `git diff docs/CLAIMS.md`.
+
+**Workaround:** None.
+
+**Consequence:** None beyond the file.
+
+**Follow-up:** None.
+
+### 2026-10-08 14:50 - Checkpoint: decisions applied
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** Close the round: full check list, both logs, commit message.
+
+**Expectation:** All checks green.
+
+**Observation:** ruff, ruff format, mypy (strict), and pydoclint clean; 662 tests pass on Python 3.14 and on 3.12 (isolated), up from 658 (the dormant disclosure mapping, `ai_self_disclosed` in both tools). Identity scan: no disallowed match; no em-dash, bidi control, or carriage return in any changed file. Moving the proposal with `git mv` staged the rename; it was unstaged, so the index matches HEAD and the move shows as a delete plus a new file.
+
+**Evidence:** The check list in CLAUDE.md.
+
+**Workaround:** None.
+
+**Consequence:** `commit-message.txt` holds this round's message. Not committed.
+
+**Follow-up:** The author commits.
+
+### 2026-10-08 - Session summary addendum (decisions after Part C2)
+
+**Completed:** the AI-authorship proposal accepted as amended (`ai_self_disclosed` label field in both tools, platform fields as a dormant source, automated detection deferred); the pre-check hypothesis recorded as refuted; the session 9 observation on `TECHNICAL_EXTENSION`; the stale `CLAIMS.md` note deleted.
+
+**Claims affected:** none (C-020 unchanged).
+
+**ADRs affected:** none.
+
+**Scope pressure:** the dormant platform mapping is code, but it stays on the observation only: not stored, shown, or used, as the author asked. No detection of self-disclosure text was written.
+
+**Next smallest useful step:** unchanged: session 9, how consequence reaches the tier.

@@ -452,6 +452,7 @@ def save_label(
     note: str,
     duration_seconds: float,
     read_via_translation: bool = False,
+    ai_self_disclosed: bool = False,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> dict[str, Any]:
     """Save the label for one comment of a batch, and its hard-to-label note if any.
@@ -466,6 +467,7 @@ def save_label(
     :param note: Optional note for the batch record, never stored in the label.
     :param duration_seconds: Time from the comment being shown to saving.
     :param read_via_translation: The labeler read the comment through a translation.
+    :param ai_self_disclosed: The comment says explicitly that it was written by an AI.
     :param now: Wall clock for ``labeled_at``.
     :returns: The saved record.
     :raises ServiceError: If the label is invalid (see :func:`afterword.labeling.make_label`).
@@ -484,6 +486,7 @@ def save_label(
             duration_seconds=duration_seconds,
             labeled_at=now(),
             read_via_translation=read_via_translation,
+            ai_self_disclosed=ai_self_disclosed,
         )
     except ValueError as exc:
         raise ServiceError(str(exc)) from None

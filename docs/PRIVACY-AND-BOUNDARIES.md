@@ -1,8 +1,10 @@
 # Privacy and Boundaries
 
-**Version:** 6 (2026-10-08)
+**Version:** 7 (2026-10-08)
 
-v6 adds the rule that AI authorship is never inferred from writing style ("AI authorship", under Identity), with the proposal for a structural, informational disclosure flag (`docs/proposals/2026-10-08-ai-authorship-disclosed-flag.md`, not yet accepted).
+v7 records the author's amended acceptance of the disclosure proposal: the labeler records `ai_self_disclosed` when a comment says explicitly that an AI wrote it; automated detection, even of explicit self-disclosure text, is deferred; the platform fields stay a dormant source.
+
+v6 adds the rule that AI authorship is never inferred from writing style ("AI authorship", under Identity), with the proposal for a structural, informational disclosure flag (`docs/proposals/accepted/2026-10-08-ai-authorship-disclosed-flag.md`, not yet accepted).
 
 v5 records path A's context size raised from 2048 to 4096 tokens, after the first real runs (nothing else on the path changes; nothing leaves the machine).
 
@@ -120,7 +122,11 @@ Cross-platform identity resolution, if explored later, requires a separate desig
 
 ### AI authorship
 
-Whether a comment was written with AI is recorded only when someone has said so: a platform's disclosure field (on DEV, `ai_disclosure_level`) or an explicit self-disclosure rule written down and agreed with the author before use.
+Whether a comment was written with AI is recorded only when someone has said so:
+
+- **The labeler, from what the comment states.** `ai_self_disclosed` on a label is set by the labeler only when the comment says explicitly that an AI wrote it (`LABELING-GUIDE.md`, `lg-v0.6`). It is a fact about the text's own statement, not a judgment about its style.
+- **A platform's disclosure field, dormant for now.** The DEV adapter maps `ai_disclosure_level` to a source-neutral value on each observed comment, but nothing stores, shows, or uses it: DEV documents disclosure for posts, and every comment so far reads `not_disclosed`.
+- **Automated detection is deferred, even of explicit self-disclosure text.** No pattern, rule, heuristic, or model sets anything about AI authorship. Proposing one needs the author's agreement first.
 
 - **Never infer AI authorship from writing style.** No model, heuristic, classifier, or labeler marks a comment as AI-written, AI-assisted, or human because of how it reads. Style-based detection is unreliable, falls hardest on non-native writers and on people who write formally, and turns a guess about a person's tools into a stored judgment about them.
 - A disclosure is a fact about what the commenter stated, recorded with its source and run. Absence of a disclosure (`not_disclosed`) means nothing was said, not that the comment is human-written.

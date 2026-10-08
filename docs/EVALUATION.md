@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 14 (2026-10-08)
+**Version:** 15 (2026-10-08)
+
+v15 (2026-10-08, later the same day) records that the author's pre-check hypothesis was refuted, and adds an observation for the session 9 design question: Llama's mistaken challenge calls on technical extensions concentrate consequential comments. Nothing registered changes; nothing is chosen.
 
 v14 (2026-10-08, later the same day, after the first full model pass on `dev`) records the dev-set evaluation of B1 and the Llama candidate under `pp-v0.1` and `pp-v0.2` (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`), that `pc-v0.1` is English-only, and a counts-only language measurement. Nothing registered changes; nothing is chosen.
 
@@ -377,6 +379,18 @@ The full write-up, with every caveat, is `docs/benchmarks/2026-10-08-dev-set-eva
 - **Llama's `SURFACE` inflation comes from class assignment, not overrides:** 137 of its 142 labeled `SURFACE` comments are there by class default, 96 of them predicted `CHALLENGE_OR_COUNTEREXAMPLE` (4 labeled so). Class agreement with the labels: 84 of 302.
 - **Model-set judgment flags** raised 9 labeled comments under `pp-v0.1`, all graded 0 or 1; `pp-v0.2` removes all but 1 and adds 8 collapses, none consequential.
 - **The pre-check fired on 3 of 458 real comments** (rules `system_prompt` 2, `taxonomy_name` 1); 2 are labeled, neither consequential. It alone raised at most 2 comments to `SURFACE`. Llama set `POSSIBLE_INSTRUCTION_TEXT` itself on 7 others.
+
+### The pre-check hypothesis was refuted (2026-10-08)
+
+**Hypothesis (the author's, before C2):** the author's posts are largely about AI, so ordinary comments about prompts and models trip `pc-v0.1` and inflate `SURFACE`.
+
+**Result:** refuted. `pc-v0.1` fired on 3 of 458 real comments from others, none of the 2 labeled ones consequential, and on its own raised at most 2 comments to `SURFACE`. `SURFACE` inflation comes from class assignment, not the pre-check: 137 of Llama's 142 labeled `SURFACE` comments are there by class default, and 124 of B1's 126 (the other 2 by the pre-check).
+
+### Observation for session 9: "challenge" calls on extensions concentrate consequence (2026-10-08)
+
+Of the 100 comments labeled `TECHNICAL_EXTENSION`, Llama called 49 `CHALLENGE_OR_COUNTEREXAMPLE`. Those 49 hold 28 comments graded 2 or 3 (57%); the other 51 hold 21 (41%). The class call is wrong, but it separates the extensions unevenly, which suggests `TECHNICAL_EXTENSION` mixes substantive comments (ones that push on the post, and matter) with passing ones (a related link or tool, and do not).
+
+This is an input to the open question above ("Class is a weak proxy for consequence"), not evidence for a design: one model, one prompt, one confusion-matrix cell, 100 labels made with hindsight, and a 16-point difference with overlapping intervals (Wilson 95%: 43.3% to 70.0% against 28.8% to 54.8%). Directions it points at, for session 9 to weigh against ADR-007: a taxonomy split of `TECHNICAL_EXTENSION`, or a structural or flag-based signal for "pushes on a claim in the post", either of which stays an auditable policy input rather than a model-chosen priority.
 
 ### `pc-v0.1` is English-only (2026-10-08)
 

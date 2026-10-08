@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 7 (2026-10-08)
+**Version:** 8 (2026-10-08)
+
+v8 records `lg-v0.6` (`ai_self_disclosed`).
 
 v7 records `lg-v0.5` (`read_via_translation`) and the first dev-set evaluation of a model (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`; nothing chosen).
 
@@ -23,7 +25,7 @@ Goal: define the question before implementation changes it.
 - [x] Project brief and scope (v2)
 - [x] Provisional taxonomy (`tax-v0.1`; `tax-v0.2` from 2026-10-04, no class changes)
 - [x] Provisional priority policy (`pp-v0.1`)
-- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel; `lg-v0.5` from 2026-10-08 adds `read_via_translation`)
+- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel; `lg-v0.5` from 2026-10-08 adds `read_via_translation`; `lg-v0.6` the same day adds `ai_self_disclosed`)
 - [x] ADR-001 to ADR-013 (ADR-001 to ADR-011 with the design; ADR-012, the service layer, and ADR-013, local-first with a hosted path preserved, added 2026-10-03)
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)

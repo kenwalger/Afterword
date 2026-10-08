@@ -122,3 +122,22 @@ def test_field_hashes_exclude_children_and_detect_change():
     assert "children" not in before
     assert before["id_code"] == after["id_code"]
     assert before["body_html"] != after["body_html"]
+
+
+def test_platform_ai_disclosure_is_mapped_to_neutral_values_only():
+    from afterword import observations as obs
+
+    level = "ai_disclosure_level"
+    cases = {
+        None: obs.AI_DISCLOSURE_NOT_EXPOSED,
+        "not_disclosed": obs.AI_DISCLOSURE_NOT_DISCLOSED,
+        "no_ai": obs.AI_DISCLOSURE_NONE,
+        "some_ai": obs.AI_DISCLOSURE_SOME,
+        "fully_autonomous": obs.AI_DISCLOSURE_FULL,
+        "something_new": obs.AI_DISCLOSURE_UNEXPECTED,
+    }
+    for value, expected in cases.items():
+        node = {} if value is None else {level: value}
+        assert records.ai_disclosure(node) == expected
+    assert records.ai_disclosure({level: 3}) == obs.AI_DISCLOSURE_UNEXPECTED
+    assert set(cases.values()) == set(obs.AI_DISCLOSURES)

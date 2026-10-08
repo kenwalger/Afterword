@@ -1,6 +1,8 @@
 # Labeling Guide
 
-**Version:** `lg-v0.5`
+**Version:** `lg-v0.6`
+
+`lg-v0.6` (2026-10-08, later the same day) adds `ai_self_disclosed`: the labeler records that a comment says explicitly that it was written by an AI. Grades, definitions, tests, blinding, and the passes are unchanged; earlier labels lack the field, which analysis treats as "not recorded".
 
 `lg-v0.5` (2026-10-08, with 302 `dev` labels made under `lg-v0.2` and `lg-v0.3`) adds `read_via_translation`: the labeler records that they read the comment through a translation rather than in its original language. Grades, definitions, tests, blinding, and the passes are unchanged, so earlier labels need no change; labels made before the field existed simply lack it, and analysis treats a missing value as "not recorded", never as `false`.
 
@@ -22,6 +24,7 @@ For each non-author comment in the corpus:
 - a one-line reason for any consequential label
 - labeling time (`duration_seconds`, recorded by the labeling tool)
 - whether the comment was read through a translation (`read_via_translation`; see below)
+- whether the comment says explicitly that an AI wrote it (`ai_self_disclosed`; see below)
 
 ## Consequential: definition
 
@@ -76,6 +79,14 @@ When a comment is in a language you do not read well enough to grade it, you may
 - Grade the comment, not the translation. If the translation seems to lose or flip something (tone, a technical detail, a correction), say so in the reason or the note, and consider `UNCERTAIN`.
 - Use the original for flags where you can: links, code, and replies are structural and do not depend on the translation.
 - Labels read through a translation are analyzed apart from the others (C-020). A translation is never stored by the labeling tools.
+
+### A comment that says an AI wrote it (`lg-v0.6`)
+
+Set `ai_self_disclosed` (`a` in the label UI; `a` instead of Enter at the terminal's `Save?` prompt, `va` with a translation) only when the comment itself says, in so many words, that it was written by an AI: "I asked an AI to write this reply", "Generated with a chatbot". Otherwise leave it unset.
+
+- **Never from how it reads.** Polished prose, a list structure, or a familiar phrasing is not a disclosure. Guessing is exactly what the rule forbids (`PRIVACY-AND-BOUNDARIES.md`, "AI authorship").
+- A comment that only mentions using AI for something else ("I used Copilot for the tests") is not a disclosure that the comment was AI-written.
+- It changes nothing else: classify and grade the comment as you would any other. It has no tier effect.
 
 `context_reconstructed` is recorded by the tool, not chosen by the labeler. It is `false` when any comment in the shown thread (an ancestor or earlier sibling) is a deletion placeholder, or when the post's last edit time is later than the comment. Otherwise it is `true`, which means "no known gap", not "verified identical". Runs from before `dev-probe-0.2` lack most posts' edit times; the tool then checks only the posts it has.
 

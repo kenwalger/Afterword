@@ -278,17 +278,3 @@ Claims below were added on 2026-10-07 (session 8), as proposed in `FUTURE-FEATUR
 **Status:** DEFERRED UNTIL STAGE 3 GATE
 
 - 2026-10-08: Added from `FUTURE-FEATURES.md`, "Multilingual comments". First count on `dev`: 2 of 458 comments from others detected as non-English, 5 uncertain, 16 too short to classify (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`, section 5). No evidence on the claim itself yet.
-
-## Future features (docs only, no code):
-- Add docs/FUTURE-FEATURES.md (already on disk) to the README reading
-  order, after LABELING-AT-SCALE.md.
-- Append C-013 through C-016 to CLAIMS.md exactly as proposed in
-  FUTURE-FEATURES.md, in the existing format, each with status
-  "DEFERRED UNTIL STAGE 3 GATE". Do not change C-001 to C-012.
-- SCOPE.md: add one Future candidates entry pointing to
-  FUTURE-FEATURES.md (spike insurance, propagation ledger, rediscovery,
-  reply context and position history), gated on the Stage 3 result,
-  noting that grouping by commenter remains excluded without the C-005
-  ADR.
-- ROADMAP.md: add the four features to Deferred, in the suggested order
-  from FUTURE-FEATURES.md.

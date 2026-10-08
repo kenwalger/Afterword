@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 11 (2026-10-08)
+**Version:** 12 (2026-10-08)
+
+v12 (2026-10-08, later the same day) adds `ai_self_disclosed` to EvaluationLabel (`lg-v0.6`), and records the platform AI-disclosure value as a dormant observation, not stored. Nothing earlier is removed.
 
 v11 (2026-10-08, later the same day) adds `read_via_translation` to EvaluationLabel (`LABELING-GUIDE.md` `lg-v0.5`). Nothing earlier is removed.
 
@@ -231,6 +233,7 @@ Ground truth for the corpus. Separate from operational overrides.
 - `context_reconstructed` (boolean)
 - `replied_before_labeling` (boolean; the author's direct reply to the comment existed in the snapshot when it was labeled)
 - `read_via_translation` (boolean, from `lg-v0.5`; the labeler read the comment through a translation. Absent on earlier labels, which means "not recorded")
+- `ai_self_disclosed` (boolean, from `lg-v0.6`; the comment says explicitly that an AI wrote it, as recorded by the labeler. Never inferred. Absent on earlier labels, which means "not recorded")
 - `reason`
 - `pass` (`initial`, `calibration`, `self_agreement`; a calibration label re-labels a comment from scratch and never overwrites its initial label. Analysis uses the latest label from a pass other than `self_agreement`, `LABELING-GUIDE.md`)
 - `snapshot_run_id` (the sync or probe run the comment and its context were read from; provenance, not identity)

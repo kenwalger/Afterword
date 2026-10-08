@@ -1,6 +1,8 @@
 # Labeling Field Guide
 
-**Version:** 3 (2026-10-08). Written against `tax-v0.2` and `lg-v0.5`.
+**Version:** 4 (2026-10-08). Written against `tax-v0.2` and `lg-v0.6`.
+
+v4 adds explicit AI self-disclosure (`lg-v0.6`, `ai_self_disclosed`). Reviewed against `lg-v0.6` and `tax-v0.2`; nothing else needed to change.
 
 v3 adds reading through a translation (`lg-v0.5`, `read_via_translation`). Reviewed against `lg-v0.5` and `tax-v0.2`; nothing else needed to change.
 
@@ -79,6 +81,12 @@ Pick your best reading and move on:
 - **If you use a translation, mark it:** `v` in the label UI (the "Read via a translation" box), or `v` instead of Enter at the terminal's `Save?` prompt. It is quick to forget, and it is the only record that the grade went through a translation.
 - **If the translation looks unreliable,** say so in the note, and do not be shy of `UNCERTAIN`.
 - **Flags come from the original.** Code, links, and replies are set for you from the source either way.
+
+## A comment that says an AI wrote it
+
+- **Only when it says so.** Mark it (`a` in the label UI, the "Says it was written by an AI" box; `a` at the terminal's `Save?` prompt, `va` together with a translation) only when the comment states that an AI wrote it.
+- **Never on a hunch.** Smooth prose, bullet points, or a generic tone are not evidence. If you catch yourself thinking "this sounds like a model", leave it unset; that is the guess the rule forbids.
+- **Grade it like any other comment.** The mark has no effect on class, grade, or tier.
 
 ## Honesty and blinding
 
