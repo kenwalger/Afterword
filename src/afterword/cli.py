@@ -22,7 +22,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from afterword import bench, heuristic, label_ui, labeling, policy, service
+from afterword import baseline, bench, heuristic, label_ui, labeling, policy, service
 from afterword.progress import StatusLine
 from afterword.providers import ollama
 
@@ -102,28 +102,10 @@ def cmd_baseline(args: argparse.Namespace) -> int:
         result = service.build_baseline(Path(args.root), args.run, exclude_weeks=exclude)
     except service.ServiceError as exc:
         return _fail(exc)
-    t = result.report["totals"]
-    print(
-        f"articles {t['articles']}, comments {t['comments']} "
-        f"(others {t['comments_from_others']}, author {t['comments_by_author']})"
-    )
-    rt = result.report["review_timing"]
-    print(
-        f"valid review timings: {len(rt['valid'])}, "
-        f"practice or unconfirmed ignored: {rt['ignored']}"
-    )
-    replacement = result.report["replacement_typical_week"]
-    if replacement:
-        week = replacement["week"]
-        print(
-            "replacement typical week: "
-            + (
-                f"{week['week_start']} ({week['comments_from_others']} comments from others)"
-                if week
-                else "none"
-            )
-        )
-    print(f"report: {result.markdown_path}")
+    for line in baseline.console_summary(result.report):
+        print(line)
+    print()
+    print(f"Full report, with weekly and monthly tables: {result.markdown_path}")
     return 0
 
 
@@ -335,7 +317,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     :returns: Process exit status.
     """
     try:
-        result = service.ingest_run(Path(args.root), args.run)
+        result = service.ingest_run(Path(args.root), args.run, keep_runs=args.keep_runs)
     except service.ServiceError as exc:
         return _fail(exc)
     made = " (new connection)" if result.created_connection else ""
@@ -346,6 +328,14 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         print(f"limitation: {item}")
     if result.counts.get("unexpected_shapes"):
         print("warning: unexpected shapes need a friction entry before this run is used (ADR-009)")
+    saved = result.saved_runs
+    print(f"saved runs: deleted comments redacted {saved.withdrawn_redactions} (counted per run)")
+    if saved.runs_reduced:
+        print(f"saved runs reduced to structure (retention): {', '.join(saved.runs_reduced)}")
+    if saved.runs_kept_for_labels:
+        print(
+            f"saved runs kept whole, labels made from them: {', '.join(saved.runs_kept_for_labels)}"
+        )
     return 0
 
 
@@ -357,6 +347,9 @@ def cmd_store_status(args: argparse.Namespace) -> int:
     """
     try:
         status = service.store_status(Path(args.root), args.connection)
+    except service.NoStoreError as exc:
+        print(str(exc))
+        return 0
     except service.ServiceError as exc:
         return _fail(exc)
     for section in ("comments", "events", "content_check"):
@@ -372,7 +365,11 @@ def cmd_connections(args: argparse.Namespace) -> int:
     :param args: Parsed arguments.
     :returns: Process exit status.
     """
-    summaries = service.list_connections(Path(args.root))
+    try:
+        summaries = service.list_connections(Path(args.root))
+    except service.NoStoreError as exc:
+        print(str(exc))
+        return 0
     if not summaries:
         print("no connections")
     for s in summaries:
@@ -393,6 +390,9 @@ def cmd_forget(args: argparse.Namespace) -> int:
     """
     try:
         counts = service.forget_connection(Path(args.root), args.connection, confirm=args.yes)
+    except service.NoStoreError as exc:
+        print(str(exc))
+        return 0
     except service.ServiceError as exc:
         return _fail(exc)
     rows = ", ".join(f"{k} {v}" for k, v in counts.items())
@@ -702,6 +702,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest = sub.add_parser("ingest", help="ingest a saved probe run into the local store")
     ingest.add_argument("--run", required=True, help="probe run ID (ingest oldest first)")
+    ingest.add_argument(
+        "--keep-runs",
+        type=int,
+        default=service.KEEP_RUNS,
+        help="saved runs kept whole; older ones are reduced to structure (default: %(default)s)",
+    )
     ingest.set_defaults(func=cmd_ingest)
 
     conns = sub.add_parser("connections", help="list platform connections in the store")

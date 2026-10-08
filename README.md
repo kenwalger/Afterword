@@ -53,7 +53,7 @@ You need [git](https://git-scm.com/) and [uv](https://docs.astral.sh/uv/). uv in
    uv run afterword baseline --run <run-id>
    ```
 
-   This prints totals and writes a report to `reports/baseline-<run-id>.md`, which opens in any Markdown viewer.
+   This prints a short summary of your comment volume, each figure with one line saying what it means, and writes a fuller report to `reports/baseline-<run-id>.md`, which opens in any Markdown viewer.
 
 Everything is saved inside your clone, in folders git ignores. To remove it, delete `fixtures/dev-api/source/real/` and `reports/`, and revoke the key on DEV.
 
@@ -112,6 +112,10 @@ The full list, in reading order, is in [`docs/README.md`](docs/README.md).
 ## Name
 
 An afterword is what comes after the text is finished. Comments are the afterword readers write. The project is about what the author does with it.
+
+## How this was built
+
+Afterword was developed with AI assistance. Much of the code and documentation was written in sessions with Claude Code, Anthropic's coding agent, working from designs, decisions, and labels that are the author's own. `CLAUDE.md`, at the repository root, is the standing brief each session reads before it does anything: which documents are the source of truth, which data it may never open, how credentials are handled, what it must never commit, and which checks must pass. The friction log records what happened in each session, the assistant's mistakes included. The labels, the decisions, and the judgment of what counts as consequential are the author's alone.
 
 ## License
 

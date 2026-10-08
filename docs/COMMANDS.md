@@ -1,6 +1,8 @@
 # Commands
 
-**Version:** 1 (2026-10-08)
+**Version:** 2 (2026-10-08)
+
+v2 adds `ingest --keep-runs` and the saved-run redaction (ADR-009, amended 2026-10-08), the plain-language `baseline` console summary, and read-only store commands that never create a database.
 
 The full command reference, moved here from the README on 2026-10-08 so the README can serve as a front door. Nothing was dropped in the move. In what order to run these, and why, is in `WORKFLOW.md`.
 
@@ -35,7 +37,7 @@ uv run afterword label --run <run-id>
 - `--pass calibration` (either tool) re-labels comments that already have an initial label, from scratch, with the earlier label hidden; `--ids <file>` picks which. Nothing is overwritten (`LABELING-GUIDE.md`).
 - Either tool takes `--posts random --seed N`, which shuffles the order of posts reproducibly; comments within a post stay oldest first. Keep the same seed for a whole pass.
 - The full labeling routine, including every shortcut, is in `WORKFLOW.md` (section 3).
-- `uv run afterword baseline --run <run-id>` writes the C-009 volume report under `reports/`.
+- `uv run afterword baseline --run <run-id>` prints a plain-language summary of your comment volume, each figure with one line saying what it means, and writes the full C-009 volume report under `reports/`.
 
 `label` and `label-ui` show comment text only on your own machine (terminal or local page) and need no key.
 
@@ -45,6 +47,7 @@ Stage 1 to 3a groundwork; the store and B1 have run on real data since 2026-10-0
 
 ```text
 uv run afterword ingest --run <run-id>
+uv run afterword ingest --run <run-id> --keep-runs 5
 uv run afterword connections
 uv run afterword store-status
 uv run afterword forget --connection <connection-id> --yes
@@ -57,7 +60,8 @@ uv run afterword models verify
 uv run afterword bench --synthetic --model <ollama-model>
 ```
 
-- `ingest` reads a saved probe run into the local SQLite store (`data/`, git-ignored), oldest run first, applying the lifecycle rules and the ADR-009 purge. `forget` removes every record of one connection; without `--yes` it only counts.
+- `ingest` reads a saved probe run into the local SQLite store (`data/`, git-ignored), oldest run first, applying the lifecycle rules and the ADR-009 purge. It then redacts every comment deleted upstream from all saved runs, and reduces saved runs older than the newest `--keep-runs` (default 3) to IDs, timestamps, counts, and structure, except a run newer than the one ingested and a run labels were made from. Runs are never deleted; each change is logged in `reports/redactions.jsonl`. It prints counts and run IDs only. A reduced run cannot be ingested. `forget` removes every record of one connection; without `--yes` it only counts.
+- `connections`, `store-status`, and `forget` never create the database. Without one they say so and exit 0.
 - `classify` runs B1 (heuristic) or B2 (a local model through Ollama, whose model-boundary path is signed off) over stored comments from others, incrementally, and applies the priority policy. It refuses a provider whose path is not signed off and a model whose digest differs from its pin.
 - `store-status` prints the store's comments by lifecycle state and its lifecycle events, counts only.
 - `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.1`, or the candidate `pp-v0.2`), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.

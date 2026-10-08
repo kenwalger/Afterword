@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 12 (2026-10-08)
+**Version:** 13 (2026-10-08)
+
+v13 (2026-10-08, later the same day) records that the purge also redacts saved probe runs, outside the store (ADR-009, amended 2026-10-08). The store's records are unchanged.
 
 v12 (2026-10-08, later the same day) adds `ai_self_disclosed` to EvaluationLabel (`lg-v0.6`), and records the platform AI-disclosure value as a dormant observation, not stored. Nothing earlier is removed.
 
@@ -140,7 +142,7 @@ A deletion placeholder's payload is a new SourceRecord because its hash differs.
 
 Every change of `lifecycle_state`, kept after any purge: `event_id`, `comment_id`, `sync_run_id`, `from_state`, `to_state`, `reason` (such as `first_observed`, `text_changed`, `absent`, `source_placeholder`, `purge`), `occurred_at`.
 
-The purge runs in the same ingest that detects the deletion, which is no later than ADR-009's "at the next sync". A comment deleted after it was observed ends `PURGED`; a placeholder first observed without content stays `DELETED_UPSTREAM`, since nothing was held to purge. Model text derived from the comment (`raw_output`, `explanation`) is purged with it; class, flags, and tiers remain as non-content judgments.
+The purge runs in the same ingest that detects the deletion, which is no later than ADR-009's "at the next sync". A comment deleted after it was observed ends `PURGED`; a placeholder first observed without content stays `DELETED_UPSTREAM`, since nothing was held to purge. Model text derived from the comment (`raw_output`, `explanation`) is purged with it; class, flags, and tiers remain as non-content judgments. The same ingest redacts the comment in the saved probe runs on disk, which are not part of the store (ADR-009, amended 2026-10-08).
 
 #### Placeholders are structure only
 

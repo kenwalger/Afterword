@@ -94,7 +94,10 @@ def test_baseline_command_ignores_practice_records(tmp_path, fake_dev, monkeypat
     (run_dir,) = (tmp_path / cli.RAW_ROOT).iterdir()
     seed(tmp_path)
     assert cli.main(["--root", str(tmp_path), "baseline", "--run", run_dir.name]) == 0
-    assert "valid review timings: 1, practice or unconfirmed ignored: 4" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Timed reads recorded: 1" in out
+    # Practice records and claim IDs stay in the written report, off the console.
+    assert "practice" not in out.lower() and "C-009" not in out
     report = json.loads(
         (tmp_path / cli.REPORT_ROOT / f"baseline-{run_dir.name}.json").read_text(encoding="utf-8")
     )
@@ -109,4 +112,4 @@ def test_baseline_command_names_a_replacement_week(tmp_path, fake_dev, monkeypat
     base = ["--root", str(tmp_path), "baseline", "--run", run_dir.name]
     assert cli.main([*base, "--exclude-week", "not-a-date"]) == 2
     assert cli.main([*base, "--exclude-week", "2026-09-21", "--exclude-week", "2026-09-07"]) == 0
-    assert "replacement typical week: " in capsys.readouterr().out
+    assert "Suggested typical week to time: " in capsys.readouterr().out

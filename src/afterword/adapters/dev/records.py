@@ -286,6 +286,38 @@ COMMENT_KEYS: frozenset[str] = PLACEHOLDER_KEYS | PLATFORM_WIDE_KEYS
 REQUIRED_USER_KEYS: frozenset[str] = frozenset({"user_id"})
 
 
+# Saved-run redaction (ADR-009, amended 2026-10-08; afterword.adapters.dev.redact).
+# A comment node that Afterword redacted carries this key; its value names the reason.
+REDACTION_KEY: str = "afterword_redaction"
+REASON_DELETED: str = "deleted_upstream"
+REASON_RETENTION: str = "retention"
+
+
+def redaction_reason(node: dict[str, Any]) -> str | None:
+    """Return why Afterword redacted a comment node in a saved run, if it did.
+
+    :param node: Comment payload.
+    :returns: :data:`REASON_DELETED`, :data:`REASON_RETENTION`, or ``None``.
+    """
+    marker = node.get(REDACTION_KEY)
+    if isinstance(marker, dict) and marker.get("reason") in (REASON_DELETED, REASON_RETENTION):
+        return str(marker["reason"])
+    return None
+
+
+def is_withdrawn(node: dict[str, Any]) -> bool:
+    """Report whether a node stands for a comment deleted upstream.
+
+    True for DEV's own deletion placeholder and for a comment whose text and
+    author Afterword removed from a saved run after the deletion was recorded.
+    Either way it is thread structure only, never a comment from anyone.
+
+    :param node: Comment payload.
+    :returns: ``True`` for a placeholder or a comment redacted as deleted.
+    """
+    return is_deletion_placeholder(node) or redaction_reason(node) == REASON_DELETED
+
+
 def is_deletion_placeholder(node: dict[str, Any]) -> bool:
     """Report whether a node is DEV's deletion placeholder.
 
@@ -318,7 +350,7 @@ def is_unexpected_shape(node: dict[str, Any]) -> bool:
     :param node: Comment payload.
     :returns: ``True`` if keys or ``user`` fall outside the observed shapes.
     """
-    if is_deletion_placeholder(node):
+    if is_deletion_placeholder(node) or redaction_reason(node) is not None:
         return False
     user = node.get("user")
     return (
@@ -499,7 +531,7 @@ def load_run(run_dir: Path, *, include_text: bool = False) -> RunObservations:
     comments = []
     for article_id, nodes in iter_run_comments(run_dir, article_ids):
         for n in nodes:
-            placeholder = is_deletion_placeholder(n.node)
+            placeholder = is_withdrawn(n.node)
             body = n.node.get("body_html") if include_text and not placeholder else None
             comments.append(
                 ObservedComment(

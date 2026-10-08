@@ -1,6 +1,8 @@
 # Privacy and Boundaries
 
-**Version:** 8 (2026-10-08)
+**Version:** 9 (2026-10-08)
+
+v9 extends the deletion rule to saved probe runs and adds their retention rule (ADR-009, amended 2026-10-08), so the rules and the code agree. Nothing else changes.
 
 v8 points "External testing" to the statement it requires, `USING-AFTERWORD-ON-YOUR-ACCOUNT.md`. No rule changes.
 
@@ -146,6 +148,8 @@ V1 does not publish replies, hide comments, block users, react, or make moderati
 
 - Raw payloads and normalized bodies are kept while the comment exists upstream.
 - When a comment reaches `DELETED_UPSTREAM`, its body text and raw payloads are purged from local storage, including from corpus files, at the next sync (ADR-009).
+- That includes saved probe runs: the same ingest redacts the comment's text and author fields in every saved run under `fixtures/dev-api/source/real/`, keeping its ID, time, and place in the thread. Runs are never deleted. Each redaction (run, comment ID, date) is recorded in the git-ignored `reports/redactions.jsonl`.
+- Retention: saved runs older than the newest three (`afterword ingest --keep-runs N`) are reduced at ingest to IDs, timestamps, counts, and thread structure. A run newer than the one being ingested, and a run that labels were made from, are kept whole; the second is still redacted for deletions.
 - Identifiers, lifecycle history, and non-content judgments (grades, dispositions) may remain so that published evaluation counts stay explainable.
 - Results computed before a purge remain as recorded. Re-runs report the purged comment as withdrawn. This reproducibility cost is accepted.
 - A single command removes all local data for a platform connection.

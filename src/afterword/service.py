@@ -41,6 +41,7 @@ from afterword import (
     timing,
 )
 from afterword.adapters.dev import records
+from afterword.adapters.dev import redact as dev_redact
 from afterword.adapters.dev import sync as dev_sync
 from afterword.adapters.dev.client import ENV_VAR, DevClient, MissingCredentialError
 from afterword.adapters.dev.probe import (
@@ -66,6 +67,10 @@ RAW_ROOT: Path = Path("fixtures/dev-api/source/real")
 STORE_PATH: Path = Path("data/afterword.sqlite3")
 REPORT_ROOT: Path = Path("reports")
 LOCK_FILE: str = ".probe.lock"
+# Every redaction of a saved run, one JSON line each (git-ignored; ADR-009).
+REDACTION_LOG: Path = REPORT_ROOT / "redactions.jsonl"
+# Saved runs kept whole by the retention rule; older ones are reduced (ADR-009).
+KEEP_RUNS: int = 3
 
 
 class ServiceError(Exception):
@@ -527,6 +532,30 @@ def open_store(root: Path) -> Repository:
     return SqliteRepository(root / STORE_PATH)
 
 
+class NoStoreError(ServiceError):
+    """Raised by a read-only store command when no store exists. Not a failure."""
+
+    def __init__(self) -> None:
+        """Create the error with its plain-language message."""
+        super().__init__(
+            f"No local database yet ({STORE_PATH.as_posix()} does not exist), so there is "
+            "nothing to show or delete. It is created by `afterword ingest`.",
+            code=0,
+        )
+
+
+def open_existing_store(root: Path) -> Repository:
+    """Open the local store for a read-only command, never creating it.
+
+    :param root: Repository root; the store is the git-ignored :data:`STORE_PATH`.
+    :returns: The repository.
+    :raises NoStoreError: If no store exists.
+    """
+    if not (root / STORE_PATH).exists():
+        raise NoStoreError()
+    return SqliteRepository(root / STORE_PATH)
+
+
 @dataclass(frozen=True)
 class IngestResult:
     """What one ingest did. Counts and IDs only, safe to print."""
@@ -536,26 +565,53 @@ class IngestResult:
     sync_run_id: str
     counts: dict[str, int]
     limitations: tuple[str, ...]
+    saved_runs: SavedRunRedaction
+
+
+@dataclass(frozen=True)
+class SavedRunRedaction:
+    """What an ingest changed in the saved runs (ADR-009). Counts and run IDs only."""
+
+    # Deleted comments whose text and author were removed, counted once per run.
+    withdrawn_redactions: int
+    # Runs reduced by the retention rule in this ingest.
+    runs_reduced: tuple[str, ...]
+    # Runs past the retention limit kept whole because labels were made from them.
+    runs_kept_for_labels: tuple[str, ...]
 
 
 def ingest_run(
-    root: Path, run_id: str, *, now: Callable[[], datetime] = lambda: datetime.now(UTC)
+    root: Path,
+    run_id: str,
+    *,
+    keep_runs: int = KEEP_RUNS,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> IngestResult:
     """Ingest one saved probe run into the store, applying the lifecycle rules and the purge.
 
     Runs are ingested oldest first, each once. The connection is the one for the
-    run's account; it is created on first ingest.
+    run's account; it is created on first ingest. After the store is updated,
+    the saved runs are redacted (:func:`redact_saved_runs`).
 
     :param root: Repository root.
     :param run_id: Probe run ID.
+    :param keep_runs: Saved runs kept whole by the retention rule (at least 1).
     :param now: Wall clock.
-    :returns: The connection, counts by lifecycle outcome, and limitations.
-    :raises ServiceError: If the run is missing or failed, names no account, was
-        already ingested, or finished before the last ingested run.
+    :returns: The connection, counts by lifecycle outcome, limitations, and what
+        changed in the saved runs.
+    :raises ServiceError: If ``keep_runs`` is below 1, or the run is missing,
+        failed, reduced by the retention rule, names no account, was already
+        ingested, or finished before the last ingested run.
     """
+    if keep_runs < 1:
+        raise ServiceError("--keep-runs must be at least 1")
     run_dir = root / RAW_ROOT / run_id
     if not (run_dir / records.RUN_FILE).exists():
         raise ServiceError(f"no probe run {run_id}")
+    if dev_redact.is_reduced(run_dir):
+        raise ServiceError(
+            f"run {run_id} was reduced by the retention rule and holds no text; nothing to ingest"
+        )
     obs = dev_sync.load_sync(run_dir)
     if obs.outcome == "FAILED":
         raise ServiceError(f"run {run_id} failed; nothing to ingest")
@@ -603,15 +659,116 @@ def ingest_run(
             for comment_id, keep in plan.purges:
                 repo.purge_source_records(cid, comment_id, keep=keep, purged_at=purged_at)
                 repo.purge_classifications(cid, comment_id)
+        withdrawn = sorted(
+            c.source_object_id
+            for c in repo.comments(cid).values()
+            if c.lifecycle_state in (domain.DELETED_UPSTREAM, domain.PURGED)
+        )
     finally:
         repo.close()
+    saved = redact_saved_runs(
+        root, withdrawn, latest_ingested=run_id, keep_runs=keep_runs, on=domain.utc(now()).date()
+    )
     return IngestResult(
         connection_id=cid,
         created_connection=created,
         sync_run_id=run_id,
         counts=dict(plan.counts),
         limitations=plan.sync_run.limitations_observed,
+        saved_runs=saved,
     )
+
+
+def labeled_run_ids(root: Path) -> set[str]:
+    """Return the runs that any label or batch record was made from.
+
+    Reads only the ``snapshot_run_id`` of each record, never a label's content.
+
+    :param root: Repository root.
+    :returns: Run IDs, across every corpus version.
+    """
+    base = root / label_records.LABEL_ROOT
+    versions = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
+    found: set[str] = set()
+    for version in versions:
+        for record in [
+            *label_records.read_labels(root, version),
+            *label_records.read_batches(root, version),
+        ]:
+            run = record.get("snapshot_run_id")
+            if isinstance(run, str):
+                found.add(run)
+    return found
+
+
+def redact_saved_runs(
+    root: Path,
+    withdrawn: Iterable[str],
+    *,
+    latest_ingested: str,
+    keep_runs: int = KEEP_RUNS,
+    on: date,
+) -> SavedRunRedaction:
+    """Apply ADR-009 to the saved probe runs, and log every change.
+
+    1. **Withdrawn comments:** the text and author of every comment deleted
+       upstream are removed from every saved run that holds them.
+    2. **Retention:** a run older than the newest ``keep_runs`` saved runs, and
+       not newer than the latest ingested run, is reduced to IDs, timestamps,
+       counts, and thread structure. A run that labels were made from is kept
+       whole (its text is the context the labels were made in), and reported.
+
+    No run is ever deleted. Each redaction is appended to :data:`REDACTION_LOG`.
+
+    :param root: Repository root.
+    :param withdrawn: Source IDs of comments deleted upstream.
+    :param latest_ingested: The run just ingested; newer saved runs are not reduced.
+    :param keep_runs: Saved runs kept whole (at least 1).
+    :param on: Date of the redaction.
+    :returns: Counts and run IDs.
+    """
+    raw_root = root / RAW_ROOT
+    entries: list[dict[str, Any]] = []
+    redactions = dev_redact.redact_withdrawn(raw_root, withdrawn, on=on)
+    entries += [
+        {
+            "date": on.isoformat(),
+            "reason": "deleted_upstream",
+            "run_id": r.run_id,
+            "comment_id": r.source_object_id,
+        }
+        for r in redactions
+    ]
+    dirs = dev_redact.run_dirs(raw_root)
+    newest = {d.name for d in dirs[-keep_runs:]}
+    labeled = labeled_run_ids(root)
+    reduced: list[str] = []
+    kept: list[str] = []
+    for run_dir in dirs:
+        if run_dir.name in newest or run_dir.name > latest_ingested:
+            continue
+        if dev_redact.is_reduced(run_dir):
+            continue
+        if run_dir.name in labeled:
+            kept.append(run_dir.name)
+            continue
+        comments = dev_redact.reduce_run(run_dir, on=on)
+        reduced.append(run_dir.name)
+        entries.append(
+            {
+                "date": on.isoformat(),
+                "reason": "retention",
+                "run_id": run_dir.name,
+                "comments_reduced": comments,
+            }
+        )
+    if entries:
+        log = root / REDACTION_LOG
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
+    return SavedRunRedaction(len(redactions), tuple(reduced), tuple(kept))
 
 
 @dataclass(frozen=True)
@@ -626,9 +783,10 @@ def list_connections(root: Path) -> list[ConnectionSummary]:
     """List the store's connections with their record counts.
 
     :param root: Repository root.
-    :returns: Connections, oldest first.
+    :returns: Connections, oldest first. Without a store, :class:`NoStoreError`
+        propagates from :func:`open_existing_store` and nothing is created.
     """
-    repo = open_store(root)
+    repo = open_existing_store(root)
     try:
         return [
             ConnectionSummary(c, repo.count_connection(c.connection_id))
@@ -644,9 +802,10 @@ def store_status(root: Path, connection_id: str | None = None) -> dict[str, dict
     :param root: Repository root.
     :param connection_id: Connection ID; ``None`` when the store has exactly one.
     :returns: Counts only (:meth:`afterword.repository.Repository.lifecycle_counts`).
-        An unknown or ambiguous connection raises :class:`ServiceError`.
+        An unknown or ambiguous connection raises :class:`ServiceError`; a
+        missing store raises :class:`NoStoreError` (nothing is created).
     """
-    repo = open_store(root)
+    repo = open_existing_store(root)
     try:
         cid = _pick_connection(repo, connection_id)
         return repo.lifecycle_counts(cid)
@@ -661,9 +820,10 @@ def forget_connection(root: Path, connection_id: str, *, confirm: bool) -> dict[
     :param connection_id: Connection ID.
     :param confirm: ``False`` only counts what would be deleted.
     :returns: Rows deleted (or that would be), by record type.
-    :raises ServiceError: If the connection does not exist.
+    :raises ServiceError: If the connection does not exist. Without a store,
+        :class:`NoStoreError` propagates and nothing is created.
     """
-    repo = open_store(root)
+    repo = open_existing_store(root)
     try:
         if repo.get_connection(connection_id) is None:
             raise ServiceError(f"no connection {connection_id}")

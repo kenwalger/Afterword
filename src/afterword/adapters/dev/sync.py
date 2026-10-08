@@ -143,7 +143,7 @@ def _comment(
     article_id: int, n: records.CommentNode, author: records.AuthorIdentity
 ) -> SyncedComment:
     node = n.node
-    if records.is_deletion_placeholder(node):
+    if records.is_withdrawn(node):
         shape = SHAPE_PLACEHOLDER
     elif records.is_unexpected_shape(node):
         shape = SHAPE_UNEXPECTED

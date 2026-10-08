@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, date, datetime
 
 from afterword import baseline
@@ -73,7 +74,9 @@ def test_partial_week_is_excluded_from_statistics():
 
 def test_median_and_p90_weeks_prefer_most_recent_on_ties():
     wt = baseline.build(observations(), as_of=date(2026, 9, 10))["weeks_to_time"]
-    trailing_52, trailing_13 = wt
+    # Five weeks of history: the 52-week and 13-week windows are the same weeks,
+    # so the block appears once.
+    (trailing_52,) = wt
     assert trailing_52["basis"].startswith("trailing 5 complete weeks")
     # Complete weekly counts [2, 1, 1, 0, 0]: median 1 (two candidates), p90 2.
     assert trailing_52["median_week"]["week_start"] == "2026-08-17"
@@ -82,7 +85,19 @@ def test_median_and_p90_weeks_prefer_most_recent_on_ties():
         "week_end": "2026-08-09",
         "comments_from_others": 2,
     }
-    assert trailing_13 == trailing_52 | {"basis": trailing_13["basis"]}
+    assert (
+        baseline.render_markdown(baseline.build(observations(), as_of=date(2026, 9, 10))).count(
+            "Basis: "
+        )
+        == 1
+    )
+
+
+def test_weeks_to_time_has_two_blocks_once_history_is_longer_than_thirteen_weeks():
+    obs = observations()
+    obs.contents.insert(0, ObservedContent("old", ts("2025-01-06"), 0))
+    wt = baseline.build(obs, as_of=date(2026, 9, 10))["weeks_to_time"]
+    assert [w["basis"].split(" complete")[0] for w in wt] == ["trailing 52", "trailing 13"]
 
 
 def test_recent_window_is_thirteen_complete_weeks():
@@ -177,3 +192,21 @@ def test_no_exclusions_means_no_replacement():
     report = baseline.build(observations(), as_of=date(2026, 9, 10))
     assert report["replacement_typical_week"] is None
     assert "Replacement typical week" not in baseline.render_markdown(report)
+
+
+def test_console_summary_is_plain_language_with_one_explanation_per_figure():
+    obs = observations()
+    obs.comments.append(
+        ObservedComment("a", "p1", None, 0, ts("2026-08-04"), False, is_deletion_placeholder=True)
+    )
+    report = baseline.build(obs, as_of=date(2026, 9, 10))
+    lines = baseline.console_summary(report)
+    text = "\n".join(lines)
+    assert not re.search(r"\bC-\d{3}\b|ADR-|\bp90\b|trailing|placeholder|SURFACE", text)
+    figures = [i for i, line in enumerate(lines) if line and not line.startswith("  ")][1:]
+    for i in figures:
+        assert lines[i + 1].startswith("  "), lines[i]
+    assert "Comments from others: 5" in text
+    assert "Deleted comments still holding a place in a thread: 1" in text
+    # The claim references stay in the written report.
+    assert "C-009" in baseline.render_markdown(report)

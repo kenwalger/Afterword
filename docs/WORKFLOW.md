@@ -1,6 +1,8 @@
 # Workflow
 
-**Version:** 5 (2026-10-08)
+**Version:** 6 (2026-10-08)
+
+v6 adds the saved-run retention rule to the rules that apply throughout (ADR-009, amended 2026-10-08).
 
 v5 adds the commands that keep a machine awake on Windows, macOS, and Linux, says that every `afterword` command is the same on all three, and points the setup to the README's new "Try it on your own account" section and to `COMMANDS.md`.
 
@@ -20,6 +22,7 @@ Commands assume the setup in the README, under "Try it on your own account"; eve
 - Never compute the baseline or label from a scoped run (`--article`) or from a run that includes hand-test comments.
 - Practice is allowed, but it is never evidence. A timing run not confirmed as valid is saved under `reports/timing/practice/` and is ignored by every report.
 - Label and timing outputs (`fixtures/labels/`, `reports/timing/`) are opened only by the author. Probe and baseline console output contains counts, statuses, and IDs only, and is safe to share.
+- `afterword ingest` keeps the newest three saved runs whole (`--keep-runs N`) and reduces older ones to structure, with no text. A run labels were made from keeps its text, so labeling, calibration, and self-agreement passes on it still work. Start a new pass from a recent run, and do not ingest with a small `--keep-runs` while a run you mean to label from has no labels yet.
 - Keep the machine awake during long runs (a full probe, a benchmark, a model pass over `dev`): disable sleep for the duration, or keep it plugged in with the lid open. A machine that sleeps mid-request turns a slow answer into a timeout, recorded as `failed:timeout`, and stretches the measured time beyond any client timeout (benchmark 2026-10-04, adv-102).
 
   ```text

@@ -305,14 +305,7 @@ def build(
             "trailing_non_empty_weeks": len(non_empty),
             "trailing_median_of_non_empty_weeks": statistics.median(non_empty) if non_empty else 0,
         },
-        "weeks_to_time": [
-            {
-                "basis": f"trailing {len(window)} complete weeks before {as_of.isoformat()}",
-                "median_week": pick_week(window, desc.get("median", 0)),
-                "p90_week": pick_week(window, desc.get("p90", 0)),
-            }
-            for window, desc in ((trailing, trailing_desc), (recent, recent_desc))
-        ],
+        "weeks_to_time": _weeks_to_time(((trailing, trailing_desc), (recent, recent_desc)), as_of),
         "replacement_typical_week": replacement,
         "weekly": [{**w, "week_start": w["week_start"].isoformat()} for w in weekly],
         "monthly": calendar_months(dated_others, dated_mine, as_of),
@@ -322,6 +315,113 @@ def build(
         },
         "review_timing": review_timing or {"valid": [], "ignored": 0},
     }
+
+
+def _weeks_to_time(
+    windows: Iterable[tuple[list[tuple[date, int]], dict[str, Any]]], as_of: date
+) -> list[dict[str, Any]]:
+    """Pick the median and p90 week of each window, once per distinct window.
+
+    With 13 complete weeks of history or fewer, the 52-week and 13-week windows
+    are the same weeks, and listing both would repeat one block.
+
+    :param windows: Pairs of complete weeks and their statistics, widest first.
+    :param as_of: Date the run finished.
+    :returns: One entry per distinct window.
+    """
+    out: list[dict[str, Any]] = []
+    seen: list[list[tuple[date, int]]] = []
+    for window, desc in windows:
+        if window in seen:
+            continue
+        seen.append(window)
+        out.append(
+            {
+                "basis": f"trailing {len(window)} complete weeks before {as_of.isoformat()}",
+                "median_week": pick_week(window, desc.get("median", 0)),
+                "p90_week": pick_week(window, desc.get("p90", 0)),
+            }
+        )
+    return out
+
+
+def _plain(value: Any) -> str:
+    """Show a whole number without a decimal point, anything else to one decimal."""
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else f"{value:.1f}"
+    return str(value)
+
+
+def console_summary(report: dict[str, Any]) -> list[str]:
+    """Summarize the report in plain language, for the terminal.
+
+    Each figure comes with one line saying what it means. No claim IDs or
+    project terms: those stay in the written report (:func:`render_markdown`).
+
+    :param report: Output of :func:`build`.
+    :returns: Lines to print, counts only.
+    """
+    t = report["totals"]
+    pa = report["per_article_from_others"]
+    recent = report["per_week_from_others"]["trailing_13_weeks"]
+    half = pa["concentration"]["articles_to_reach_50pct"]
+    lines = [
+        f"Comment volume, from run {report['run_id']} (as of {report['as_of']})",
+        "",
+        f"Posts: {t['articles']}",
+        "  Your published posts that this run read.",
+        f"Comments from others: {t['comments_from_others']}",
+        "  Comments by anyone but you: the ones you would read, and might answer.",
+        f"Your own comments: {t['comments_by_author']}",
+        "  Your replies on your own posts; counted here, left out of every figure below.",
+        f"Posts with at least one comment from others: "
+        f"{t['articles_with_comments_from_others']} of {t['articles']}",
+        "  How many of your posts started a conversation.",
+    ]
+    if pa.get("n"):
+        lines += [
+            f"Comments from others per post: median {_plain(pa['median'])}, "
+            f"busiest post {_plain(pa['max'])}",
+            "  Half your posts have no more than the median; the busiest shows the peak.",
+        ]
+    if half is not None:
+        lines += [
+            f"Posts holding half of the comments from others: {half}",
+            "  The smaller this is, the more your conversation gathers on a few posts.",
+        ]
+    if recent.get("n"):
+        lines += [
+            f"Comments from others per week, last {recent['n']} complete weeks: "
+            f"median {_plain(recent['median'])}, busiest week {_plain(recent['max'])}",
+            "  A typical recent week, and the heaviest one, in comments to read.",
+        ]
+    else:
+        lines += ["Comments from others per week: no complete weeks yet."]
+    if t["deletion_placeholders"]:
+        lines += [
+            f"Deleted comments still holding a place in a thread: {t['deletion_placeholders']}",
+            "  Deleted, but kept in its thread so replies stay in place; not anyone's comment.",
+        ]
+    valid = report["review_timing"]["valid"]
+    if valid:
+        lines += [
+            f"Timed reads recorded: {len(valid)}",
+            "  Your own timed, oldest-first reads of a week; details in the full report.",
+        ]
+    replacement = report.get("replacement_typical_week")
+    if replacement:
+        week = replacement["week"]
+        lines += [
+            "Suggested typical week to time: "
+            + (
+                f"{week['week_start']} to {week['week_end']} "
+                f"({week['comments_from_others']} comments from others)"
+                if week
+                else "none"
+            ),
+            "  The complete recent week closest to the median, skipping the weeks you excluded.",
+        ]
+    return lines
 
 
 def _stats_row(label: str, d: dict[str, Any]) -> str:

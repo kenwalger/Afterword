@@ -1,6 +1,8 @@
 # Using Afterword on your own account
 
-**Version:** 1 (2026-10-08)
+**Version:** 2 (2026-10-08)
+
+v2: saved probe runs are now redacted when a comment is deleted, and older runs are reduced to structure ("When a commenter deletes a comment", "How long saved runs keep text"). Read-only database commands no longer create a database.
 
 This is the statement `PRIVACY-AND-BOUNDARIES.md` requires before another author uses Afterword ("External testing"). It covers what Afterword collects when you run it against your own DEV account, where that goes, what is sent to any model, what the tool can and cannot do, how your key is handled, and how to delete everything.
 
@@ -38,7 +40,8 @@ Everything stays in your clone, in folders git ignores, so a `git add` or a pull
 | `fixtures/dev-api/source/real/<run-id>/` | `probe` | The raw responses: your posts and every comment, with commenter profile fields. |
 | `reports/probe/<run-id>/` | `probe` | Findings about the API (counts, field shapes, rate limits) and a comment index of opaque IDs, timestamps, and hashes. No comment text and no names. |
 | `reports/baseline-<run-id>.md` and `.json` | `baseline` | Counts only: comments per post and per week, and how they are spread. |
-| `data/afterword.sqlite3` | `ingest` and later commands | The local database, if you go beyond the "Try it" steps: posts, comments, and their history. |
+| `data/afterword.sqlite3` | `ingest` and later commands | The local database, if you go beyond the "Try it" steps: posts, comments, and their history. Commands that only read it (`connections`, `store-status`, `forget` without `--yes`) never create it. |
+| `reports/redactions.jsonl` | `ingest` | A record of every change `ingest` made to saved runs: run, comment ID, and date. No text. |
 | `fixtures/labels/`, `reports/timing/` | `label`, `label-ui` | Your own labels and timing records, if you label. |
 | `reports/eval/`, `reports/bench/` | `evaluate`, `dev-subset`, `dev-analysis`, `bench` | Counts, comment IDs, and synthetic results. |
 | `.env` | You | Your DEV API key. |
@@ -103,4 +106,12 @@ Then revoke your key on DEV and delete `.env`. Deleting the whole clone also rem
 
 ## When a commenter deletes a comment
 
-When a comment is deleted on DEV, Afterword's database removes its text the next time a newer probe run is ingested (ADR-009). The raw responses of earlier probe runs are files on your disk and are not rewritten: a run saved before the deletion still contains the comment. Delete probe runs you no longer need from `fixtures/dev-api/source/real/`.
+Afterword notices a deletion when you ingest a newer probe run (`afterword ingest`): DEV either shows the comment as a placeholder, or the comment is missing from two runs in a row (ADR-009). That same ingest removes the comment's text from the database and redacts it in every saved run on your disk: its text and the commenter's name, handle, and profile fields go, and only its ID, its time, and its place in the thread stay. Saved runs are rewritten, never deleted, and each redaction is recorded in `reports/redactions.jsonl` (run, comment ID, date).
+
+If you only ever run `probe` and `baseline`, nothing is ingested and nothing is redacted: delete runs you no longer need from `fixtures/dev-api/source/real/`.
+
+## How long saved runs keep text
+
+Each `ingest` keeps the newest three saved runs whole and reduces older ones to IDs, timestamps, counts, and thread structure: no comment text, no names or handles, no post titles or bodies. The volume counts from a reduced run stay the same. Choose a different number with `afterword ingest --run <run-id> --keep-runs N`.
+
+Two kinds of run keep their text past that limit: a run newer than the one being ingested, and a run you labeled comments from (the labels depend on it). Deleted comments are still redacted in both. Runs are never deleted; to remove one, delete its folder.
