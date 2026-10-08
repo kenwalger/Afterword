@@ -63,7 +63,7 @@ Everything is saved inside your clone, in folders git ignores. To remove it, del
 - **DEV only.** Other platforms wait until the experiment has a result.
 - **Expect change.** There is no installer and no review interface yet, and commands and documents change between commits.
 - **Issues and findings are welcome,** especially from running the steps above on your own account: API surprises, counts that look wrong, or anything that assumed the author's machine. Please share counts and descriptions, never other people's comments.
-- **Pull requests:** _policy to come._
+- **Pull requests:** Issues and findings are welcome; for pull requests, please open an issue first so we can discuss.
 
 ## For contributors
 
