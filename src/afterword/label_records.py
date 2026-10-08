@@ -438,7 +438,8 @@ def oracle_ceiling(
         comments by tier, the collapsed count (review reduction), the
         consequential comments surfaced (``SURFACE`` or ``QUEUE``), and
         ``surface_precision`` as [consequential at ``SURFACE``, all at
-        ``SURFACE``]. Counts only.
+        ``SURFACE``], and ``surface_capture`` as [consequential at ``SURFACE``,
+        all consequential]. Counts only.
     """
     records = list(labels)
     out: dict[str, dict[str, Any]] = {}
@@ -464,6 +465,10 @@ def oracle_ceiling(
             "surface_precision": [
                 consequential[policy.Tier.SURFACE.name],
                 tiers[policy.Tier.SURFACE.name],
+            ],
+            "surface_capture": [
+                consequential[policy.Tier.SURFACE.name],
+                sum(consequential.values()),
             ],
         }
     return out

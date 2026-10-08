@@ -63,6 +63,9 @@ class Provider(Protocol):
     identity: ModelIdentity
     # A conservative cap on prompt characters, or None when the context is large.
     max_input_chars: int | None
+    # Generation options that can change the answer, recorded in the cache key;
+    # None when the provider has none beyond the model, prompt, and output cap.
+    options_key: str | None
 
     def verify(self) -> ModelIdentity:
         """Check that the model to be used is the pinned, approved one.

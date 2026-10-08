@@ -118,3 +118,12 @@ def test_unresolved_article_scope_never_prints_the_path(tmp_path, fake_dev, monk
     captured = capsys.readouterr()
     assert "some_handle" not in captured.out + captured.err
     assert "scope article:unresolved" in captured.out
+
+
+def test_classify_counts_comments_not_articles():
+    stream = io.StringIO()
+    line = StatusLine(stream, interactive=False)
+    line.start("classify")
+    line.step("classify", 25, 458)
+    out = stream.getvalue()
+    assert "comment 25 of 458 (classify)" in out and "article" not in out

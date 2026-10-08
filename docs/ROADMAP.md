@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 6 (2026-10-08)
+**Version:** 7 (2026-10-08)
+
+v7 records `lg-v0.5` (`read_via_translation`) and the first dev-set evaluation of a model (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`; nothing chosen).
 
 v6 records the Stage 1 gate decision (passed, with a caveat) and adds a read-only ID-list viewer to the Stage 3a backlog.
 
@@ -21,7 +23,7 @@ Goal: define the question before implementation changes it.
 - [x] Project brief and scope (v2)
 - [x] Provisional taxonomy (`tax-v0.1`; `tax-v0.2` from 2026-10-04, no class changes)
 - [x] Provisional priority policy (`pp-v0.1`)
-- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel)
+- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel; `lg-v0.5` from 2026-10-08 adds `read_via_translation`)
 - [x] ADR-001 to ADR-013 (ADR-001 to ADR-011 with the design; ADR-012, the service layer, and ADR-013, local-first with a hosted path preserved, added 2026-10-03)
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
@@ -165,7 +167,7 @@ Cross-platform identity reconciliation, Substack, LinkedIn, additional analytics
 
 - Labeler calibration exercise (`LABELING-AT-SCALE.md`, Labeler onboarding): about 20 synthetic comments with researcher-approved reference labels and rationales, covering the boundaries that change a tier or proved hard in V1 labeling; reveal-after-answer in the label UI; agreement summarized per boundary; answers recorded as `sample_kind: calibration_exercise` and excluded from every measure. Gated on the Stage 3 result, except that a minimal version may be built earlier as an optional refresher for the author's calibration pass.
 - External interface (ADR-012): a local MCP server first, possibly an HTTP API later, over the application service layer. Gated on the Stage 3 result; see `SCOPE.md` (Future candidates) for its limits.
-- Future features (`FUTURE-FEATURES.md`), each gated on the Stage 3 result, with proposed claims C-013 to C-019 (`CLAIMS.md`). Grouping by commenter stays excluded without the C-005 evaluation and its own ADR. In the suggested order, for the author:
+- Future features (`FUTURE-FEATURES.md`), each gated on the Stage 3 result, with proposed claims C-013 to C-019, and C-020 for multilingual comments (`CLAIMS.md`). Grouping by commenter stays excluded without the C-005 evaluation and its own ADR. In the suggested order, for the author:
   1. Spike insurance (C-012).
   2. Propagation ledger with assisted suggestions (C-013).
   3. Rediscovery, cheap version: no new model work (C-014).

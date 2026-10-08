@@ -420,3 +420,413 @@ Times are UTC. No comment text, names, or handles: every figure below is a count
 **Consequence:** The subset is class-balanced, not natural-rate, so its recall and reduction are not estimates of the full set's: it is for comparing the two models' behavior and speed, and for catching problems before the overnight passes. `classify` and `evaluate` take `--ids`.
 
 **Follow-up:** The author runs both models on it, then the full passes (Part C1 commands).
+
+## Session 8: subset runs, before the overnight passes (2026-10-08)
+
+### 2026-10-08 02:20 - input_too_long came from the guard's margin, not the context
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** PROJECT
+
+**Task:** Explain the 2 `failed:input_too_long` outcomes, which were the same 2 comments for both models on the 50-comment subset, and fit the full model input without truncating comment text.
+
+**Expectation:** Real comments fit the 2048-token context, as every synthetic case did.
+
+**Observation:**
+- Full model input (system prompt, 2,469 characters, plus the rendered title, parent, and comment) across all 458 stored comments from others: median 3,438 characters, p90 4,259, p99 5,407, max 5,953.
+- Tokens are estimated, not counted: no tokenizer runs offline, and calling Ollama on real comments is the author's to do. At the guard's conservative 3 characters per token, the longest is about 1,984 tokens; at the 4.4 measured on the synthetic sets, about 1,353. Inputs over 2048 tokens: 0 at either estimate; over 4096 and over 8192: 0.
+- The guard refuses any input over (2048 - 200) x 3 = 5,544 characters, which 3 of the 458 exceed, including the 2 in the subset. Ollama itself would probably have fit them; the guard exists so nothing is ever silently cut.
+
+**Evidence:** `afterword.service._subjects` and `classifier.render_user` over the store, lengths only.
+
+**Workaround:** `num_ctx` raised to 4096 (`ollama.NUM_CTX`): at the conservative estimate, the guard now admits about 11,688 characters, about twice the longest input. No comment text is truncated.
+
+**Consequence:**
+- The generation options are now part of the cache key: `model_options`, such as `num_ctx=4096;num_predict=200;seed=20261003;temperature=0`. Store schema 2 adds the column, and the migration records the options earlier Ollama rows ran with (2048). `evaluate --num-ctx 2048` scores those earlier runs. DATA-MODEL v10, PRIVACY-AND-BOUNDARIES v5 (path A's context size; nothing else changes), EVALUATION v13 (versioning).
+- Run time: the context size changes memory, not the work per token, which is set by the input length. The subset took about 30 s per comment sent for qwen and 44 s for llama (more than the synthetic 23 and 26, since real inputs are longer). The new key means the full pass reclassifies all 458, the subset included: about 5.6 hours for llama, 3.8 for qwen. The 3 long inputs add a few minutes, and Ollama reloads the model once for the new context size.
+- Synthetic benchmarks now also run at 4096, so a future benchmark is not like for like with the 2026-10-03 and 2026-10-04 runs on this option.
+
+**Follow-up:** Record measured input tokens per classification (Ollama returns them), so the next estimate is a count; not done this session.
+
+### 2026-10-08 02:30 - First model runs on real comments: the 50-comment subset
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** Score both models on the subset against the author's labels, under `pp-v0.1` and `pp-v0.2`, beside B1 and the oracle on the same 50.
+
+**Expectation:** None fixed. The subset is class-balanced, so its tier shares are not natural rates.
+
+**Observation (all 50; the 2 failed comments count as `SURFACE`, as the policy assigns them):**
+
+| Condition | Outcomes | Consequential surfaced | Collapsed | SURFACE | SURFACE precision | SURFACE capture | Flag-caused raises (graded 0 or 1) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| B1 `hb-v0.2`, either policy | 50 OK | 14 of 16 | 11 | 23 | 10 of 23 | 10 of 16 | 0 |
+| qwen, `pp-v0.1` | 45 OK, 3 malformed, 2 failed | 16 of 16 | 0 | 30 | 9 of 30 | 9 of 16 | 8 (8) |
+| qwen, `pp-v0.2` | same | 16 of 16 | 3 | 30 | 9 of 30 | 9 of 16 | 5 (5) |
+| llama, `pp-v0.1` | 48 OK, 2 failed | 16 of 16 | 4 | 23 | 9 of 23 | 9 of 16 | 3 (3) |
+| llama, `pp-v0.2` | same | 16 of 16 | 7 | 23 | 9 of 23 | 9 of 16 | 0 |
+| Oracle, class and flags, `pp-v0.1` | | 16 of 16 | 10 | 16 | 10 of 16 | 10 of 16 | |
+| Oracle, class and flags, `pp-v0.2` | | 16 of 16 | 11 | 16 | 10 of 16 | 10 of 16 | |
+
+- Excluding the 2 comments both models failed (48 left, still 16 consequential): B1 collapses 11 with SURFACE 21 (10 of 21); qwen 0 and 3 collapsed, SURFACE 28 (9 of 28); llama 4 and 7, SURFACE 21 (9 of 21); oracle 10 (`pp-v0.1`) and 11 (`pp-v0.2`), SURFACE 15.
+- Model flag precision against the labels (set, agreeing): qwen `REFERENCES_SPECIFIC_CLAIM` 35, 13; `NEEDS_THREAD_CONTEXT` 20, 3; `ADDRESSED_TO_OTHER_COMMENTER` 15, 0; `POSSIBLE_INSTRUCTION_TEXT` 5, 0; `HOSTILE_TONE` 4, 1. llama `REFERENCES_SPECIFIC_CLAIM` 26, 11; `NEEDS_THREAD_CONTEXT` 29, 7; `HOSTILE_TONE` 1, 0. Every flag-caused raise was of a comment graded 0 or 1.
+- Both models surface every consequential comment on the subset; B1 misses 2. Neither model puts more consequential comments at `SURFACE` than B1 (9 against 10).
+
+**Evidence:** `afterword.service.evaluate_condition` with `--ids` and `--num-ctx 2048` (counts only); git-ignored `reports/eval/subset-preview.json`.
+
+**Workaround:** None.
+
+**Consequence:** Informational; 50 class-balanced comments decide nothing. `pp-v0.2` removed every flag-caused raise for llama, costing no consequential comment here.
+
+**Follow-up:** The full llama pass, then the C2 write-up.
+
+### 2026-10-08 02:35 - Qwen on the subset: informational
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Record qwen's subset result, as the author asked.
+
+**Expectation:** None.
+
+**Observation:** Qwen (`qwen3:4b-instruct-2507-q4_K_M`, 2048 context) collapsed 0 of 50 under `pp-v0.1`, with 3 malformed outputs (`duplicate_flag`) and 2 failed (`input_too_long`). That matches the synthetic benchmark under `pr-v0.2` (0 of 59 collapsed, `duplicate_flag` 3 of 59): it sets judgment flags on most comments, and `ADDRESSED_TO_OTHER_COMMENTER` 15 times with no label agreeing.
+
+**Evidence:** The author's run output; the scores above.
+
+**Workaround:** None.
+
+**Consequence:** Qwen's full pass is optional, as a secondary comparison only (`EVALUATION.md`, "Which model is B2").
+
+**Follow-up:** The author decides whether to run it.
+
+### 2026-10-08 02:40 - SURFACE measures accepted; class is a weak proxy for consequence
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** Apply the author's decisions on the SURFACE proposal and the class-to-tier finding.
+
+**Expectation:** None.
+
+**Observation:**
+- Proposal accepted with one addition, SURFACE capture (the share of consequential comments at `SURFACE`): on 302 labels the oracle gives 30 of 84, B1 50 of 84. Moved to `docs/proposals/accepted/`; `EVALUATION.md` v13 makes SURFACE size, precision, and capture co-primary with recall and reduction.
+- Finding: under `pp-v0.1` even perfect classification places 54 of 84 consequential comments at `QUEUE`. Consequential comments are mostly `TECHNICAL_EXTENSION` (49) and `CONVERSATIONAL` (4), which default to `QUEUE`, while `TECHNICAL_QUESTION` defaults to `SURFACE` although 22 of its 46 labeled comments are graded 1. Class is a weak proxy for consequence.
+
+**Evidence:** `EVALUATION.md` (label summary, oracle ceiling); `afterword evaluate` reports.
+
+**Workaround:** None. The policy is unchanged.
+
+**Consequence:** Dated entries on C-001, C-002, and C-008. "How should consequence reach the tier?" is recorded in `EVALUATION.md` as the open design question for session 9, with its tension with ADR-007: a model-reported importance would bring back model-chosen priority and the manipulation risk ADR-007 and ADR-008 removed.
+
+**Follow-up:** Session 9.
+
+## Session 8: Part C2, dev-set evaluation and small items (2026-10-08)
+
+Times are UTC. No comment text, names, or handles: every figure below is a count, computed by code that printed aggregates only.
+
+### 2026-10-08 13:20 - Orientation for C2, at the source
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** Orientation: check labels, timing records, the store, and stored classifications directly.
+
+**Expectation:** 302 labels; 458 Llama classifications at a 4096-token context, all `OK`; Part C1's tail uncommitted.
+
+**Observation:**
+- Labels: 302 initial, 0 calibration, 0 self-agreement; 150 publication order, 152 shuffled (seed 20261004); all from run `20261003T141450Z`. Timing: 2 valid records.
+- Store: 458 live comments from others, 291 by the author, 1 placeholder. Classifications: B1 `hb-v0.1` and `hb-v0.2` 458 each; Llama at `num_ctx=4096` 458 `OK`; Llama at 2048 48 `OK` and 2 `FAILED` (the subset); qwen at 2048 45 `OK`, 3 `MALFORMED`, 2 `FAILED`. Every cached input hash matches the current input.
+- Uncommitted: the C1 tail (context size 4096, `model_options` in the cache key, store schema 2, SURFACE capture, the accepted proposal's move, and their docs). Check list green: 646 tests on 3.14 and on 3.12 (isolated).
+- `CLAIMS.md` still ends with the author's to-do note "Future features (docs only, no code)", which Part A's entry says was replaced by C-013 to C-019. The claims were added; the note itself is still in the committed file.
+
+**Evidence:** `afterword store-status`; `afterword.label_records` and `afterword.timing.load_valid` (counts only); a counts-only pass over the store's cache keys.
+
+**Workaround:** None. The note was left in place, and C-020 was inserted before it so the claims stay in sequence.
+
+**Consequence:** The author's figures match the records.
+
+**Follow-up:** The author decides whether to delete the stale to-do note.
+
+### 2026-10-08 13:50 - The pre-check fired on 3 of 458 real comments
+
+**Platform:** DEV
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** C2.1: count which rule decided each tier, and whether ordinary comments about prompts and models trip `pc-v0.1` on posts that are largely about AI.
+
+**Expectation:** Possibly many false positives, since the author writes about AI.
+
+**Observation:**
+- `pc-v0.1` fired on 3 of 458 comments from others: rule `system_prompt` 2, `taxonomy_name` 1. 2 are labeled, graded 0 and 1; none consequential.
+- The pre-check alone raised 1 comment to `SURFACE` under B1 and 2 under Llama; its other firings were on comments already at `SURFACE` by class.
+- Llama set `POSSIBLE_INSTRUCTION_TEXT` itself on 7 other comments (3 labeled, none consequential): the model is the larger source of instruction flags.
+- Decided-by counts mislead on their own: an override is recorded as `rule_applied` whenever it reaches the final tier, even when the class default gives the same tier. The raises were counted separately.
+
+**Evidence:** `afterword dev-analysis` (`afterword.service.analyze_dev`), report in `reports/eval/` (git-ignored, counts only).
+
+**Workaround:** None.
+
+**Consequence:** The hypothesis holds in kind (the `system_prompt` rule matches ordinary AI discussion) but costs at most 2 `SURFACE` places of 458. Recorded in the dev-set evaluation, section 1.
+
+**Follow-up:** None.
+
+### 2026-10-08 13:55 - Llama's SURFACE inflation is class assignment, mostly "challenge"
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** C2.2: Llama's predicted class against the labels, to see whether its large `SURFACE` comes from classes or overrides.
+
+**Expectation:** Unknown; on the 50-comment subset Llama's `SURFACE` matched B1's.
+
+**Observation:**
+- Class agreement: 84 of 302 (B1: 77).
+- Llama predicts `CHALLENGE_OR_COUNTEREXAMPLE` for 96 labeled comments, 4 of them labeled so: 49 are labeled `TECHNICAL_EXTENSION`, 23 `CONVERSATIONAL`, 16 `TECHNICAL_QUESTION`. 137 of its 142 labeled `SURFACE` comments are there by class default; the other 5 by `POSSIBLE_INSTRUCTION_TEXT`, none consequential.
+- The same error lifts capture: of Llama's 55 consequential comments at `SURFACE`, 41 were predicted challenge. Of the 49 labeled extensions it called a challenge, 28 are graded 2 or 3, against 21 of the other 51 labeled extensions.
+- It predicts 26 acknowledgments and 8 spam against 40 and 17 labeled, which is where review reduction goes.
+
+**Evidence:** `afterword dev-analysis` (confusion matrix, counts only).
+
+**Workaround:** None.
+
+**Consequence:** Recorded in the dev-set evaluation, section 2. The extension-called-challenge cell is an input to session 9's question (how consequence reaches the tier), not evidence for a design.
+
+**Follow-up:** Session 9.
+
+### 2026-10-08 14:00 - No condition is near the oracle on all five measures
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** DOMAIN
+
+**Task:** C2.3: the five primary measures for B1 `hb-v0.2` and Llama under `pp-v0.1` and `pp-v0.2`, beside the oracle.
+
+**Expectation:** None fixed.
+
+**Observation:**
+- B1: recall 81 of 84, collapsed 45, SURFACE 126, precision 50 of 126, capture 50 of 84 (either policy).
+- Llama `pp-v0.1`: 84 of 84, 17, 142, 55 of 142, 55 of 84. `pp-v0.2`: 25 collapsed, the rest unchanged; its 8 extra collapses are all graded below 2.
+- Oracle `pp-v0.1`: 84 of 84, 44, 55, 30 of 55, 30 of 84 (`pp-v0.2`: 51 collapsed).
+- Capture above the oracle's comes with a `SURFACE` more than twice the oracle's size, so it is not better classification.
+
+**Evidence:** `afterword evaluate` reports (`reports/eval/`, counts only); the miss lists for Llama are empty under both policies.
+
+**Workaround:** None.
+
+**Consequence:** `docs/benchmarks/2026-10-08-dev-set-evaluation.md`, with the caveats first; `EVALUATION.md` v14; a dated C-008 entry. Nothing chosen.
+
+**Follow-up:** The B2 and policy choices, before preregistration.
+
+### 2026-10-08 14:00 - pc-v0.1 is English-only
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** PROJECT
+
+**Task:** C2.6: record the known language gap of the deterministic pre-check.
+
+**Expectation:** Already known from the synthetic set.
+
+**Observation:** Every `pc-v0.1` pattern is English, so instruction-like text in another language bypasses the check. `adv-110` (a Spanish instruction to call the comment thanks) is the known case: in the 2026-10-03 synthetic benchmark neither model flagged it, and it reached `QUEUE` or `COLLAPSED`. On `dev`, the 2 comments detected as non-English did not trip the check.
+
+**Evidence:** `src/afterword/precheck.py`; `fixtures/corpus/adversarial.jsonl` (`adv-110`, `expect_precheck: false`); `docs/benchmarks/2026-10-03-synthetic-local-models.md`.
+
+**Workaround:** None. Recorded in `EVALUATION.md` v14.
+
+**Consequence:** A gap in ADR-008's defence, not a change to it. Extending the check is proposed in `FUTURE-FEATURES.md` ("Multilingual comments").
+
+**Follow-up:** A new pre-check version for the languages actually observed, after the Stage 3 gate.
+
+### 2026-10-08 14:00 - Language detection: a dependency, two guardrails, counts only
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** C2.6: count stored comments from others by detected language with a local, deterministic detector.
+
+**Expectation:** A new dependency needs the author's approval.
+
+**Observation:**
+- The author chose `py3langid` (0.4.0) as an analysis dependency group only, with two guardrails: under 40 characters of prose is "too short to classify"; a normalized confidence under a stated threshold is "uncertain". The threshold, 0.80, was set on six synthetic sentences before any real comment was counted (a Spanish sentence scored 0.898, so 0.90 would have called it uncertain).
+- Detection runs on normalized prose with code and link targets removed. Result: 435 English, 2 non-English (both detected as Vietnamese, neither labeled; Llama put both at `SURFACE`), 5 uncertain (3 labeled, all spam, grade 0), 16 too short (9 labeled, all grade 0).
+- `uv run` syncs the analysis group by default (`[tool.uv] default-groups`), so the check list and the isolated 3.12 run both have it; it is not a runtime dependency.
+
+**Evidence:** `afterword dev-analysis` (language section, counts only); `src/afterword/language.py`; `pyproject.toml`.
+
+**Workaround:** None.
+
+**Consequence:** If language detection later becomes a runtime structural field, the detector is chosen again then; `lingua` is the stronger candidate for short texts. Recorded in `FUTURE-FEATURES.md`.
+
+**Follow-up:** None now.
+
+### 2026-10-08 14:00 - What DEV says the AI-disclosure fields mean
+
+**Platform:** DEV
+
+**Type:** SURPRISE
+
+**Class:** PRODUCT
+
+**Task:** Report `ai_disclosure_label` and `ai_disclosure_level` across stored comments, cross-tabulated with the labels, and record what DEV documents about them.
+
+**Expectation:** Undocumented fields (capability matrix, 2026-10-02).
+
+**Observation:**
+- Values: one pair only, `Not Disclosed` / `not_disclosed`, on 750 of 750 nodes in the run behind every stored comment. All 302 labeled comments have it, so the cross-tab with class and grade is the label distribution itself.
+- DEV's announcement of AI disclosure describes author self-disclosure on posts (Hand Written, AI-Assisted, Fully Autonomous), chosen from a dropdown, with no detection described. Forem's OpenAPI description gives article values `not_disclosed`, `no_ai`, `some_ai`, `fully_autonomous`. Forem pull request #23895, merged 2026-10-05, made the v1 comments API emit both fields, which the v0 serializer and the schema already had. Afterword requests v1, and the merge falls between the two runs, which fits the jump from 189 to 750 nodes; why 189 had the keys before is not explained.
+- How a commenter sets a comment's disclosure is not documented anywhere found.
+
+**Evidence:** `probe-findings.json` of both runs (`comments.ai_disclosure`); the DEV announcement post; `forem/forem` `swagger/v1/api_v1.json`; `forem/forem` pull request #23895.
+
+**Workaround:** None.
+
+**Consequence:** Session 8 Part B's "schema changed without notice" now has a likely cause: an upstream change to the v1 comment template, public but unannounced to API users. Capability matrix v5; a proposal for a structural, informational `AI_AUTHORSHIP_DISCLOSED` flag (`docs/proposals/2026-10-08-ai-authorship-disclosed-flag.md`, not accepted); `PRIVACY-AND-BOUNDARIES.md` v6 adds the rule that AI authorship is never inferred from writing style; a parking-lot note on counting human and disclosed-AI comments separately.
+
+**Follow-up:** The author's decision on the flag. Watching Forem's repository is a cheap early warning for payload changes.
+
+### 2026-10-08 14:05 - The classify progress line counted comments as articles
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** PROJECT
+
+**Task:** C2.5: fix the `classify` progress label.
+
+**Expectation:** None.
+
+**Observation:** The status line was written for the probe and always said "article N of M"; `classify` passes comments through the same step.
+
+**Evidence:** `src/afterword/progress.py`.
+
+**Workaround:** The unit now depends on the step: "comment N of M (classify)", "article" for the probe. A test covers it.
+
+**Consequence:** None beyond the fix.
+
+**Follow-up:** None.
+
+### 2026-10-08 14:05 - read_via_translation: which key, and where in the terminal
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** PROJECT
+
+**Task:** C2.6: add `read_via_translation` to the label schema and both tools.
+
+**Expectation:** A free key in the label UI and one more terminal prompt.
+
+**Observation:**
+- `l` was free, but it was `CONTAINS_LINK`'s key before `tax-v0.2`; a labeler's old habit would set the new field silently. `v` was used instead.
+- A new terminal prompt would shift every scripted answer sequence in the labeling tests (about 70) and lengthen every label. The field is set at the existing `Save?` prompt instead: `v` saves with `read_via_translation: true`; Enter still saves with `false`.
+- Labels made before the field existed lack it; analysis treats a missing value as "not recorded", never as `false`.
+
+**Evidence:** `src/afterword/labeling.py`, `label_ui.py`, `label_ui_page.py`; tests in `test_labeling.py` and `test_label_ui.py`.
+
+**Workaround:** None needed.
+
+**Consequence:** `lg-v0.5` (what is recorded changed; grades did not), field guide v3, `DATA-MODEL` v11, `fixtures/README.md`, `WORKFLOW.md` shortcuts.
+
+**Follow-up:** None.
+
+### 2026-10-08 14:05 - The shell tool broke a heredoc again
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** ENVIRONMENT
+
+**Task:** Insert the analysis functions into `service.py` with a Python script.
+
+**Expectation:** Session 8 Part A's rule (scripts through the file tool) would prevent this.
+
+**Observation:** A script passed through a bash heredoc inside a longer command failed with "unexpected EOF while looking for matching" quote. The rule was not followed for that one script.
+
+**Evidence:** The shell tool error.
+
+**Workaround:** The script and the inserted block were written to the scratchpad with the file tool and run from there.
+
+**Consequence:** A few minutes.
+
+**Follow-up:** None; the rule stands.
+
+### 2026-10-08 14:15 - Checkpoint: Part C2 complete
+
+**Platform:** Project
+
+**Type:** DELIGHT
+
+**Class:** PROJECT
+
+**Task:** Close Part C2: full check list, both logs, commit message.
+
+**Expectation:** All checks green.
+
+**Observation:** ruff, ruff format, mypy (strict), and pydoclint clean; 658 tests pass on Python 3.14 and on 3.12 (isolated), up from 646 (dev analysis, language detection, the progress unit, `read_via_translation`). The identity scan finds no disallowed match, and a scan of every changed and new file finds no em-dash, bidi control, or carriage return.
+
+**Evidence:** The check list in CLAUDE.md.
+
+**Workaround:** None.
+
+**Consequence:** `commit-message.txt` covers the uncommitted C1 tail and C2. Not committed.
+
+**Follow-up:** The author commits.
+
+### 2026-10-08 - Session summary (session 8, Parts A to C2)
+
+**Goal:** Label summary and post panel (A); first real data and offline scoring (B); decisions, a dev subset, and the first model runs on real comments (C1); score and write the dev-set evaluation, plus small items (C2).
+
+**Completed:**
+- A: label summary for 302 labels and the provisional accrual estimate; the label UI's post panel (`lg-v0.4`).
+- B: ADR-009 amended for platform-wide keys; both real runs ingested; B1 scored on `dev`; `pp-v0.2` as a candidate; offline re-scoring.
+- C1: SURFACE size, precision, and capture made co-primary; class-as-proxy finding; a seeded 50-comment subset; the context size raised to 4096 with options in the cache key.
+- C2: tier causes, pre-check firings, class confusion, and the five measures for B1 and Llama under both policies (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`); a counts-only language measurement; AI-disclosure values and documentation; the progress label; `read_via_translation` (`lg-v0.5`); the multilingual future feature and C-020; the AI-authorship proposal and privacy rule.
+
+**Friction discovered:** DEV changed the comment payload without notice (now traced to a merged Forem change); the guard's margin refused 3 long inputs at 2048 tokens; heredocs in the shell tool; the classify progress label.
+
+**Delight discovered:** offline re-scoring of any cached run under any policy; the pre-check is quiet on real comments (3 of 458).
+
+**Claims affected:** C-001, C-002, C-008 (dated entries, provisional, from `dev`); C-010 (the post-order split); C-020 added, DEFERRED UNTIL STAGE 3 GATE.
+
+**ADRs affected:** ADR-009 amended (platform-wide key allowlist). ADR-007 and ADR-008 unchanged; the pre-check's English-only gap is recorded against ADR-008.
+
+**Scope pressure:**
+- A `dev-analysis` command was added rather than an ad hoc script, so the counts come from tested service code (ADR-012). Kept to counts only.
+- Language detection stayed an analysis aid: no stored field, no policy input, analysis dependency group only.
+- `AI_AUTHORSHIP_DISCLOSED` was written as a proposal, not implemented: a new flag is a taxonomy change and needs the author's approval.
+- Translation and the multilingual pre-check stayed in `FUTURE-FEATURES.md`, gated on Stage 3.
+- Choosing B2 or a policy: not done, as agreed.
+
+**Next smallest useful step:** Session 9: how consequence should reach the tier, weighed against ADR-007, using section 2's evidence; then the B2 and policy choices before preregistration. The author: finish labeling `dev` (156 left) and decide on the AI-authorship proposal.

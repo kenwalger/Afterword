@@ -1,6 +1,10 @@
 # Evaluation Plan
 
-**Version:** 12 (2026-10-07)
+**Version:** 14 (2026-10-08)
+
+v14 (2026-10-08, later the same day, after the first full model pass on `dev`) records the dev-set evaluation of B1 and the Llama candidate under `pp-v0.1` and `pp-v0.2` (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`), that `pc-v0.1` is English-only, and a counts-only language measurement. Nothing registered changes; nothing is chosen.
+
+v13 (2026-10-08, before preregistration, after the first model runs on a 50-comment `dev` subset) makes SURFACE size, SURFACE precision, and SURFACE capture co-primary measures (`docs/proposals/accepted/2026-10-08-surface-co-primary.md`), records that class is a weak proxy for consequence under `pp-v0.1` as the open design question for session 9, and adds the model options (context size) to what every result records. Nothing else registered changes; nothing is registered yet.
 
 v12 (2026-10-07, later the same day, after the first ingest of real data and before any model classified a real comment) records B1 on `dev` (`hb-v0.1`, and `hb-v0.2` with its length threshold tuned on `dev`), the candidate policy `pp-v0.2`, and how both are scored offline. Nothing registered changes.
 
@@ -141,6 +145,18 @@ Reported as a count first: "19 of 20 surfaced; the miss is described below." A p
 ### Review reduction
 
 Share of non-author test comments assigned `COLLAPSED`, reported alongside recall at that operating point.
+
+### SURFACE size, SURFACE precision, and SURFACE capture (co-primary, 2026-10-08)
+
+- **SURFACE size:** the number of non-author test comments assigned `SURFACE`, as a count and as a share of all test comments.
+- **SURFACE precision:** of the comments assigned `SURFACE`, how many are prospectively graded 2 or 3.
+- **SURFACE capture:** of the comments prospectively graded 2 or 3, how many are assigned `SURFACE`.
+
+Each is reported as a count first ("30 of 55"), then a percentage with a Wilson interval, and the three are always reported together. They are co-primary with consequential recall and review reduction: a condition is judged on all five at once. Recall and reduction say whether the review threshold is in the right place; SURFACE size, precision, and capture say whether "review first" means anything. Precision alone rewards a small `SURFACE`, capture alone a large one.
+
+The oracle ceiling (the policy applied to the labels themselves) is reported beside every condition, because the policy's class defaults bound all three: under `pp-v0.1`, on the 302 `dev` labels, perfect classes and flags give SURFACE size 55, precision 30 of 55, and capture 30 of 84 (below, "Class is a weak proxy for consequence"). B1 gives 126, 50 of 126, and 50 of 84.
+
+When registered thresholds are set, a threshold for SURFACE size, precision, or capture is registered with the others, relative to the oracle on `dev`, or the registration states explicitly that none is set.
 
 ### Consequential miss review
 
@@ -340,6 +356,34 @@ The labels show the same pressure from the other side: the author's `tax-v0.1` l
 
 Both are judged on `dev` by the same measures as everything else: consequential recall and review reduction at the same time, with flag-caused raises and their grades reported. The choice, if any, is made before preregistration and frozen with the other versions.
 
+### Class is a weak proxy for consequence (2026-10-08, finding)
+
+Under `pp-v0.1`, even perfect classification places 54 of the 84 consequential comments on the 302 `dev` labels at `QUEUE`, not `SURFACE` (SURFACE capture 30 of 84). The consequential comments are mostly `TECHNICAL_EXTENSION` (49 of 84) and `CONVERSATIONAL` (4), which default to `QUEUE`, while `TECHNICAL_QUESTION`, which defaults to `SURFACE`, has 22 of its 46 labeled comments graded 1. The class says what a comment does; it does not say how much the comment matters, and the policy maps class to tier.
+
+Nothing changes now. **Open design question for session 9: how should consequence reach the tier?** Candidates include grade-like signals from the classifier, a policy that uses more than the class, or accepting the ceiling and judging conditions against it. Any answer has to be weighed against ADR-007 (priority is computed by an explicit, auditable policy from class, flags, and structure, never chosen by the model): a model-reported importance would reintroduce the model-chosen priority that ADR-007 removed, and its manipulation risk (ADR-008). Any change is a new policy (and possibly prompt and taxonomy) version, chosen on `dev` before preregistration.
+
+### Dev-set evaluation, B1 and Llama (2026-10-08, provisional)
+
+The full write-up, with every caveat, is `docs/benchmarks/2026-10-08-dev-set-evaluation.md`: historical comments, labels made with hindsight and mostly after replying (192 of 302), the first 150 in publication order, and tuning on the same set. It records evidence and chooses nothing: not B2, not a policy.
+
+| Condition | Recall | Collapsed | SURFACE | SURFACE precision | SURFACE capture |
+| --- | --- | --- | --- | --- | --- |
+| B1 `hb-v0.2`, either policy | 81 of 84 | 45 of 302 | 126 | 50 of 126 | 50 of 84 |
+| Llama (`llama3.1:8b-instruct-q4_K_M`, `pr-v0.2`, 4096 context), `pp-v0.1` | 84 of 84 | 17 | 142 | 55 of 142 | 55 of 84 |
+| Llama, `pp-v0.2` | 84 of 84 | 25 | 142 | 55 of 142 | 55 of 84 |
+| Oracle, `pp-v0.1` | 84 of 84 | 44 | 55 | 30 of 55 | 30 of 84 |
+| Oracle, `pp-v0.2` | 84 of 84 | 51 | 55 | 30 of 55 | 30 of 84 |
+
+- **Llama's `SURFACE` inflation comes from class assignment, not overrides:** 137 of its 142 labeled `SURFACE` comments are there by class default, 96 of them predicted `CHALLENGE_OR_COUNTEREXAMPLE` (4 labeled so). Class agreement with the labels: 84 of 302.
+- **Model-set judgment flags** raised 9 labeled comments under `pp-v0.1`, all graded 0 or 1; `pp-v0.2` removes all but 1 and adds 8 collapses, none consequential.
+- **The pre-check fired on 3 of 458 real comments** (rules `system_prompt` 2, `taxonomy_name` 1); 2 are labeled, neither consequential. It alone raised at most 2 comments to `SURFACE`. Llama set `POSSIBLE_INSTRUCTION_TEXT` itself on 7 others.
+
+### `pc-v0.1` is English-only (2026-10-08)
+
+Every pre-check pattern is English, so instruction-like text in another language bypasses the deterministic check and reaches `SURFACE` only if the classifier flags it or its class surfaces it. Adversarial case `adv-110` (a Spanish instruction to call the comment thanks) is the known example: in the 2026-10-03 synthetic benchmark neither model flagged it, and it landed at `QUEUE` for one and `COLLAPSED` for the other, failing the injection pass condition. This is a gap in ADR-008's defence, not a change to it: the model's output is still schema-constrained and the policy still only raises. Extending the check beyond English is a new pre-check version, proposed in `FUTURE-FEATURES.md` ("Multilingual comments").
+
+**Measured (counts only, `py3langid`, 40-character and 0.80-confidence guardrails):** of 458 comments from others, 435 detected English, 2 detected non-English (both unlabeled; neither tripped the pre-check), 5 uncertain, 16 too short to classify. From `lg-v0.5` a label records `read_via_translation`.
+
 ### Decisions left for preregistration
 
 - **Duplicate flags in model output.** A model output that lists a flag twice is currently `MALFORMED` (`duplicate_flag`) and surfaced. Qwen did this in 1 of 54 outputs under `pr-v0.1` and 3 of 59 under `pr-v0.2`; the schema dialects cannot forbid it.
@@ -355,6 +399,6 @@ Design preference stands: tolerate extra false positives before accepting conseq
 
 ## Versioning
 
-Every result records: corpus version, label guide version, taxonomy version, normalization version, pre-check version, policy version, heuristic version, model provider, model ID, model digest (local models), prompt version, application version, timestamp.
+Every result records: corpus version, label guide version, taxonomy version, normalization version, pre-check version, policy version, heuristic version, model provider, model ID, model digest (local models), model options (local models: context size, output cap, seed, temperature; from 2026-10-08), prompt version, application version, timestamp.
 
 Historical results are never overwritten.

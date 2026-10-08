@@ -1,6 +1,8 @@
 # Labeling Field Guide
 
-**Version:** 2 (2026-10-07). Written against `tax-v0.2` and `lg-v0.4`.
+**Version:** 3 (2026-10-08). Written against `tax-v0.2` and `lg-v0.5`.
+
+v3 adds reading through a translation (`lg-v0.5`, `read_via_translation`). Reviewed against `lg-v0.5` and `tax-v0.2`; nothing else needed to change.
 
 v2 adds the post panel (`lg-v0.4`): when to open it, and the edit warning. Reviewed against `lg-v0.4` and `tax-v0.2`; nothing else needed to change.
 
@@ -70,6 +72,13 @@ Pick your best reading and move on:
 - correction versus challenge (both surface)
 - technical versus direct question (both are seen)
 - which of several queue-raising flags applies
+
+## Comments in another language
+
+- **Read it in the original first.** If you can grade it from the original, do; translation adds a layer that can lose a correction's detail or flip a joke's tone.
+- **If you use a translation, mark it:** `v` in the label UI (the "Read via a translation" box), or `v` instead of Enter at the terminal's `Save?` prompt. It is quick to forget, and it is the only record that the grade went through a translation.
+- **If the translation looks unreliable,** say so in the note, and do not be shy of `UNCERTAIN`.
+- **Flags come from the original.** Code, links, and replies are set for you from the source either way.
 
 ## Honesty and blinding
 

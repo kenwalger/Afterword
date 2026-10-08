@@ -39,7 +39,7 @@ from afterword.observations import ObservedComment, ObservedContent, RunObservat
 LABEL_ROOT: Path = label_records.LABEL_ROOT
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
-LABEL_GUIDE_VERSION: str = "lg-v0.4"
+LABEL_GUIDE_VERSION: str = "lg-v0.5"
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
@@ -541,6 +541,7 @@ def make_label(
     reason: str,
     duration_seconds: float,
     labeled_at: datetime,
+    read_via_translation: bool = False,
 ) -> dict[str, Any]:
     """Build one label record, the same for every transport (terminal or browser).
 
@@ -558,6 +559,8 @@ def make_label(
     :param reason: One line; required for a prospective grade of 2 or 3.
     :param duration_seconds: Time from the comment being shown to the label being saved.
     :param labeled_at: Wall-clock time of saving.
+    :param read_via_translation: The labeler read the comment through a
+        translation (any tool), not in its original language.
     :returns: The record, per the schema in ``fixtures/README.md``.
     :raises ValueError: For an unknown class or flag, a grade outside 0 to 3, or a
         missing reason on a consequential grade.
@@ -592,6 +595,7 @@ def make_label(
         "consequential_retrospective_state": "UNKNOWN" if retrospective is None else "PRESENT",
         "context_reconstructed": snap.context_reconstructed(c),
         "replied_before_labeling": snap.author_replied(c),
+        "read_via_translation": bool(read_via_translation),
         "reason": reason,
         "pass": ctx.pass_name,
         "batch_id": ctx.batch_id,
@@ -998,7 +1002,8 @@ def _ask_label(
         )
         try:
             decision = console.ask(
-                "Save? [Enter = yes, r = redo, s = skip, q = save and stop]: "
+                "Save? [Enter = yes, v = yes, read via a translation, "
+                "r = redo, s = skip, q = save and stop]: "
             ).lower()
         except Quit:
             decision = "q"
@@ -1019,6 +1024,7 @@ def _ask_label(
         reason=reason,
         duration_seconds=monotonic() - started,
         labeled_at=now(),
+        read_via_translation=decision == "v",
     )
     if decision == "q":
         raise SavedThenQuit(record, note)

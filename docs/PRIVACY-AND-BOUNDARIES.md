@@ -1,6 +1,10 @@
 # Privacy and Boundaries
 
-**Version:** 4 (2026-10-03)
+**Version:** 6 (2026-10-08)
+
+v6 adds the rule that AI authorship is never inferred from writing style ("AI authorship", under Identity), with the proposal for a structural, informational disclosure flag (`docs/proposals/2026-10-08-ai-authorship-disclosed-flag.md`, not yet accepted).
+
+v5 records path A's context size raised from 2048 to 4096 tokens, after the first real runs (nothing else on the path changes; nothing leaves the machine).
 
 v4 records the author's sign-off of path A (local, Ollama). Path B (Anthropic) remains unsigned.
 
@@ -84,7 +88,7 @@ Built by the application from the store, never by the adapter. The same fields g
 - **Provider and models:** Ollama on the author's machine, at `http://localhost:11434`. Candidate models, pinned by content digest: `qwen3:4b-instruct-2507-q4_K_M` and `llama3.1:8b-instruct-q4_K_M` (digests recorded in `docs/FRICTION-LOG.md` when pulled and verified by the application before each run).
 - **What leaves the machine:** nothing. Requests go to the loopback interface only. The application refuses a non-loopback Ollama host unless configuration names it explicitly, and a non-loopback host is a different boundary that needs its own record.
 - **Retention:** whatever the local Ollama server keeps. Ollama does not store prompts by default; its server log may record request metadata. The store keeps each response locally (`raw_output`), purged with the comment's body (ADR-009).
-- **Context limit:** 2048 tokens with a 200-token output cap. An input that may not fit is not sent at all (it would otherwise be silently cut by Ollama); the classification is `FAILED` and the comment is surfaced.
+- **Context limit:** 4096 tokens with a 200-token output cap (2048 until 2026-10-08; raised because the guard refused 3 of the 458 `dev` comments, while the longest input is at most about 1,984 tokens at 3 characters per token). The context size is part of every cache key. An input that may not fit is not sent at all (it would otherwise be silently cut by Ollama); the classification is `FAILED` and the comment is surfaced.
 - **Training:** none. Local inference does not change the model.
 - **Redaction:** none beyond the field list above.
 - **Model download:** pulling a model contacts the Ollama registry. No comment data is involved.
@@ -113,6 +117,14 @@ Do not:
 - use commenter history, follower counts, or reactions in priority
 
 Cross-platform identity resolution, if explored later, requires a separate design review and ADR.
+
+### AI authorship
+
+Whether a comment was written with AI is recorded only when someone has said so: a platform's disclosure field (on DEV, `ai_disclosure_level`) or an explicit self-disclosure rule written down and agreed with the author before use.
+
+- **Never infer AI authorship from writing style.** No model, heuristic, classifier, or labeler marks a comment as AI-written, AI-assisted, or human because of how it reads. Style-based detection is unreliable, falls hardest on non-native writers and on people who write formally, and turns a guess about a person's tools into a stored judgment about them.
+- A disclosure is a fact about what the commenter stated, recorded with its source and run. Absence of a disclosure (`not_disclosed`) means nothing was said, not that the comment is human-written.
+- In V1 a disclosure has no effect on priority.
 
 ## Labels
 

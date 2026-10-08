@@ -141,6 +141,7 @@ def test_score_counts_recall_reduction_classes_flags_and_raises():
     assert c["consequential_recall"]["count"] == 1 and c["consequential_recall"]["of"] == 2
     assert c["review_reduction"]["count"] == 2 and c["surface_size"] == 1
     assert (c["surface_precision"]["count"], c["surface_precision"]["of"]) == (1, 1)
+    assert (c["surface_capture"]["count"], c["surface_capture"]["of"]) == (1, 2)
     assert out.missed_ids == ["b"]
     assert c["per_class"]["CONVERSATIONAL"] == {"predicted": 3, "labeled": 4, "agree": 3}
     assert c["flag_precision"]["REFERENCES_SPECIFIC_CLAIM"] == {"set": 1, "agree": 0, "labeled": 0}
@@ -220,7 +221,7 @@ def test_reports_hold_counts_and_the_miss_list_holds_ids_only(labeled, tmp_path,
     reports = sorted((tmp_path / service.EVAL_ROOT).iterdir())
     report = next(p for p in reports if p.suffix == ".json")
     text = report.read_text(encoding="utf-8")
-    assert REASON not in text and "missed_ids" not in text
+    assert REASON not in text and "missed_ids" not in text and "failed_ids" not in text
     misses = next(p for p in reports if p.name.endswith("-misses.txt"))
     for line in misses.read_text(encoding="utf-8").splitlines():
         assert line in {"s1a1", "s1b1", "s1a3"}

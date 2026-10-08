@@ -27,7 +27,7 @@ Done:
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 - `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
 
-Open: labeling the `dev` corpus (the author; 302 of 458 on 2026-10-07). Both real probe runs are ingested into the local store, and B1 has been scored against the labels on `dev` (`docs/EVALUATION.md`). No model has classified a real comment. Both local models were benchmarked on the synthetic sets only (`docs/benchmarks/`), with no model chosen.
+Open: labeling the `dev` corpus (the author; 302 of 458 on 2026-10-07). Both real probe runs are ingested into the local store, and B1 has been scored against the labels on `dev` (`docs/EVALUATION.md`). The author ran both local models on a 50-comment `dev` subset and Llama over all 458 stored comments from others, on their own machine; the dev-set evaluation of B1 and Llama under `pp-v0.1` and `pp-v0.2` is in `docs/benchmarks/2026-10-08-dev-set-evaluation.md`. No model or policy is chosen.
 
 ## Quick start
 
@@ -78,6 +78,7 @@ uv run afterword classify --condition b1 --heuristic hb-v0.2
 uv run afterword classify --condition b2 --model qwen3:4b-instruct-2507-q4_K_M
 uv run afterword evaluate --condition b1 --heuristic hb-v0.2 --policy pp-v0.2
 uv run afterword dev-subset --size 50 --seed 20261008
+uv run afterword dev-analysis --model <ollama-model>
 uv run afterword models verify
 uv run afterword bench --synthetic --model <ollama-model>
 ```
@@ -87,6 +88,7 @@ uv run afterword bench --synthetic --model <ollama-model>
 - `store-status` prints the store's comments by lifecycle state and its lifecycle events, counts only.
 - `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.1`, or the candidate `pp-v0.2`), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.
 - `dev-subset` draws a seeded, class-balanced subset of labeled `dev` comments and writes its IDs to a git-ignored file, for `classify --ids` and `evaluate --ids`. It prints counts only.
+- `dev-analysis` counts, offline, which rule decided each tier for B1 and B2 under each policy, how often the pre-check fired and on what labels, B2's class against your labels, and comments by detected language; counts only, to a git-ignored report.
 - `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.
 
 `label` and `label-ui` show comment text only on your own machine (terminal or local page) and need no key. In what order to run these, and why, is in `docs/WORKFLOW.md`.

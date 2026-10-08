@@ -498,3 +498,23 @@ def test_batch_records_say_whether_the_post_panel_was_available(tmp_path, fake_d
     batch.start()
     (start,) = lines(tmp_path / "t" / labeling.LABEL_ROOT / "unfrozen" / "batches.jsonl")
     assert (start["tool"], start["post_panel"]) == ("terminal", False)
+
+
+# Read via a translation (session 8, Part C2) ----------------------------------------
+
+
+def test_a_label_can_record_that_it_was_read_via_a_translation(running, tmp_path):
+    token = running.server.token
+    body = answer(running.ui, read_via_translation="yes")
+    status, refused = running.request("POST", "/api/label", body, token=token)
+    assert status == 409 and "true or false" in refused["error"]
+    body = answer(running.ui, read_via_translation=True)
+    assert running.request("POST", "/api/label", body, token=token)[0] == 200
+    assert running.request("POST", "/api/label", answer(running.ui), token=token)[0] == 200
+    first, second = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")
+    assert first["read_via_translation"] is True and second["read_via_translation"] is False
+
+
+def test_the_page_offers_the_translation_toggle():
+    assert "Read via a translation" in PAGE and 'k === "v"' in PAGE
+    assert "read_via_translation: form.translated" in PAGE

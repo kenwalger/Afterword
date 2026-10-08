@@ -1,6 +1,6 @@
 """Console progress for long commands: one updating status line.
 
-The line carries counts only (requests sent, article N of total, 429 waits),
+The line carries counts only (requests sent, item N of total, 429 waits),
 never comment text, names, handles, or the API key, so the console stays safe
 to share. On a terminal the line is redrawn in place. When output is captured
 (not a terminal), only occasional plain lines are printed, so a captured log
@@ -25,6 +25,9 @@ _PHASES: dict[str, str] = {
     "comments": "comments",
     "thread checks": "thread checks",
 }
+# What a step counts, by phase: articles for the probe, comments for classify.
+_UNITS: dict[str, str] = {"classify": "comment"}
+DEFAULT_UNIT: str = "article"
 
 
 def format_elapsed(seconds: float) -> str:
@@ -123,8 +126,9 @@ class StatusLine:
         """Report the current step.
 
         :param phase: Step name, such as ``comments``.
-        :param current: Article number within the step (1-based), or page number.
-        :param total: Number of articles in the step, or 0 when not counted.
+        :param current: Item number within the step (1-based), or page number.
+        :param total: Number of items in the step (articles, or comments for
+            ``classify``), or 0 when not counted.
         """
         changed = phase != self._phase
         self._phase, self._current, self._total = phase, current, total
@@ -162,7 +166,8 @@ class StatusLine:
         parts = [f"[{format_elapsed(self._elapsed())}]", f"requests {self.requests}"]
         name = _PHASES.get(self._phase, self._phase)
         if self._total:
-            parts.append(f"article {self._current} of {self._total} ({name})")
+            unit = _UNITS.get(self._phase, DEFAULT_UNIT)
+            parts.append(f"{unit} {self._current} of {self._total} ({name})")
         elif self._phase == "listing" and self._current:
             parts.append(f"{name}, page {self._current}")
         elif name:

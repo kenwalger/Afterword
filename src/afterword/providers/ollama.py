@@ -6,8 +6,9 @@ because it would be a different boundary needing its own record.
 
 Each model is pinned by its content digest (``docs/FRICTION-LOG.md``, session 4,
 07:55) and checked against ``/api/tags`` before any run. Generation is as
-deterministic as Ollama allows: temperature 0, a fixed seed, a 2048-token
-context, an output cap, and thinking off.
+deterministic as Ollama allows: temperature 0, a fixed seed, a fixed context
+size, an output cap, and thinking off. These options are part of every cache
+key (:func:`options_key`), so changing one reclassifies rather than reusing.
 """
 
 from __future__ import annotations
@@ -42,12 +43,24 @@ PINNED_DIGESTS: dict[str, str] = {
     ),
 }
 SEED: int = 20261003
-NUM_CTX: int = 2048
+# 4096 from 2026-10-08 (2048 before). The longest model input among the 458 `dev`
+# comments is 5,953 characters, at most about 1,984 tokens at the guard's
+# conservative 3 characters per token; at 2048 the guard refused 3 of them.
+NUM_CTX: int = 4096
 NUM_PREDICT: int = 200
 # Prompt characters allowed: the context left after the output cap, at a
 # conservative 3 characters per token. Longer inputs are not sent.
 MAX_INPUT_CHARS: int = (NUM_CTX - NUM_PREDICT) * 3
 TIMEOUT_S: float = 300.0
+
+
+def options_key(num_ctx: int = NUM_CTX) -> str:
+    """Name the generation options that can change a model's answer, for the cache key.
+
+    :param num_ctx: Context size, in tokens.
+    :returns: A stable string such as ``num_ctx=4096;num_predict=200;seed=20261003;temperature=0``.
+    """
+    return f"num_ctx={num_ctx};num_predict={NUM_PREDICT};seed={SEED};temperature=0"
 
 
 def is_loopback(host_url: str) -> bool:
@@ -99,6 +112,7 @@ class OllamaProvider:
         self.clock = clock
         self.identity = ModelIdentity(PROVIDER, model, PINNED_DIGESTS[model], "PRESENT")
         self.max_input_chars: int | None = MAX_INPUT_CHARS
+        self.options_key: str | None = options_key()
 
     def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
         try:

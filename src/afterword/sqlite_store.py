@@ -18,7 +18,10 @@ from typing import Any
 
 from afterword import domain
 
-SCHEMA_VERSION: int = 1
+SCHEMA_VERSION: int = 2
+# Schema 2 (2026-10-08) adds `model_options` to classifications. Ollama rows from
+# schema 1 ran with these options (`ollama.options_key(2048)`), recorded on migration.
+_V1_OLLAMA_OPTIONS: str = "num_ctx=2048;num_predict=200;seed=20261003;temperature=0"
 
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS connections (
@@ -135,6 +138,7 @@ CREATE TABLE IF NOT EXISTS classifications (
     model_digest_state TEXT NOT NULL,
     prompt_version TEXT,
     taxonomy_version TEXT NOT NULL,
+    model_options TEXT,
     primary_class TEXT,
     flags TEXT NOT NULL,
     flags_by_source TEXT NOT NULL,
@@ -215,6 +219,13 @@ class SqliteRepository:
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"store schema {version} is newer than {SCHEMA_VERSION}")
         self.db.executescript(_SCHEMA)
+        columns = {r[1] for r in self.db.execute("PRAGMA table_info(classifications)")}
+        if "model_options" not in columns:
+            self.db.execute("ALTER TABLE classifications ADD COLUMN model_options TEXT")
+            self.db.execute(
+                "UPDATE classifications SET model_options = ? WHERE model_provider = 'ollama'",
+                (_V1_OLLAMA_OPTIONS,),
+            )
         self.db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self._depth = 0
 
@@ -766,6 +777,7 @@ class SqliteRepository:
                 model_digest=r["model_digest"],
                 prompt_version=r["prompt_version"],
                 taxonomy_version=r["taxonomy_version"],
+                model_options=r["model_options"],
             ),
             primary_class=r["primary_class"],
             flags=tuple(json.loads(r["flags"])),
@@ -802,6 +814,7 @@ class SqliteRepository:
             "SELECT * FROM classifications WHERE connection_id = ? AND comment_id = ? "
             "AND input_hash = ? AND model_provider = ? AND model_id = ? "
             "AND model_digest IS ? AND prompt_version IS ? AND taxonomy_version = ? "
+            "AND model_options IS ? "
             f"AND outcome IN ({marks}) ORDER BY classified_at DESC, rowid DESC LIMIT 1",
             (
                 connection_id,
@@ -812,6 +825,7 @@ class SqliteRepository:
                 key.model_digest,
                 key.prompt_version,
                 key.taxonomy_version,
+                key.model_options,
                 *wanted,
             ),
         ).fetchone()
@@ -851,6 +865,7 @@ class SqliteRepository:
                 "model_digest_state": c.model_digest_state,
                 "prompt_version": k.prompt_version,
                 "taxonomy_version": k.taxonomy_version,
+                "model_options": k.model_options,
                 "primary_class": c.primary_class,
                 "flags": json.dumps(list(c.flags)),
                 "flags_by_source": json.dumps(c.flags_by_source, sort_keys=True),

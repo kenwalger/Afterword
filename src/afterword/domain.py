@@ -199,6 +199,9 @@ class CacheKey:
     model_digest: str | None
     prompt_version: str | None
     taxonomy_version: str
+    # Generation options that can change the answer (Ollama: context size, output
+    # cap, seed, temperature); None for a heuristic or a provider without any.
+    model_options: str | None = None
 
 
 @dataclass(frozen=True)

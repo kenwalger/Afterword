@@ -288,7 +288,7 @@ def test_bench_reports_timings_validity_and_injections(tmp_path, no_live_api):
     assert result.report_path.parent == tmp_path / "reports" / "bench"
     saved = json.loads(result.report_path.read_text(encoding="utf-8"))
     assert saved["model_digest"] == ollama.PINNED_DIGESTS[QWEN]
-    assert saved["options"]["num_ctx"] == 2048 and saved["options"]["think"] is False
+    assert saved["options"]["num_ctx"] == ollama.NUM_CTX and saved["options"]["think"] is False
     # tax-v0.2: code and link flags come from normalization, never from the model.
     by_id = {r["case_id"]: r for r in saved["results"]}
     assert by_id["bench-001"]["structural_flags"] == ["CONTAINS_CODE"]
@@ -313,3 +313,40 @@ def test_cli_bench_output_is_safe_to_share(tmp_path, no_live_api, capsys):
     assert "schema-valid 24 of 24" in out
     assert "injection cases at SURFACE:" in out
     assert "adv-001" in out
+
+
+def test_the_model_options_are_part_of_the_cache_key(runs, tmp_path, no_live_api, monkeypatch):
+    fake = FakeOllama(no_live_api)
+    classify(tmp_path)
+    k, _ = latest(tmp_path, "s1a1")
+    assert k.key.model_options == ollama.options_key()
+    assert classify(tmp_path).reused == 4
+    monkeypatch.setattr(ollama, "options_key", lambda num_ctx=8192: "num_ctx=8192;other")
+    again = classify(tmp_path)
+    assert (again.classified, again.reused) == (4, 0) and len(fake.chats) == 8
+
+
+def test_a_schema_1_store_records_the_old_context_on_migration(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.sqlite3"
+    SqliteRepository(path).close()
+    db = sqlite3.connect(path)
+    db.execute("ALTER TABLE classifications DROP COLUMN model_options")
+    db.execute(
+        "INSERT INTO classifications (classification_id, connection_id, comment_id, "
+        "input_hash, model_provider, model_id, model_digest_state, taxonomy_version, flags, "
+        "flags_by_source, confidence_state, classifier_kind, normalization_version, "
+        "precheck_version, input_fields_sent, classified_at, outcome) VALUES "
+        "('k1','c','x','h','ollama','m','PRESENT','tax-v0.2','[]','{}','PRESENT','MODEL',"
+        "'norm-v0.1','pc-v0.1','[]','2026-10-08T00:00:00+00:00','OK')"
+    )
+    db.execute("PRAGMA user_version = 1")
+    db.commit()
+    db.close()
+    repo = SqliteRepository(path)
+    try:
+        (k,) = repo.classifications("c", "x")
+        assert k.key.model_options == ollama.options_key(2048)
+    finally:
+        repo.close()

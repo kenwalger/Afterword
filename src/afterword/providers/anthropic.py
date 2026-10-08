@@ -66,6 +66,7 @@ class AnthropicProvider:
         self.clock = clock
         self.identity = ModelIdentity(PROVIDER, model, None, "NOT_EXPOSED")
         self.max_input_chars: int | None = None
+        self.options_key: str | None = None
 
     @classmethod
     def from_env(cls, **kwargs: Any) -> AnthropicProvider:

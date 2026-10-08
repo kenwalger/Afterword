@@ -451,6 +451,7 @@ def save_label(
     reason: str,
     note: str,
     duration_seconds: float,
+    read_via_translation: bool = False,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> dict[str, Any]:
     """Save the label for one comment of a batch, and its hard-to-label note if any.
@@ -464,6 +465,7 @@ def save_label(
     :param reason: Required for a prospective grade of 2 or 3.
     :param note: Optional note for the batch record, never stored in the label.
     :param duration_seconds: Time from the comment being shown to saving.
+    :param read_via_translation: The labeler read the comment through a translation.
     :param now: Wall clock for ``labeled_at``.
     :returns: The saved record.
     :raises ServiceError: If the label is invalid (see :func:`afterword.labeling.make_label`).
@@ -481,6 +483,7 @@ def save_label(
             reason=reason,
             duration_seconds=duration_seconds,
             labeled_at=now(),
+            read_via_translation=read_via_translation,
         )
     except ValueError as exc:
         raise ServiceError(str(exc)) from None
@@ -1035,6 +1038,7 @@ def classify_comments(
                 identity.digest,
                 prompt_version,
                 taxonomy.TAXONOMY_VERSION,
+                None if provider is None else provider.options_key,
             )
             k = repo.find_classification(cid, c.comment_id, key, (domain.OK, domain.MALFORMED))
             if k is not None:
@@ -1080,7 +1084,9 @@ EVAL_ROOT: Path = REPORT_ROOT / "eval"
 class EvaluationResult:
     """One condition scored against the analysis labels under one policy. Counts only.
 
-    ``missed_ids`` are for :func:`write_miss_report` alone and are never printed.
+    ``missed_ids`` are for :func:`write_evaluation_report` alone, and
+    ``failed_ids`` (classifications not ``OK``) for re-scoring without them;
+    neither is ever printed.
     """
 
     condition: str
@@ -1088,6 +1094,7 @@ class EvaluationResult:
     model_id: str
     model_digests: tuple[str, ...]
     prompt_version: str | None
+    model_options: str | None
     policy_version: str
     labels: int
     calibration_labels: int
@@ -1096,13 +1103,14 @@ class EvaluationResult:
     scores: dict[str, dict[str, Any]]
     oracle: dict[str, dict[str, Any]]
     missed_ids: list[str]
+    failed_ids: list[str] = field(default_factory=list)
 
     def report(self) -> dict[str, Any]:
         """Return everything but the missed IDs, for a counts-only JSON report.
 
         :returns: JSON-ready counts and versions.
         """
-        out = {k: v for k, v in self.__dict__.items() if k != "missed_ids"}
+        out = {k: v for k, v in self.__dict__.items() if k not in ("missed_ids", "failed_ids")}
         out["model_digests"] = list(self.model_digests)
         return out
 
@@ -1126,7 +1134,12 @@ def _labels_with_content_flags(
 
 
 def _cached(
-    repo: Repository, cid: str, s: _Subject, identity: tuple[str, str, str | None], b1: bool
+    repo: Repository,
+    cid: str,
+    s: _Subject,
+    identity: tuple[str, str, str | None],
+    b1: bool,
+    model_options: str | None,
 ) -> domain.Classification | None:
     provider, model_id, prompt_version = identity
     wanted = _b1_hash(s.inp) if b1 else s.inp.input_hash
@@ -1138,6 +1151,7 @@ def _cached(
         and k.key.model_id == model_id
         and k.key.prompt_version == prompt_version
         and k.key.taxonomy_version == taxonomy.TAXONOMY_VERSION
+        and k.key.model_options == model_options
     ]
     kept = [k for k in matches if k.outcome in (domain.OK, domain.MALFORMED)]
     pool = kept or matches
@@ -1151,17 +1165,7 @@ def _decide(
     c: domain.Comment,
     policy_version: str,
 ) -> str:
-    ok = outcome == domain.OK
-    return policy.assign(
-        policy.PolicyInput(
-            outcome=outcome,
-            primary_class=primary_class if ok else None,
-            flags=flags,
-            confidence=None,
-            edited_since_review=c.lifecycle_state == domain.EDITED,
-        ),
-        policy_version=policy_version,
-    ).tier.name
+    return _decision(outcome, primary_class, flags, c, policy_version).tier.name
 
 
 def evaluate_condition(
@@ -1174,6 +1178,7 @@ def evaluate_condition(
     model: str | None = None,
     corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
     only_ids: set[str] | None = None,
+    num_ctx: int | None = None,
     connection_id: str | None = None,
 ) -> EvaluationResult:
     """Score cached classifications of labeled comments against the labels, offline.
@@ -1192,6 +1197,8 @@ def evaluate_condition(
     :param model: Model ID, required for ``b2``.
     :param corpus_version: Label directory.
     :param only_ids: Restrict to these comment IDs, such as a fixed dev subset.
+    :param num_ctx: For an Ollama ``b2``, score classifications made with this
+        context size instead of the current one (``ollama.NUM_CTX``).
     :param connection_id: Connection; may be omitted when the store has exactly one.
     :returns: Scores for all labels and for each post order, the oracle ceilings
         under the same policy, and the consequential comments collapsed.
@@ -1212,6 +1219,9 @@ def evaluate_condition(
             raise ServiceError("b2 needs --model")
         identity = (provider_name, model, classifier.PROMPT_VERSION)
         source = "model"
+    options: str | None = None
+    if condition == "b2" and provider_name == ollama.PROVIDER:
+        options = ollama.options_key(num_ctx or ollama.NUM_CTX)
     repo = open_store(root)
     try:
         cid = _pick_connection(repo, connection_id)
@@ -1226,7 +1236,7 @@ def evaluate_condition(
             if s is None:
                 not_scored["not_a_live_subject_in_store"] += 1
                 continue
-            k = _cached(repo, cid, s, identity, condition == "b1")
+            k = _cached(repo, cid, s, identity, condition == "b1", options)
             if k is None:
                 not_scored["not_classified"] += 1
                 continue
@@ -1258,6 +1268,7 @@ def evaluate_condition(
         model_id=identity[1],
         model_digests=tuple(sorted(digests)),
         prompt_version=identity[2],
+        model_options=options,
         policy_version=policy_version,
         labels=len(wanted),
         calibration_labels=calibration,
@@ -1266,6 +1277,7 @@ def evaluate_condition(
         scores={k: v.counts for k, v in scored.items()},
         oracle=label_records.oracle_ceiling(scored_labels, policy_version=policy_version),
         missed_ids=scored["all"].missed_ids,
+        failed_ids=scored["all"].failed_ids,
     )
 
 
@@ -1460,6 +1472,289 @@ def write_evaluation_report(
         misses = out / f"{stamp}-{result.condition}-{name}-misses.txt"
         misses.write_text("".join(f"{i}\n" for i in result.missed_ids), encoding="utf-8")
     return report, misses
+
+
+# Dev-set analysis: tier causes, class confusion, language (counts only) ---------------
+
+
+@dataclass(frozen=True)
+class DevAnalysis:
+    """Counts behind the dev-set evaluation, for a git-ignored JSON report. Counts only.
+
+    No comment text, ID, or name appears anywhere in it.
+    """
+
+    model_id: str
+    model_options: str | None
+    heuristic_version: str
+    subjects: int
+    labels: int
+    conditions: dict[str, dict[str, Any]]
+    precheck: dict[str, Any]
+    confusion: dict[str, dict[str, int]]
+    language: dict[str, Any]
+
+    def report(self) -> dict[str, Any]:
+        """Return the counts as JSON-ready data.
+
+        :returns: Every field.
+        """
+        return dict(self.__dict__)
+
+
+def _decision(
+    outcome: str,
+    primary_class: str | None,
+    flags: frozenset[str],
+    c: domain.Comment,
+    policy_version: str,
+) -> policy.PriorityDecision:
+    ok = outcome == domain.OK
+    return policy.assign(
+        policy.PolicyInput(
+            outcome=outcome,
+            primary_class=primary_class if ok else None,
+            flags=flags,
+            confidence=None,
+            edited_since_review=c.lifecycle_state == domain.EDITED,
+        ),
+        policy_version=policy_version,
+    )
+
+
+def _is_consequential_label(label: dict[str, Any] | None) -> bool:
+    grade = None if label is None else label.get("consequential_prospective")
+    return isinstance(grade, int) and grade >= label_records.CONSEQUENTIAL_FROM
+
+
+def _flags_for(s: _Subject, k: domain.Classification, source: str) -> frozenset[str]:
+    own = frozenset(k.flags_by_source.get(source, [])) & frozenset(taxonomy.FLAGS)
+    return own | frozenset(f for v in s.extra.values() for f in v)
+
+
+type _Row = tuple[_Subject, domain.Classification, dict[str, Any] | None]
+
+
+def _tier_causes(rows: list[_Row], source: str, policy_version: str) -> dict[str, Any]:
+    pit = taxonomy.POSSIBLE_INSTRUCTION_TEXT
+    by_rule: dict[str, Counter[str]] = {"all": Counter(), "labeled": Counter()}
+    by_tier: dict[str, Counter[str]] = {"all": Counter(), "labeled": Counter()}
+    surface: Counter[str] = Counter()
+    surface_consequential: Counter[str] = Counter()
+    raised: Counter[str] = Counter()
+    for s, k, label in rows:
+        flags = _flags_for(s, k, source)
+        d = _decision(k.outcome, k.primary_class, flags, s.comment, policy_version)
+        for scope in ["all"] + (["labeled"] if label is not None else []):
+            by_rule[scope][d.rule_applied] += 1
+            by_tier[scope][d.tier.name] += 1
+        if label is not None and d.tier == policy.Tier.SURFACE:
+            surface[d.rule_applied] += 1
+            if _is_consequential_label(label):
+                surface_consequential[d.rule_applied] += 1
+        if pit in s.extra["precheck"] and d.tier == policy.Tier.SURFACE:
+            without = _decision(
+                k.outcome, k.primary_class, flags - {pit}, s.comment, policy_version
+            )
+            if without.tier != policy.Tier.SURFACE:
+                raised["all"] += 1
+                if label is not None:
+                    raised["labeled"] += 1
+                    raised["labeled_consequential"] += _is_consequential_label(label)
+    return {
+        "rule_applied": {k: dict(sorted(v.items())) for k, v in by_rule.items()},
+        "by_tier": {k: {t: v[t] for t in scoring.TIERS} for k, v in by_tier.items()},
+        "labeled_surface_by_rule": dict(sorted(surface.items())),
+        "labeled_surface_consequential_by_rule": dict(sorted(surface_consequential.items())),
+        "raised_to_surface_by_precheck_alone": {
+            k: raised[k] for k in ("all", "labeled", "labeled_consequential")
+        },
+    }
+
+
+def _counted(values: Iterable[Any]) -> dict[str, int]:
+    return dict(sorted(Counter(str(v) for v in values).items()))
+
+
+def _group_counts(
+    group: list[tuple[_Subject, domain.Classification | None, dict[str, Any] | None]],
+) -> dict[str, Any]:
+    labeled = [label for _, _, label in group if label is not None]
+    model = [(s, k) for s, k, _ in group if k is not None]
+    out: dict[str, Any] = {
+        "comments": len(group),
+        "precheck_fired": sum(
+            1 for s, _, _ in group if taxonomy.POSSIBLE_INSTRUCTION_TEXT in s.extra["precheck"]
+        ),
+        "labeled": len(labeled),
+        "labeled_consequential": sum(1 for r in labeled if _is_consequential_label(r)),
+        "label_class": _counted(r.get("primary_class") for r in labeled),
+        "label_grade": _counted(r.get("consequential_prospective") for r in labeled),
+        "read_via_translation": sum(1 for r in labeled if r.get("read_via_translation") is True),
+        "model_outcomes": _counted(k.outcome for _, k in model),
+        "model_class": _counted(k.primary_class for _, k in model if k.outcome == domain.OK),
+    }
+    for pv in policy.POLICY_VERSIONS:
+        tiers = Counter(
+            _decision(
+                k.outcome, k.primary_class, _flags_for(s, k, "model"), s.comment, pv
+            ).tier.name
+            for s, k in model
+        )
+        out[f"model_tiers_{pv}"] = {t: tiers[t] for t in scoring.TIERS}
+    return out
+
+
+def analyze_dev(
+    root: Path,
+    *,
+    model: str,
+    provider_name: str = ollama.PROVIDER,
+    num_ctx: int | None = None,
+    heuristic_version: str = "hb-v0.2",
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    connection_id: str | None = None,
+) -> DevAnalysis:
+    """Count what decided each tier, the class confusion, and the language mix, offline.
+
+    No model runs. For every stored comment from others, the cached B1 and B2
+    classifications are found as :func:`evaluate_condition` finds them, and each
+    policy version is applied in memory, recording the rule that decided the
+    tier. Also: how often the deterministic pre-check fired and on what labels;
+    B2's predicted class against the label (``OK`` outcomes only); and comments
+    by detected language (:mod:`afterword.language`), with B2's outcomes and the
+    labels for each. Counts only.
+
+    :param root: Repository root.
+    :param model: B2 model ID.
+    :param provider_name: B2 provider.
+    :param num_ctx: For an Ollama B2, the context size its runs used
+        (default: the current one).
+    :param heuristic_version: B1 heuristic version.
+    :param corpus_version: Label directory.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :returns: The counts.
+    :raises ServiceError: For an unknown heuristic version or an ambiguous connection.
+    """
+    from afterword import language
+
+    if heuristic_version not in heuristic.HEURISTIC_VERSIONS:
+        raise ServiceError(f"unknown heuristic version: {heuristic_version}")
+    options = None
+    if provider_name == ollama.PROVIDER:
+        options = ollama.options_key(num_ctx or ollama.NUM_CTX)
+    b1_identity: tuple[str, str, str | None] = ("afterword", heuristic_version, None)
+    b2_identity: tuple[str, str, str | None] = (provider_name, model, classifier.PROMPT_VERSION)
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = {s.comment.comment_id: s for s in _subjects(repo, cid)}
+        labels, _, _ = _labels_with_content_flags(root, corpus_version, subjects)
+        b1 = {i: _cached(repo, cid, s, b1_identity, True, None) for i, s in subjects.items()}
+        b2 = {i: _cached(repo, cid, s, b2_identity, False, options) for i, s in subjects.items()}
+    finally:
+        repo.close()
+    labels = {i: r for i, r in labels.items() if i in subjects}
+
+    conditions: dict[str, dict[str, Any]] = {}
+    for name, cached, source in (("b1", b1, "heuristic"), ("b2", b2, "model")):
+        rows: list[_Row] = []
+        for i, s in subjects.items():
+            k = cached[i]
+            if k is not None:
+                rows.append((s, k, labels.get(i)))
+        conditions[name] = {
+            "classified": len(rows),
+            "not_classified": len(subjects) - len(rows),
+            "outcomes": _counted(k.outcome for _, k, _ in rows),
+        } | {pv: _tier_causes(rows, source, pv) for pv in policy.POLICY_VERSIONS}
+
+    pit = taxonomy.POSSIBLE_INSTRUCTION_TEXT
+    fired = [s for s in subjects.values() if pit in s.extra["precheck"]]
+    fired_labels = [labels[s.comment.comment_id] for s in fired if s.comment.comment_id in labels]
+    rules: Counter[str] = Counter()
+    for s in fired:
+        rules.update(precheck.precheck(s.inp.comment).rules_matched)
+    model_set = [
+        i for i, k in b2.items() if k is not None and pit in k.flags_by_source.get("model", [])
+    ]
+    precheck_counts: dict[str, Any] = {
+        "version": precheck.PRECHECK_VERSION,
+        "fired": len(fired),
+        "of": len(subjects),
+        "rules_matched": dict(sorted(rules.items())),
+        "labeled": len(fired_labels),
+        "labeled_consequential": sum(1 for r in fired_labels if _is_consequential_label(r)),
+        "label_grade": _counted(r.get("consequential_prospective") for r in fired_labels),
+        "label_class": _counted(r.get("primary_class") for r in fired_labels),
+        "model_set_flag": {
+            "set": len(model_set),
+            "also_precheck": sum(1 for i in model_set if pit in subjects[i].extra["precheck"]),
+            "labeled": sum(1 for i in model_set if i in labels),
+            "labeled_consequential": sum(
+                1 for i in model_set if _is_consequential_label(labels.get(i))
+            ),
+        },
+    }
+
+    confusion: dict[str, Counter[str]] = {}
+    for i, label in labels.items():
+        k = b2.get(i)
+        if k is not None and k.outcome == domain.OK:
+            confusion.setdefault(str(k.primary_class), Counter())[
+                str(label.get("primary_class"))
+            ] += 1
+
+    groups: dict[str, list[tuple[_Subject, domain.Classification | None, dict[str, Any] | None]]]
+    groups = {}
+    for i, s in subjects.items():
+        text = normalize.normalize(s.comment.body_source, s.comment.body_source_format or "HTML")
+        guess = language.detect(heuristic.prose(text.text))
+        groups.setdefault(guess.language, []).append((s, b2[i], labels.get(i)))
+    not_languages = ("en", language.TOO_SHORT, language.UNCERTAIN)
+    non_english = [row for code, g in groups.items() if code not in not_languages for row in g]
+    language_counts: dict[str, Any] = {
+        "detector": language.DETECTOR,
+        "min_chars": language.MIN_CHARS,
+        "min_confidence": language.MIN_CONFIDENCE,
+        "text": "normalized prose: code and link targets removed (heuristic.prose)",
+        "by_language": {code: len(g) for code, g in sorted(groups.items())},
+        "groups": {code: _group_counts(g) for code, g in sorted(groups.items())},
+        "non_english": _group_counts(non_english),
+    }
+    return DevAnalysis(
+        model_id=model,
+        model_options=options,
+        heuristic_version=heuristic_version,
+        subjects=len(subjects),
+        labels=len(labels),
+        conditions=conditions,
+        precheck=precheck_counts,
+        confusion={k: dict(sorted(v.items())) for k, v in sorted(confusion.items())},
+        language=language_counts,
+    )
+
+
+def write_dev_analysis(
+    root: Path,
+    result: DevAnalysis,
+    *,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> Path:
+    """Write a dev analysis under ``reports/eval/`` (git-ignored), counts only.
+
+    :param root: Repository root.
+    :param result: The analysis.
+    :param now: Wall clock, for the file name.
+    :returns: The report path.
+    """
+    stamp = now().astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", result.model_id)
+    out = root / EVAL_ROOT
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{stamp}-dev-analysis-{name}.json"
+    path.write_text(json.dumps(result.report(), indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 # Benchmark (synthetic only) -------------------------------------------------------------

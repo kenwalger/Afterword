@@ -190,7 +190,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "corpus_version": "unfrozen",
         "corpus_set": "dev",
         "sample_kind": "researcher",
-        "label_guide_version": "lg-v0.4",
+        "label_guide_version": "lg-v0.5",
         "taxonomy_version": "tax-v0.2",
         "normalization_version": "display-v0.1",
         "primary_class": "TECHNICAL_QUESTION",
@@ -200,6 +200,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "consequential_retrospective_state": "PRESENT",
         "context_reconstructed": True,
         "replied_before_labeling": True,
+        "read_via_translation": False,
         "reason": "needs an answer",
         "pass": "initial",
         "batch_id": "b_20261009T180000Z",
@@ -687,3 +688,14 @@ def test_the_post_view_says_when_the_run_has_no_post_body():
     view = labeling.post_view(snap, comment)
     assert view["available"] is False
     assert "did not capture" in view["reason"]
+
+
+def test_v_at_the_save_prompt_records_a_reading_via_translation(tmp_path, fake_dev):
+    snap = snapshot(tmp_path)
+    answers = label_answers()
+    answers[-1] = "v"
+    script = Script([*answers, *label_answers()])
+    run(snap, tmp_path, script)
+    first, second = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")[:2]
+    assert first["read_via_translation"] is True and second["read_via_translation"] is False
+    assert "v = yes, read via a translation" in script.prompts[6]

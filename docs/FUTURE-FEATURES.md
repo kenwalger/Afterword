@@ -2,7 +2,9 @@
 
 **Status:** Future design note. Not in V1 scope. Every feature here is gated on the Stage 3 result: each assumes that classification on real data is trustworthy, which is exactly what V1 has not yet shown.
 
-**Version:** 3 (2026-10-07)
+**Version:** 4 (2026-10-08)
+
+v4 adds "Multilingual comments" with proposed claim C-020 (appended to `CLAIMS.md`, DEFERRED UNTIL STAGE 3 GATE), and a parking-lot note on counting human and disclosed-AI comments separately.
 
 v3 records that the proposed claims C-013 to C-019 are in `CLAIMS.md` (status DEFERRED UNTIL STAGE 3 GATE), and adds a parking lot.
 
@@ -193,6 +195,28 @@ People with much larger comment volumes than the V1 author do not just have more
 
 Large accounts and teams have comments on many platforms at once (DEV, Hashnode, Medium, YouTube, Reddit, Hacker News). This is likely their biggest need, and the adapter architecture (ADR-001) exists for it. It is deliberately last: one platform working well comes first, and Stage 6 already makes a second source an explicit decision after V1 has evidence.
 
+## Multilingual comments
+
+**What:** help the author read, triage, and answer comments written in languages the author does not read, without the tool ever standing in for the comment.
+
+**Why:** the first count on `dev` (2026-10-08, `docs/benchmarks/2026-10-08-dev-set-evaluation.md`) found 2 of 458 comments from others detected as non-English, with 5 more uncertain. Small for this author, but for a larger or more international audience a comment the author cannot read is a comment the author cannot triage, and today the pre-check cannot see an instruction written in another language (`pc-v0.1` is English-only; adversarial case `adv-110`).
+
+**Adds:**
+
+- **Language detection as a structural field.** Detected language, with the detector and its version, set from normalization like the code and link flags: never a judgment, never a priority input. The detector is chosen again when this becomes a runtime field (the counts-only analysis uses `py3langid`; `lingua` is the stronger candidate for short texts). Short and low-confidence texts get no language rather than a guess.
+- **Local translation, shown beside the original.** Translation through a local model (Ollama), displayed next to the comment, never in place of it, and marked as machine-generated. Stored as derived data with the model, digest, prompt version, and options that produced it, purged with the comment (ADR-009), and never used as the comment's text for classification or labels unless a later, separate decision says so.
+- **A model-boundary record for translation** in `PRIVACY-AND-BOUNDARIES.md`, signed off by the author before any real comment is translated. Translation is a new use of comment text, even on the local path.
+- **The pre-check beyond English.** Instruction patterns for the languages actually observed, each a new pre-check version, tested on synthetic cases in those languages (including `adv-110`), with the same rule as now: a match only raises attention.
+- **Optional translation of the author's reply drafts.** The author writes in their own language; a local model offers a translation; the author reviews, edits, and sends it themselves (ADR-003). Nothing is posted by the tool, and the draft and its translation stay local.
+- **Labels record translation.** From `lg-v0.5` a label records `read_via_translation`, so grades given through a translation can be analyzed apart.
+
+**Hard part:** a translation can be fluent and wrong. A correction can lose the detail that makes it a correction, and a joke or a challenge can flip in tone. The design keeps the original primary and the translation visibly secondary for that reason.
+
+**Proposed claim, C-020: local translation lets the author triage and answer non-English comments without misreading them.**
+
+- Evidence needed: on non-English comments, the author's grade made through the translation against a later grade made with a fluent reader's help or a second translation (agreement on the consequential binary), the share of translations the author judges misleading, and whether any consequential non-English comment was missed.
+- Would weaken or falsify: grades through translation disagree often with the checked grades, translations the author judges misleading are common, or non-English comments are too rare for the feature to matter.
+
 ## Discovery questions for high-volume accounts
 
 Before building anything for larger accounts, find out whether the problem exists for them, how they handle it today, and whether a tool already does it. It is entirely possible that high-volume authors and teams already have a solution, self-built or commercial. Finding that out early is a good outcome.
@@ -242,7 +266,7 @@ For high-volume and team accounts, after discovery conversations confirm the nee
 ## Rules for all of these
 
 - Nothing here starts before the Stage 3 gate.
-- Each feature's claim is appended to `CLAIMS.md` before the feature is built, in the existing format. C-013 to C-019 were appended on 2026-10-07 with status DEFERRED UNTIL STAGE 3 GATE; a feature's claim moves to UNTESTED, by a dated entry, when its work starts.
+- Each feature's claim is appended to `CLAIMS.md` before the feature is built, in the existing format. C-013 to C-019 were appended on 2026-10-07 and C-020 on 2026-10-08, each with status DEFERRED UNTIL STAGE 3 GATE; a feature's claim moves to UNTESTED, by a dated entry, when its work starts.
 - Nothing acts on the author's behalf. Every feature informs; the author decides (ADR-003). That includes every export through an output adapter.
 - Local first (ADR-013). Any new model boundary, such as embeddings, is recorded in `PRIVACY-AND-BOUNDARIES.md` before use.
 
@@ -254,3 +278,4 @@ Ideas noted but not designed. Nothing here is planned.
 
 - **Community Gems.** Show which of the author's posts, and which comments on them, earned DEV gems, and compare gemmed comments with comments labeled consequential. First check whether the API exposes gems at all. (2026-10-04)
 - **Reaction counts are not a reliable engagement metric.** One person can add up to five reactions to a post, so the aggregate cannot be read as unique reactors or as approval. Do not use reaction counts as a proxy for reach or approval without a per-user breakdown, which the API likely does not expose. (2026-10-05)
+- **Count human and disclosed-AI comments separately.** Any dashboard or report that counts comments shows comments whose author disclosed AI use separately from the rest, from platform disclosure fields only and never inferred from style (`PRIVACY-AND-BOUNDARIES.md`, "AI authorship"). Comments disclosed as hand-written (`no_ai` on DEV) count as human; "not disclosed" is its own bucket, never folded into either. (2026-10-08)

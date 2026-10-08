@@ -59,7 +59,7 @@ def test_chat_request_is_schema_constrained_deterministic_and_thinking_off(no_li
     assert body["options"] == {
         "temperature": 0,
         "seed": ollama.SEED,
-        "num_ctx": 2048,
+        "num_ctx": ollama.NUM_CTX,
         "num_predict": 200,
     }
     assert [m["role"] for m in body["messages"]] == ["system", "user"]
@@ -69,7 +69,7 @@ def test_length_and_context_overflow_are_reported(no_live_api):
     fake = FakeOllama(no_live_api, done_reason="length")
     provider = ollama.OllamaProvider(QWEN)
     assert provider.complete("s", "u", SCHEMA, 200).stop_reason == LENGTH
-    fake.done_reason, fake.prompt_eval_count = "stop", 1900
+    fake.done_reason, fake.prompt_eval_count = "stop", ollama.NUM_CTX - 150
     assert provider.complete("s", "u", SCHEMA, 200).stop_reason == CONTEXT_OVERFLOW
 
 

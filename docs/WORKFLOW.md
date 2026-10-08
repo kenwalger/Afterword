@@ -92,7 +92,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 ### The screen
 
 - **Left:** the post title, when the comment was posted, the context status, a "Show post" panel, and the thread as it stood when the comment was posted (later comments hidden). The context status says whether any known gap exists (a deleted earlier comment, a post edited after the comment), whether the comment replies to you (`REPLY_TO_AUTHOR` is then set automatically), and whether your reply already exists in the snapshot (`replied_before_labeling`). By default only the reply chain is shown; `t` shows every earlier comment in the thread. `p` opens the post panel: the post's body as saved in the run, as plain text with no live links, with a warning when the post was edited after the comment (`LABELING-GUIDE.md`, `lg-v0.4`). Runs from before `dev-probe-0.2` have no post bodies, and the panel says so.
-- **Right:** the class (radio buttons), flags (checkboxes), the prospective grade, the retrospective grade (shown only after the prospective grade is set), the reason, a hard-to-label note, and the shortcut legend. Hovering a class or flag shows its definition; `h` shows all of them.
+- **Right:** the class (radio buttons), flags (checkboxes), the prospective grade, the retrospective grade (shown only after the prospective grade is set), the reason, "Read via a translation" (`v`), a hard-to-label note, and the shortcut legend. Hovering a class or flag shows its definition; `h` shows all of them.
 - **Header:** pass, batch, position in the batch, labels saved this session, and comments still unlabeled in the pass. A badge on the right shows the totals for the run: comments labeled (initial pass), relabeled (calibration pass), and eligible. It never shows classes or grades.
 
 ### Keyboard shortcuts
@@ -109,6 +109,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 | `g` then `0` to `3` | Retrospective grade (`g` then `-` clears it) |
 | `e` | Type the reason |
 | `w` | Type a hard-to-label note |
+| `v` | Mark that you read the comment through a translation (`read_via_translation`, `lg-v0.5`) |
 | Esc | Leave a text field; close the definitions |
 | Enter | Save the label and show the next comment (also from inside a text field) |
 | `t` | Toggle the reply chain and the full thread as of the comment |
@@ -129,7 +130,7 @@ Flag keys toggle. From `tax-v0.2` (2026-10-04) `CONTAINS_CODE` and `CONTAINS_LIN
 
 ### Saving and stopping in the terminal (`label`)
 
-- A label is written when its summary is confirmed at the `Save? [Enter = yes, r = redo, s = skip, q = save and stop]` prompt: Enter saves; `q` (or end of input) saves, then stops. Each saved label is on disk before the next comment is shown.
+- A label is written when its summary is confirmed at the `Save? [Enter = yes, v = yes, read via a translation, r = redo, s = skip, q = save and stop]` prompt: Enter saves; `v` saves with `read_via_translation: true`; `q` (or end of input) saves, then stops. Each saved label is on disk before the next comment is shown.
 - `q` at any earlier prompt, or Ctrl+C anywhere, stops without saving the comment on screen. The tool says so: "was NOT saved" when answers had been entered for it, "was not labeled" when none had. The batch's end record carries `abandoned_in_progress` (true when answers were discarded). The comment comes back in a later batch.
 - When a batch ends, by completion or by `q`, the last line gives the totals: "N labeled this session, bringing the total to M of T." M counts the eligible comments labeled in the pass and T the eligible comments in the run, by the same rules the tools use to choose batches.
 

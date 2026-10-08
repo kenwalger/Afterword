@@ -54,6 +54,7 @@ class Score:
 
     counts: dict[str, Any]
     missed_ids: list[str] = field(default_factory=list)
+    failed_ids: list[str] = field(default_factory=list)
 
 
 def _consequential(item: Scored) -> bool:
@@ -81,7 +82,8 @@ def score(items: Iterable[Scored]) -> Score:
     :param items: The joined records.
     :returns: Consequential recall (``SURFACE`` or ``QUEUE``), review reduction
         (share ``COLLAPSED``), tier sizes, ``SURFACE`` precision (the share of
-        ``SURFACE`` comments graded 2 or 3), outcomes, per-class precision and
+        ``SURFACE`` comments graded 2 or 3), ``SURFACE`` capture (the share of
+        consequential comments at ``SURFACE``), outcomes, per-class precision and
         recall, judgment-flag precision (``REFERENCES_SPECIFIC_CLAIM`` also by
         the label's taxonomy version), flag-caused raises, and the IDs of
         consequential comments collapsed.
@@ -129,6 +131,8 @@ def score(items: Iterable[Scored]) -> Score:
         "surface_size": by_tier["SURFACE"],
         # Of the comments at SURFACE, how many are graded 2 or 3 (proposed co-primary).
         "surface_precision": _share(cons_tier["SURFACE"], by_tier["SURFACE"]),
+        # Of the consequential comments, how many reach SURFACE.
+        "surface_capture": _share(cons_tier["SURFACE"], len(consequential)),
         "review_reduction": _share(by_tier[COLLAPSED], n),
         "consequential": len(consequential),
         "consequential_by_tier": {t: cons_tier[t] for t in TIERS},
@@ -142,7 +146,8 @@ def score(items: Iterable[Scored]) -> Score:
             "graded_0_or_1": sum(1 for r in raised if not _consequential(r)),
         },
     }
-    return Score(counts=counts, missed_ids=missed)
+    failed = sorted(r.comment_id for r in rows if r.outcome != "OK")
+    return Score(counts=counts, missed_ids=missed, failed_ids=failed)
 
 
 def score_by_post_order(items: Iterable[Scored]) -> dict[str, Score]:

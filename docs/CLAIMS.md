@@ -19,6 +19,7 @@ When evidence changes a claim, append the result and date. Do not rewrite the or
 **Status:** UNTESTED
 
 - 2026-10-02: Measurement linked to labeler self-agreement (`LABELING-GUIDE.md`) and `UNCERTAIN` rate. No evidence yet.
+- 2026-10-08: Provisional, from 302 `dev` labels. The categories are usable (1 `UNCERTAIN` in 302), but class is a weak proxy for consequence: 49 of the 84 comments graded 2 or 3 are `TECHNICAL_EXTENSION`, a `QUEUE` class, and 22 of the 46 `TECHNICAL_QUESTION` comments, a `SURFACE` class, are graded 1 (`EVALUATION.md`, "Class is a weak proxy for consequence"). The claim says categories help decide what to inspect next; on this evidence they decide whether to inspect, not well what to inspect first. The claim text is unchanged.
 
 ## C-002: Prioritization can reduce review workload
 
@@ -32,6 +33,7 @@ When evidence changes a claim, append the result and date. Do not rewrite the or
 
 - 2026-10-02: Priority is now policy-computed (ADR-007). Measured on `test-natural` for reduction and `test-enriched` for recall. No evidence yet.
 - 2026-10-02 (later): ADR-010 amended. `test-natural` and `test-enriched` are replaced by one prospective `test` set (comments on posts published after preregistration), which measures both reduction and recall. No evidence yet.
+- 2026-10-08: Provisional, from 302 `dev` labels (not the test set). Under `pp-v0.1` even perfect classification collapses at most 57 of 302 (18.9%) and places 54 of the 84 consequential comments at `QUEUE`, not `SURFACE`, because class is a weak proxy for consequence. The reduction available from class-based priority is therefore modest by construction, and the ordering within the review threshold carries little of the consequence. SURFACE size, precision, and capture are now co-primary measures (`EVALUATION.md` v13). How consequence should reach the tier is the open design question for session 9, in tension with ADR-007. The claim text is unchanged.
 
 ## C-003: Explanations improve oversight
 
@@ -103,6 +105,8 @@ Claims below were added on 2026-10-02 during scoping v2.
 
 - 2026-10-02: Measured on the prospective `test` set (ADR-010 amended), where B1 and B2 run in shadow mode with sealed outputs. No evidence yet.
 - 2026-10-08: Provisional, from `dev` (302 labels; tuning set, not the test set). B1 under `pp-v0.1` already matches the oracle ceiling on review reduction (44 of 302 collapsed, as with perfect classes and flags) and surfaces 81 of 84 consequential comments against the oracle's 84. On the claim's two named measures, the room left for B2 to beat B1 on `dev` is therefore at most 3 consequential comments, or reduction beyond the oracle's under `pp-v0.1`, which only a policy change could give. Where B1 is weak is `SURFACE`: 126 comments, 50 of them graded 2 or 3 (39.7%), against the oracle's 55 and 30 of 55. A proposal (`docs/proposals/2026-10-08-surface-co-primary.md`, not yet approved) would make SURFACE size and precision co-primary measures, which would change what "materially better" in this claim is measured on. The claim text is unchanged.
+- 2026-10-08 (later): The proposal was accepted by the author with SURFACE capture added, and moved to `docs/proposals/accepted/2026-10-08-surface-co-primary.md`. SURFACE size, precision, and capture are co-primary in `EVALUATION.md` v13. On the 302 labels: B1 capture 50 of 84, oracle 30 of 84. The claim text is unchanged.
+- 2026-10-08 (C2): Provisional, from `dev` (302 labels; tuning set, not the test set), with the first full model pass (`llama3.1:8b-instruct-q4_K_M`, `pr-v0.2`, 4096-token context; a candidate, not B2). Against B1 `hb-v0.2` under `pp-v0.1`: recall 84 of 84 against 81 of 84; review reduction 17 of 302 against 45; SURFACE 142 against 126, precision 55 of 142 against 50 of 126, capture 55 of 84 against 50 of 84. Under `pp-v0.2` Llama collapses 25, with the rest unchanged. On the claim's terms the model buys 3 consequential comments at the cost of 20 to 28 fewer collapses, so neither "better recall at the same reduction" nor "better reduction at the same recall" holds on `dev`. Its class agreement with the labels is 84 of 302 (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`). The claim text is unchanged.
 
 ## C-009: The problem exists at this author's volume
 
@@ -262,6 +266,18 @@ Claims below were added on 2026-10-07 (session 8), as proposed in `FUTURE-FEATUR
 
 - 2026-10-07: Added from `FUTURE-FEATURES.md`, feature 7 (feedback extraction through output adapters). No evidence yet.
 
+
+## C-020: Local translation lets the author triage and answer non-English comments without misreading them
+
+**Claim:** Local translation, shown beside the original comment and marked as machine-generated, lets the author triage and answer non-English comments without misreading them.
+
+**Evidence needed:** On non-English comments, the author's grade made through the translation against a later grade made with a fluent reader's help or a second translation (agreement on the consequential binary), the share of translations the author judges misleading, and whether any consequential non-English comment was missed.
+
+**Would weaken/falsify:** Grades made through translation often disagree with the checked grades, translations the author judges misleading are common, or non-English comments are too rare for the feature to matter.
+
+**Status:** DEFERRED UNTIL STAGE 3 GATE
+
+- 2026-10-08: Added from `FUTURE-FEATURES.md`, "Multilingual comments". First count on `dev`: 2 of 458 comments from others detected as non-English, 5 uncertain, 16 too short to classify (`docs/benchmarks/2026-10-08-dev-set-evaluation.md`, section 5). No evidence on the claim itself yet.
 
 ## Future features (docs only, no code):
 - Add docs/FUTURE-FEATURES.md (already on disk) to the README reading

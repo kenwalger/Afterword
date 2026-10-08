@@ -1,6 +1,8 @@
 # Labeling Guide
 
-**Version:** `lg-v0.4`
+**Version:** `lg-v0.5`
+
+`lg-v0.5` (2026-10-08, with 302 `dev` labels made under `lg-v0.2` and `lg-v0.3`) adds `read_via_translation`: the labeler records that they read the comment through a translation rather than in its original language. Grades, definitions, tests, blinding, and the passes are unchanged, so earlier labels need no change; labels made before the field existed simply lack it, and analysis treats a missing value as "not recorded", never as `false`.
 
 `lg-v0.4` (2026-10-07, with 302 `dev` labels made under `lg-v0.2` and `lg-v0.3`) lets the label UI show the post's body, on request, from the saved run (context reconstruction, "Post edits"). Grades, definitions, tests, blinding, and the passes are unchanged, so earlier labels need no change. Each batch record says whether the post panel was available (`post_panel`).
 
@@ -19,6 +21,7 @@ For each non-author comment in the corpus:
 - retrospective consequentiality (required when known)
 - a one-line reason for any consequential label
 - labeling time (`duration_seconds`, recorded by the labeling tool)
+- whether the comment was read through a translation (`read_via_translation`; see below)
 
 ## Consequential: definition
 
@@ -65,6 +68,14 @@ The reconstruction is partial, and the limits are known:
 - **The post body (`lg-v0.4`, label UI only).** `afterword label-ui` can show the post's body in a collapsible panel (`p`, or "Show post"), rendered as plain text from the saved run's single fetch of the post: no comments, no profiles, no live links, nothing fetched. It is the post as of the run. When the post's last edit is later than the comment, the panel warns that the text may differ from what the commenter saw (the same condition sets `context_reconstructed: false`). Runs from before `dev-probe-0.2` have no post bodies, and the panel says so. The terminal tool does not show the body. Each batch record carries `post_panel`: `true` when the panel was available for that batch.
 
 `replied_before_labeling` is also recorded by the tool: `true` when the snapshot contains the author's direct reply to the comment. For historical comments it is usually `true`, and it lets the analysis separate grades given after replying from grades given before. For the prospective test set, label before replying where possible.
+
+### Reading through a translation (`lg-v0.5`)
+
+When a comment is in a language you do not read well enough to grade it, you may read it through a translation (any tool you choose, outside Afterword). Record that you did: `v` in the label UI, or `v` instead of Enter at the terminal's `Save?` prompt. The field is `read_via_translation: true`; otherwise it is `false`.
+
+- Grade the comment, not the translation. If the translation seems to lose or flip something (tone, a technical detail, a correction), say so in the reason or the note, and consider `UNCERTAIN`.
+- Use the original for flags where you can: links, code, and replies are structural and do not depend on the translation.
+- Labels read through a translation are analyzed apart from the others (C-020). A translation is never stored by the labeling tools.
 
 `context_reconstructed` is recorded by the tool, not chosen by the labeler. It is `false` when any comment in the shown thread (an ancestor or earlier sibling) is a deletion placeholder, or when the post's last edit time is later than the comment. Otherwise it is `true`, which means "no known gap", not "verified identical". Runs from before `dev-probe-0.2` lack most posts' edit times; the tool then checks only the posts it has.
 

@@ -1,6 +1,8 @@
 # Proposal: SURFACE size and SURFACE precision as co-primary measures (amends EVALUATION.md)
 
-**Status:** PROPOSED (2026-10-08). Not applied. `EVALUATION.md` is unchanged until the author approves.
+**Status:** ACCEPTED WITH ONE ADDITION (2026-10-08, the author). Applied to `EVALUATION.md` v13. This file is kept as the record of the evidence and the original proposal; where it differs from the applied text, `EVALUATION.md` wins.
+
+Addition on acceptance: **SURFACE capture**, the share of consequential comments that reach `SURFACE`, is reported alongside SURFACE size and SURFACE precision for every condition. On the 302 labels under `pp-v0.1`: oracle (labeled class and flags) 30 of 84, B1 50 of 84.
 
 **Date:** 2026-10-08, before preregistration and before any model classified a real comment.
 

@@ -1,6 +1,10 @@
 # Data Model
 
-**Version:** 9 (2026-10-07)
+**Version:** 11 (2026-10-08)
+
+v11 (2026-10-08, later the same day) adds `read_via_translation` to EvaluationLabel (`LABELING-GUIDE.md` `lg-v0.5`). Nothing earlier is removed.
+
+v10 (2026-10-08) adds `model_options` to Classification and its cache key (store schema 2), after the local context size changed. Nothing earlier is removed.
 
 v9 (2026-10-07, ADR-009 amended) matches the deletion placeholder by its distinguishing features and ignores an allowlist of platform-wide keys. Nothing earlier is removed.
 
@@ -177,6 +181,7 @@ A model interpretation of a comment. Never part of the comment itself.
 - `model_provider`, `model_id` (for a heuristic: `afterword` and the heuristic version, such as `hb-v0.1`)
 - `model_digest` (value state; the local model's content digest, which pins it; `NOT_EXPOSED` for a remote model, which is pinned by its dated ID)
 - `prompt_version` (null for a heuristic; `classifier_kind` says why)
+- `model_options` (part of the cache key; see Cache below)
 - `normalization_version`
 - `precheck_version`
 - `input_fields_sent` (for the model boundary record)
@@ -189,7 +194,7 @@ A model interpretation of a comment. Never part of the comment itself.
 
 #### Cache and incremental classification
 
-A classification is identified by its **cache key**: `input_hash`, `model_provider`, `model_id`, `model_digest`, `prompt_version`, and `taxonomy_version`. The input hash covers the comment's normalized text and every context field sent with it (post title, parent comment text), so an edit to a parent changes the key.
+A classification is identified by its **cache key**: `input_hash`, `model_provider`, `model_id`, `model_digest`, `prompt_version`, `taxonomy_version`, and `model_options` (from 2026-10-08: the generation options that can change the answer, such as `num_ctx=4096;num_predict=200;seed=20261003;temperature=0` for Ollama; null for a heuristic. Rows from before store schema 2 record the options they ran with, 2048-token context for Ollama). The input hash covers the comment's normalized text and every context field sent with it (post title, parent comment text), so an edit to a parent changes the key.
 
 A comment is classified only when no `OK` or `MALFORMED` classification exists for its current key: new comments, edited comments (or edited context), and any version change. `MALFORMED` is kept rather than retried, because at temperature 0 the same input produces the same output. `FAILED` (transport error, timeout) is retried on the next run.
 
@@ -225,6 +230,7 @@ Ground truth for the corpus. Separate from operational overrides.
 - `consequential_retrospective` (0 to 3, value state)
 - `context_reconstructed` (boolean)
 - `replied_before_labeling` (boolean; the author's direct reply to the comment existed in the snapshot when it was labeled)
+- `read_via_translation` (boolean, from `lg-v0.5`; the labeler read the comment through a translation. Absent on earlier labels, which means "not recorded")
 - `reason`
 - `pass` (`initial`, `calibration`, `self_agreement`; a calibration label re-labels a comment from scratch and never overwrites its initial label. Analysis uses the latest label from a pass other than `self_agreement`, `LABELING-GUIDE.md`)
 - `snapshot_run_id` (the sync or probe run the comment and its context were read from; provenance, not identity)

@@ -474,6 +474,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
             model=args.model,
             corpus_version=args.corpus_version,
             only_ids=_id_file(args.ids),
+            num_ctx=args.num_ctx,
             connection_id=args.connection,
         )
     except service.ServiceError as exc:
@@ -498,6 +499,39 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     print(f"report: {report}")
     if misses is not None:
         print(f"miss list (IDs only, {len(result.missed_ids)}): {misses}")
+    return 0
+
+
+def cmd_dev_analysis(args: argparse.Namespace) -> int:
+    """Count tier causes, class confusion, and languages on the dev set, offline.
+
+    Writes the counts to a git-ignored JSON report and prints a short summary.
+    Counts only: no text, IDs, or names.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        result = service.analyze_dev(
+            Path(args.root),
+            model=args.model,
+            provider_name=args.provider,
+            num_ctx=args.num_ctx,
+            heuristic_version=args.heuristic,
+            corpus_version=args.corpus_version,
+            connection_id=args.connection,
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    path = service.write_dev_analysis(Path(args.root), result)
+    pre = result.precheck
+    print(
+        f"{result.subjects} comments from others, {result.labels} labeled; pre-check "
+        f"{pre['version']} fired on {pre['fired']} ({pre['labeled']} labeled, "
+        f"{pre['labeled_consequential']} graded 2 or 3)"
+    )
+    print(f"languages ({result.language['detector']}): {result.language['by_language']}")
+    print(f"report: {path}")
     return 0
 
 
@@ -715,6 +749,11 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--model", help="model ID (B2)")
     evaluate.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
     evaluate.add_argument("--ids", help="file of comment IDs to restrict to, one per line")
+    evaluate.add_argument(
+        "--num-ctx",
+        type=int,
+        help="Ollama B2: score runs made with this context size (default: the current one)",
+    )
     evaluate.add_argument("--connection", help="connection ID; optional with one connection")
     evaluate.add_argument(
         "--misses",
@@ -722,6 +761,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="also write the IDs of consequential comments collapsed (git-ignored)",
     )
     evaluate.set_defaults(func=cmd_evaluate)
+
+    analysis = sub.add_parser(
+        "dev-analysis", help="tier causes, class confusion, and languages on dev (counts only)"
+    )
+    analysis.add_argument("--model", required=True, help="B2 model ID")
+    analysis.add_argument("--provider", choices=service.PROVIDERS, default="ollama")
+    analysis.add_argument(
+        "--num-ctx", type=int, help="Ollama B2: the context size its runs used (default: current)"
+    )
+    analysis.add_argument(
+        "--heuristic", choices=list(heuristic.HEURISTIC_VERSIONS), default="hb-v0.2"
+    )
+    analysis.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
+    analysis.add_argument("--connection", help="connection ID; optional with one connection")
+    analysis.set_defaults(func=cmd_dev_analysis)
 
     subset = sub.add_parser(
         "dev-subset", help="seeded, class-balanced subset of labeled dev comments (IDs to a file)"
