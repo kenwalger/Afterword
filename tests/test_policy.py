@@ -26,7 +26,7 @@ def ok(cls: str, *flags: str, confidence: str | None = None, edited: bool = Fals
 def test_class_defaults_match_the_document():
     table = dict(re.findall(r"^\| `([A-Z_]+)` \| `(SURFACE|QUEUE|COLLAPSED)` \|$", DOC, re.M))
     assert {k: v.name for k, v in CLASS_DEFAULTS.items()} == table
-    assert POLICY_VERSION == "pp-v0.1" and f"`{POLICY_VERSION}`" in DOC
+    assert POLICY_VERSION == "pp-v0.2" and f"`{POLICY_VERSION}`" in DOC
 
 
 @pytest.mark.parametrize("cls", taxonomy.CLASSES)
@@ -35,7 +35,7 @@ def test_each_class_gets_its_default_and_records_it(cls):
     assert decision.tier == CLASS_DEFAULTS[cls]
     assert decision.rule_applied == f"class_default:{cls}"
     assert decision.rules_fired == (f"class_default:{cls}",)
-    assert decision.policy_version == "pp-v0.1"
+    assert decision.policy_version == "pp-v0.2"
 
 
 @pytest.mark.parametrize("outcome", [None, "MALFORMED", "FAILED"])
@@ -79,10 +79,18 @@ def test_instruction_text_is_recorded_even_when_the_class_already_surfaces():
         ("REFERENCES_SPECIFIC_CLAIM", "override:references_specific_claim"),
     ],
 )
-def test_flag_overrides_raise_collapsed_to_queue(flag, rule):
-    decision = assign(ok("LIGHTWEIGHT_ACKNOWLEDGMENT", flag))
+def test_flag_overrides_raise_collapsed_to_queue_under_pp_v0_1(flag, rule):
+    decision = assign(ok("LIGHTWEIGHT_ACKNOWLEDGMENT", flag), policy_version="pp-v0.1")
     assert decision.tier is Tier.QUEUE
     assert decision.rule_applied == rule
+
+
+@pytest.mark.parametrize("flag", ["NEEDS_THREAD_CONTEXT", "REFERENCES_SPECIFIC_CLAIM"])
+def test_judgment_flags_are_informational_under_the_applied_policy(flag):
+    decision = assign(ok("LIGHTWEIGHT_ACKNOWLEDGMENT", flag))
+    assert decision.policy_version == "pp-v0.2"
+    assert decision.tier is Tier.COLLAPSED
+    assert decision.rules_fired == ("class_default:LIGHTWEIGHT_ACKNOWLEDGMENT",)
 
 
 def test_a_flag_override_does_not_claim_a_tier_the_class_already_set():
@@ -105,7 +113,8 @@ def test_several_queue_overrides_record_the_first_in_table_order():
             "REFERENCES_SPECIFIC_CLAIM",
             "REPLY_TO_AUTHOR",
             edited=True,
-        )
+        ),
+        policy_version="pp-v0.1",
     )
     assert decision.rule_applied == "override:edited_since_review"
     assert decision.rules_fired == (

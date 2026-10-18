@@ -1,6 +1,8 @@
 # Commands
 
-**Version:** 2 (2026-10-08)
+**Version:** 3 (2026-10-18)
+
+v3 makes `pp-v0.2` the default policy of `classify` and `evaluate` (adopted 2026-10-18).
 
 v2 adds `ingest --keep-runs` and the saved-run redaction (ADR-009, amended 2026-10-08), the plain-language `baseline` console summary, and read-only store commands that never create a database.
 
@@ -64,7 +66,7 @@ uv run afterword bench --synthetic --model <ollama-model>
 - `connections`, `store-status`, and `forget` never create the database. Without one they say so and exit 0.
 - `classify` runs B1 (heuristic) or B2 (a local model through Ollama, whose model-boundary path is signed off) over stored comments from others, incrementally, and applies the priority policy. It refuses a provider whose path is not signed off and a model whose digest differs from its pin.
 - `store-status` prints the store's comments by lifecycle state and its lifecycle events, counts only.
-- `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.1`, or the candidate `pp-v0.2`), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.
+- `evaluate` scores cached B1 or B2 classifications against your `dev` labels under a policy version (`pp-v0.2`, the applied one and the default, or `pp-v0.1` for earlier results), without running a model. It prints counts and writes a git-ignored report under `reports/eval/`; `--misses` also writes the IDs of consequential comments that were collapsed, for your own review.
 - `dev-subset` draws a seeded, class-balanced subset of labeled `dev` comments and writes its IDs to a git-ignored file, for `classify --ids` and `evaluate --ids`. It prints counts only.
 - `dev-analysis` counts, offline, which rule decided each tier for B1 and B2 under each policy, how often the pre-check fired and on what labels, B2's class against your labels, and comments by detected language; counts only, to a git-ignored report.
 - `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.

@@ -179,7 +179,9 @@ def test_policies_are_compared_on_cached_model_output_without_calling_the_model(
     )
     service.classify_comments(tmp_path, condition="b2", model=QWEN)
     calls = len(fake.chats)
-    first = service.evaluate_condition(tmp_path, condition="b2", model=QWEN)
+    first = service.evaluate_condition(
+        tmp_path, condition="b2", model=QWEN, policy_version="pp-v0.1"
+    )
     second = service.evaluate_condition(
         tmp_path, condition="b2", model=QWEN, policy_version="pp-v0.2"
     )

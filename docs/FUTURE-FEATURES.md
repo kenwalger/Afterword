@@ -2,7 +2,9 @@
 
 **Status:** Future design note. Not in V1 scope. Every feature here is gated on the Stage 3 result: each assumes that classification on real data is trustworthy, which is exactly what V1 has not yet shown.
 
-**Version:** 4 (2026-10-08)
+**Version:** 5 (2026-10-18)
+
+v5 adds "V2: how consequence reaches the tier", with two candidates the author deferred from V1 on 2026-10-18: a split of `TECHNICAL_EXTENSION` made by a classifier, and a model-predicted consequence signal as a raise-only tier input. Their proposed claims are not yet in `CLAIMS.md`.
 
 v4 adds "Multilingual comments" with proposed claim C-020 (appended to `CLAIMS.md`, DEFERRED UNTIL STAGE 3 GATE), and a parking-lot note on counting human and disclosed-AI comments separately.
 
@@ -216,6 +218,38 @@ Large accounts and teams have comments on many platforms at once (DEV, Hashnode,
 
 - Evidence needed: on non-English comments, the author's grade made through the translation against a later grade made with a fluent reader's help or a second translation (agreement on the consequential binary), the share of translations the author judges misleading, and whether any consequential non-English comment was missed.
 - Would weaken or falsify: grades through translation disagree often with the checked grades, translations the author judges misleading are common, or non-English comments are too rare for the feature to matter.
+
+## V2: how consequence reaches the tier
+
+**Why:** class is a weak proxy for consequence. With perfect classes and flags, `pp-v0.2` surfaces all 129 consequential `dev` comments within the review threshold but puts 75 of them at `QUEUE`, 65 of those `TECHNICAL_EXTENSION`, a class whose labeled comments are graded 2 or 3 about half the time (65 of 131). For V1 the author accepted this ceiling (2026-10-18): thresholds are registered against the oracle under `pp-v0.2`. The analysis behind both candidates below, and the class-default remaps that were rejected, is in `docs/proposals/accepted/2026-10-18-consequence-to-tier.md`. Neither candidate starts before the Stage 3 gate.
+
+### Candidate (b): split `TECHNICAL_EXTENSION` into substantive and passing, made by a classifier
+
+**What:** two kinds of extension: substantive (engages with the post's argument, reports a result, extends a method) at `SURFACE`, passing (a related link or tool, a brief aside) at `QUEUE`. A taxonomy and policy change, inside ADR-007.
+
+**The open question is whether a classifier can make the split.** A split made by hand risks re-encoding the consequence grade: a labeler who already knows how much a comment mattered will tend to call the consequential ones substantive, and the split then measures the grade under another name. Its value depends on a definition by what the comment does that a classifier (B2, and a rule for B1) can apply without access to the grade, and on agreement between that classifier and the labeler that does not simply track the grade.
+
+**Bounds and current evidence (`dev`, 2026-10-18):** a perfect split that tracked the grade exactly would give the oracle `SURFACE` 149, precision 119 of 149, capture 119 of 129, an upper bound only. The one classifier signal available, Llama calling a labeled extension a challenge, separates weakly (30 of 55 consequential against 35 of 76) and reversed on the newest labels.
+
+**Needs:** a taxonomy version, a guide version and field-guide review, a prompt version, a B1 rule, a full B2 rerun, and labels for the split made in a way that limits re-encoding (for example, judged from the comment alone, without the thread outcome, in a separate pass with grades hidden).
+
+**Proposed claim (not yet in `CLAIMS.md`): a classifier can split technical extensions so that the split separates consequence.**
+
+- Evidence needed: on labeled extensions, the classifier's split against the consequential binary (share consequential in each part, with intervals), its agreement with a labeler's split, and how much of that agreement the grade alone explains.
+- Would weaken or falsify: the substantive part's consequential share is not clearly above the class's, or the classifier's split agrees with the labeler only where the grade does.
+
+### Candidate (c): a model-predicted consequence signal as a raise-only tier input
+
+**What:** the model reports one descriptive boolean, such as "pushes on a specific claim or method in the post", with a quoted span of the comment as evidence, verified verbatim. The policy raises a comment with a valid signal to `SURFACE`, never lowers anything, and records the rule.
+
+**Needs an ADR-007 amendment** (drafted in the proposal): what the signal describes (a property of the text, never "importance"), raise-only through a named policy rule, the policy's control over it, accepted manipulation cost under ADR-008 (it can inflate `SURFACE`, never suppress), checkable evidence, no self-reported strength (Llama reported `HIGH` confidence on all 478 `dev` comments), and how B1 compares when it has no counterpart.
+
+**Test path:** a prompt version with the one field, synthetic cases for and against it and injection cases aimed at it, then a full `dev` pass by the author, scored offline under a candidate policy with the five primary measures.
+
+**Proposed claim (not yet in `CLAIMS.md`): an evidence-carrying model signal raises consequential comments to `SURFACE` more precisely than class does.**
+
+- Evidence needed: the signal's raises, counted with their grades, against the condition's existing `SURFACE` precision; how often it fires; its behavior on adversarial cases.
+- Would weaken or falsify: its raises are no more often consequential than the condition's existing `SURFACE`, it fires on a large share of comments (as the judgment flags did, about half), or adversarial text trips it with valid-looking evidence.
 
 ## Discovery questions for high-volume accounts
 

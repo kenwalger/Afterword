@@ -53,7 +53,7 @@ def test_b1_classifies_comments_from_others_only_and_reuses_its_cache(runs, tmp_
     assert k.classifier_kind == domain.HEURISTIC
     assert (k.confidence, k.confidence_state) == (None, domain.NOT_EXPOSED)
     assert k.key.prompt_version is None and k.input_fields_sent == ("comment",)
-    assert p.policy_version == "pp-v0.1"
+    assert p.policy_version == "pp-v0.2"
     again = classify(tmp_path, "b1")
     assert (again.classified, again.reused) == (0, 4)
 

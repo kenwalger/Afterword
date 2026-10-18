@@ -1,12 +1,14 @@
 # ADR-009: Upstream Deletion Propagates to Local Data
 
-**Status:** Accepted, provisional (amended 2026-10-02, 2026-10-07, and 2026-10-08)
+**Status:** Accepted, provisional (amended 2026-10-02, 2026-10-07, 2026-10-08, and 2026-10-18)
 
 The 2026-10-02 amendment is based on one self-deleted sample per case (a comment without replies and a comment with a reply, both deleted by their author, who is also the post author). Deletion by another user, moderator removal, and account deletion are untested. Any of them may look different, and this ADR is revisited when one is observed.
 
 The 2026-10-07 amendment changes how the placeholder is matched, after DEV added two keys to every comment node, the placeholder included (run `20261007T224849Z`; `docs/friction-log/session-8.md`). It matches by the placeholder's distinguishing features instead of its exact key set, and ignores an explicit allowlist of platform-wide keys. The evidence base for what a deletion looks like is unchanged, so the status stays provisional.
 
 The 2026-10-08 amendment makes the code and this decision agree about saved probe runs. The purge had covered the store only, while the decision said "local storage"; the raw responses of earlier runs, under `fixtures/dev-api/source/real/`, still held a deleted comment's text and author (`docs/friction-log/session-9.md`). Saved runs are now redacted, never deleted, and a retention rule limits how long any saved run keeps text. What a deletion looks like on DEV is still known from author self-deletion only, so the status stays provisional.
+
+The 2026-10-18 amendment records a second DEV deletion behavior, observed in run `20261018T173927Z` (`docs/friction-log/session-11.md`): two deleted comments **without replies** remained as placeholders and were still counted in `comments_count`, unlike the 2026-10-02 hand test. Who deleted them is unknown; moderation or spam removal is the likely cause, unconfirmed. The placeholder rule matched them unchanged, so handling stays as it is. The cause is unconfirmed and the evidence is two comments on one post, so the status stays provisional.
 
 ## Context
 
@@ -16,6 +18,10 @@ The original decision assumed deletion appears as absence. A hand test on 2026-1
 
 - A deleted comment **without replies** disappears from the thread.
 - A deleted comment **with replies** remains as a **placeholder**. It keeps its `id_code`, `created_at`, `type_of`, and `children`; its body is replaced; and its `user` is an empty object. The placeholder persisted after its last reply was deleted. DEV's `comments_count` excludes placeholders.
+
+Both were observed for author self-deletion. A second behavior was observed on 2026-10-18 (run `20261018T173927Z`), for comments whose deleter is unknown:
+
+- Two top-level comments **without replies**, posted on 2026-10-09 and 2026-10-10 and never observed live, **remain as placeholders** of the same shape, and DEV's `comments_count` for their post **counts them** (3: one live comment and the two placeholders). Under author self-deletion such a comment disappeared and the count excluded placeholders. The likely cause is moderation or spam removal; it is not confirmed.
 
 Between runs `20261003T141450Z` and `20261007T224849Z`, DEV extended `ai_disclosure_label` and `ai_disclosure_level` from 189 of 714 comment nodes (the newer comments) to 750 of 750, including the one known placeholder, whose other fields were unchanged. Under the exact-key-set rule of 2026-10-02 that placeholder became an unexpected shape. DEV's comment schema can change without notice, so a rule that depends on the whole key set breaks on any platform-wide addition, while a rule that ignores unknown keys would let a genuinely new shape pass silently.
 
@@ -55,6 +61,8 @@ Its body text and raw payloads are purged from local storage and corpus files at
 - Count reconciliation against `comments_count` compares live comments only.
 - Replies to a deleted author comment keep `REPLY_TO_AUTHOR` only when authorship was known before deletion.
 - Deletion paths other than author self-deletion remain `UNKNOWN` until observed. Observing one is a trigger to revisit this ADR.
+- A placeholder may have no replies (2026-10-18). Nothing in the matching rule depends on replies, so such a placeholder is handled like any other: `DELETED_UPSTREAM` by `SOURCE_PLACEHOLDER`, authorship `UNKNOWN` when it was never observed live, thread structure only.
+- `comments_count` does not reliably exclude placeholders: it excluded them after author self-deletion and included them in the 2026-10-18 case. Count reconciliation reports a post where they differ as a limitation; it is not an error.
 - Re-running a measurement on a reduced run gives the same counts but no text; labeling or classifying from it is not possible. Measurements that need text use a recent run.
 - A run that labels were made from keeps its text for as long as those labels exist, apart from deleted comments. Deleting the labels lets the next ingest reduce it.
 - The pre-commit identity scan reads names and handles from saved runs, so a reduced run no longer contributes the names it held. The newest runs, and any run kept for labels, still do.

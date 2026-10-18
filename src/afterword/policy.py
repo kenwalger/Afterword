@@ -1,4 +1,4 @@
-"""Priority policy `pp-v0.1`, and the candidate `pp-v0.2` (`docs/PRIORITY-POLICY.md`, ADR-007).
+"""Priority policy `pp-v0.2`, and the earlier `pp-v0.1` (`docs/PRIORITY-POLICY.md`, ADR-007).
 
 A pure function from a classification (or its absence) and structural signals
 to a tier. The model never chooses priority. Overrides only raise a tier.
@@ -18,10 +18,10 @@ from enum import IntEnum
 
 from afterword import taxonomy
 
-POLICY_VERSION: str = "pp-v0.1"
-# Policy versions that can be applied. `pp-v0.2` is a candidate evaluated offline
-# on `dev` (EVALUATION.md, "Model-set flags only raise tiers", design (b)); the
-# version applied when classifying stays POLICY_VERSION until one is chosen.
+POLICY_VERSION: str = "pp-v0.2"
+# Policy versions that can be applied. `pp-v0.2` (adopted 2026-10-18,
+# docs/proposals/accepted/2026-10-18-adopt-pp-v0.2.md) is applied when
+# classifying; `pp-v0.1` stays available so earlier results can be rescored.
 POLICY_VERSIONS: tuple[str, ...] = ("pp-v0.1", "pp-v0.2")
 # Judgment flags that are informational under each version: recorded and shown,
 # never raising a tier. Only a classifier (a model, or a labeler in an oracle
@@ -116,7 +116,7 @@ def assign(
     confidence_floor: str | None = CONFIDENCE_FLOOR,
     policy_version: str = POLICY_VERSION,
 ) -> PriorityDecision:
-    """Compute the tier for one comment under `pp-v0.1` or the candidate `pp-v0.2`.
+    """Compute the tier for one comment under `pp-v0.2` (applied) or `pp-v0.1`.
 
     `pp-v0.2` differs in one way: ``NEEDS_THREAD_CONTEXT`` and
     ``REFERENCES_SPECIFIC_CLAIM`` are informational and never raise a tier. The

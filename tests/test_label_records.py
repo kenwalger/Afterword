@@ -201,11 +201,14 @@ def test_the_broad_rsc_ceiling_ignores_rsc_on_tax_v0_1_labels_only():
     old = label("a", cls="LIGHTWEIGHT_ACKNOWLEDGMENT", flags=["REFERENCES_SPECIFIC_CLAIM"])
     old["taxonomy_version"] = "tax-v0.1"
     new = old | {"comment_id": "b", "taxonomy_version": "tax-v0.2"}
-    ceiling = lr.oracle_ceiling([old, new])
+    ceiling = lr.oracle_ceiling([old, new], policy_version="pp-v0.1")
     assert ceiling["class_and_flags"]["collapsed"] == 0
     assert ceiling["class_and_flags_without_broad_rsc"]["collapsed"] == 1
     assert ceiling["class_and_flags_without_rsc"]["collapsed"] == 2
     assert list(ceiling) == [name for name, _, _ in lr.ORACLE_VARIANTS]
+    # Under pp-v0.2 the flag never raises, so every variant collapses both.
+    applied = lr.oracle_ceiling([old, new])
+    assert {v["collapsed"] for v in applied.values()} == {2}
 
 
 def test_wilson_interval_brackets_the_share():

@@ -11,28 +11,20 @@ Rules for any session working in this repository.
 
 ## Current stage
 
-**Stage 0** of `docs/ROADMAP.md` is finishing in parallel with **Stage 1 to 3a groundwork** (plan approved 2026-10-03, session 4).
+**Stage 0 is done and Stage 3a decisions are made; preregistration (Stage 3b) is next.** Stage 1 to 3a groundwork (plan approved 2026-10-03, session 4) is built: normalization `norm-v0.1`, pre-check `pc-v0.1`, the priority policy, B1, the synthetic adversarial set, the SQLite store with ingest, lifecycle, purge, and saved-run redaction (ADR-009, ADR-013), the classifier wrapper with its cache, the Ollama and Anthropic providers, and the service functions and CLI commands over them (ADR-012).
 
-- Stage 0 done: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (Option 2: historical `dev`, prospective `test`; ADR-010 amended). Timed chronological reviews done (2026-10-03, recorded in `CLAIMS.md` 2026-10-04). Stage 0 gate decided 2026-10-04: continue as planned (C-012 added). Remaining, by the author: labeling the `dev` corpus, from 2026-10-04 with `--posts random --seed N`. Analyses of partial labels report publication-order and shuffled labels separately (`afterword.label_records.split_by_post_order`).
-- Groundwork in scope, all of it independent of labels and real comment data, all through the service layer (ADR-012):
-  1. Docs: `DATA-MODEL` v5, `PRIORITY-POLICY` clarifications, `EVALUATION` v4, model-boundary records in `PRIVACY-AND-BOUNDARIES` v3.
-  2. Normalization `norm-v0.1` (separate from the labeling tool's `display-v0.1`) and edit detection by normalized text.
-  3. Instruction pre-check `pc-v0.1` (ADR-008).
-  4. Priority policy `pp-v0.1`, pure, recording `rule_applied`.
-  5. Heuristic baseline B1 `hb-v0.1`.
-  6. Synthetic adversarial set `fixtures/corpus/adversarial.jsonl`, including injection cases.
-  7. SQLite store behind a repository interface (ADR-013), ingest from probe runs with lifecycle and purge (ADR-009).
-  8. Classifier wrapper with schema-constrained output and an incremental cache.
-  9. Providers: Ollama (primary, local) and Anthropic (secondary, `claude-haiku-4-5-20251001`).
-  10. Service functions and CLI commands for the above.
-  11. Benchmark of the two approved Ollama models on synthetic fixtures only.
-- Checkpoint: after items 1 to 6, stop for the author to commit before items 7 to 11.
+- Stage 0: skeleton, read-only DEV probe, capability matrix, volume baseline (C-009), corpus targets (historical `dev`, prospective `test`; ADR-010 amended), timed chronological reviews, and the gate decision (2026-10-04: continue as planned, C-012 added). **`dev` labeling is complete:** 478 of 478 comments from others in run `20261018T173927Z` (2026-10-18), 150 in publication order and 328 shuffled (seed 20261004). Comments that arrive before preregistration also belong to `dev` and are labeled as they come. Analyses report publication-order and shuffled labels separately (`afterword.label_records.split_by_post_order`).
+- **Stage 3a decisions (the author, 2026-10-18; `docs/EVALUATION.md` v17):**
+  - B2 is Llama, `llama3.1:8b-instruct-q4_K_M` through Ollama, pinned digest, `pr-v0.2`, `num_ctx=4096`. B1 `hb-v0.2` is the baseline.
+  - The applied policy is `pp-v0.2`: model-set `NEEDS_THREAD_CONTEXT` and `REFERENCES_SPECIFIC_CLAIM` are informational. `pp-v0.1` stays available for rescoring.
+  - The class-based ceiling is accepted for V1; registered thresholds are set against the oracle under `pp-v0.2`. Class-default remaps are rejected; the extension split and a model consequence signal are V2 candidates (`docs/FUTURE-FEATURES.md`).
+  - The labeler self-agreement check runs on or after 2026-10-22, by the rule in `LABELING-GUIDE.md` (pool: labels at least 14 days old when drawn; every pooled comment graded 2 or 3 plus 25 at random, seed 20261018). The calibration pass on the first 150 is dropped unless that check shows a problem.
 
 Orientation checks open items at their source, not in earlier session summaries: count the valid timing records under `reports/timing/` (`afterword.timing.load_valid`, aggregates only) and the label records under `fixtures/labels/` (`afterword.label_records`, counts only). Never print record contents. A summary that lists an item as open can be out of date.
 
 Model calls, local or remote, run only on synthetic data. No real comment data goes to any model until the author says so and the model-boundary record for that path is signed off; the author runs real model passes in their own terminal. Claude may ingest saved probe runs into the local store when a session prompt asks for it (from 2026-10-07). Claude never reads real comment text, and reports counts and aggregates only.
 
-The seeded, class-balanced dev subset for model runs (session 8, Part C) is in scope now that labels exist.
+The seeded, class-balanced dev subset for model runs (session 8, Part C) is in scope.
 
 Still out of scope: shadow mode and sealing (Stage 3b/3c), `--set test` selection, review state, overrides, dispositions, any UI, and any write call to DEV.
 

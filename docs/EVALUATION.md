@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 16 (2026-10-18)
+**Version:** 17 (2026-10-18)
+
+v17 (2026-10-18, later the same day) records the author's decisions: B2 is Llama, with B1 as the baseline; `pp-v0.2` is the applied policy; the class-based ceiling is accepted for V1, with thresholds to be set against the oracle under `pp-v0.2`; the self-agreement check runs on or after 2026-10-22; the calibration pass is dropped unless that check shows a problem. Nothing is registered yet.
 
 v16 (2026-10-18, `dev` labeling complete on run `20261018T173927Z`) records the label summary of all 478 `dev` labels, the recomputed accrual estimate, and the oracle ceilings of `pp-v0.1` and `pp-v0.2` with SURFACE measures. Nothing registered changes; nothing is chosen.
 
@@ -153,6 +155,20 @@ Every other model (a second local model, a remote comparison model such as Anthr
 
 During Stage 3a the candidate models are compared on `dev` and on the adversarial set. The choice of B2 is made there, recorded with its reasons, and frozen with the other versions.
 
+**Decision (2026-10-18, the author): B2 is Llama,** `llama3.1:8b-instruct-q4_K_M` through Ollama, pinned by its content digest (`46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e`), with prompt `pr-v0.2` and options `num_ctx=4096;num_predict=200;seed=20261003;temperature=0` as they stand, all to be frozen at preregistration. **B1 (`hb-v0.2`) is the baseline.** Qwen and the Anthropic path are not registered; either may still run as a secondary comparison under the rules above. The evidence is in `docs/proposals/accepted/2026-10-18-b2-identity-evidence.md`. The trade-offs accepted with it, on all 478 `dev` labels under `pp-v0.2` (development evidence, labels made with hindsight):
+
+| | Llama (B2) | B1 (baseline) | Oracle |
+| --- | --- | --- | --- |
+| Consequential recall | 129 of 129 | 125 of 129 | 129 of 129 |
+| Review reduction | 39 of 478 (8.2%) | 79 (16.5%) | 103 (21.5%) |
+| SURFACE size | 216 (45.2%) | 199 (41.6%) | 84 (17.6%) |
+| SURFACE precision | 79 of 216 (36.6%) | 77 of 199 (38.7%) | 54 of 84 (64.3%) |
+| SURFACE capture | 79 of 129 (61.2%) | 77 of 129 (59.7%) | 54 of 129 (41.9%) |
+
+- **For Llama:** no consequential miss (B1 misses 4); class agreement 144 of 478 against 131; it can carry a later consequence signal (`FUTURE-FEATURES.md`, V2); `pp-v0.2` costs it nothing on `dev` or the adversarial set.
+- **Accepted against it:** about half B1's review reduction (39 against 79); a slightly larger, slightly less precise `SURFACE`; about 44 seconds per comment locally, and a full rerun for any prompt change; explanations that can go along with injected text (Stage 4 marks them).
+- **Shared shortfall:** neither is near the oracle's `SURFACE`; they put different consequential comments there (48 shared, 31 Llama only, 29 B1 only).
+
 ## Primary measures
 
 ### Consequential recall
@@ -208,7 +224,7 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 - Stability across model or prompt versions on `dev`.
 - Prospective versus retrospective agreement (C-010), separately for `dev` (hindsight available when labeled) and `test` (labeled at first read).
 - Grades given after replying versus before (`replied_before_labeling`).
-- Labeler self-agreement (see `LABELING-GUIDE.md`).
+- Labeler self-agreement (see `LABELING-GUIDE.md`). **On `dev` (decided 2026-10-18):** the check runs on or after 2026-10-22, by the guide's rule: the pool is the analysis labels at least 14 days old when the list is drawn, and the sample is every pooled comment graded 2 or 3 plus 25 at random (seed 20261018). On 2026-10-22 that is about 104 comments, covering the first 150 and the first 152 shuffled labels. **The calibration pass on the first 150 is dropped** unless this check shows a problem: under `pp-v0.2` no first-150 label's tier depends on the judgment flags the pass was meant to correct (none, against 1 under `pp-v0.1`), and the C-010 outlier is the first 152 shuffled labels, not the first 150 (`docs/proposals/accepted/2026-10-18-relabeling-scope.md`).
 - **Volume split (C-012).** Review reduction, consequential recall, and, where weeks are timed, review time per week, reported separately for test-period weeks above the trailing-13-week median volume of comments from others and for weeks at or below it. The median is computed from the last full probe run before preregistration, recorded with the run ID, and frozen with the other versions; weeks are Monday to Sunday, UTC, as in the C-009 baseline. Each group reports its number of weeks and comments. With at most 16 weeks the groups are small, so the split is indicative and reported in counts.
 
 ## Provisional observations on `dev`
@@ -439,11 +455,15 @@ The labels show the same pressure from the other side: the author's `tax-v0.1` l
 
 Both are judged on `dev` by the same measures as everything else: consequential recall and review reduction at the same time, with flag-caused raises and their grades reported. The choice, if any, is made before preregistration and frozen with the other versions.
 
+**Decision (2026-10-18, the author): design (b) is adopted as `pp-v0.2`,** the applied policy (`PRIORITY-POLICY.md`; `docs/proposals/accepted/2026-10-18-adopt-pp-v0.2.md`). On all 478 `dev` labels it moves 12 Llama comments (all graded 0) and 9 oracle comments (graded 0 or 1) from `QUEUE` to `COLLAPSED`, and nothing for B1. Design (a) is not pursued in V1. The judgment flags stay in the model's output and their precision is still reported.
+
 ### Class is a weak proxy for consequence (2026-10-08, finding)
 
 Under `pp-v0.1`, even perfect classification places 54 of the 84 consequential comments on the 302 `dev` labels at `QUEUE`, not `SURFACE` (SURFACE capture 30 of 84). The consequential comments are mostly `TECHNICAL_EXTENSION` (49 of 84) and `CONVERSATIONAL` (4), which default to `QUEUE`, while `TECHNICAL_QUESTION`, which defaults to `SURFACE`, has 22 of its 46 labeled comments graded 1. The class says what a comment does; it does not say how much the comment matters, and the policy maps class to tier.
 
 Nothing changes now. **Open design question for session 9: how should consequence reach the tier?** Candidates include grade-like signals from the classifier, a policy that uses more than the class, or accepting the ceiling and judging conditions against it. Any answer has to be weighed against ADR-007 (priority is computed by an explicit, auditable policy from class, flags, and structure, never chosen by the model): a model-reported importance would reintroduce the model-chosen priority that ADR-007 removed, and its manipulation risk (ADR-008). Any change is a new policy (and possibly prompt and taxonomy) version, chosen on `dev` before preregistration.
+
+**Decision (2026-10-18, the author): accept the ceiling for V1.** Registered thresholds will be set against the oracle under `pp-v0.2` (on all 478 `dev` labels: recall 129 of 129, reduction 103 of 478, SURFACE 84, precision 54 of 84, capture 54 of 129). Class-default remaps are rejected: the only one stable across a split-half search, `TECHNICAL_EXTENSION` to `SURFACE`, inflates `SURFACE` to about 80% of comments for Llama. A classifier-made split of `TECHNICAL_EXTENSION` and a model-predicted consequence signal are V2 candidates (`FUTURE-FEATURES.md`). Evidence: `docs/proposals/accepted/2026-10-18-consequence-to-tier.md`.
 
 ### Dev-set evaluation, B1 and Llama (2026-10-08, provisional)
 
@@ -488,7 +508,7 @@ Every pre-check pattern is English, so instruction-like text in another language
 
 ## Registered thresholds
 
-*Not yet set. To be filled at the end of Stage 3a.*
+*Not yet set. To be filled at the end of Stage 3a.* Decided 2026-10-18: thresholds for SURFACE size, precision, and capture are set relative to the oracle under `pp-v0.2` on `dev`, as above.
 
 Design preference stands: tolerate extra false positives before accepting consequential false negatives.
 

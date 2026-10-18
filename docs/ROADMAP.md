@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 10 (2026-10-18)
+**Version:** 11 (2026-10-18)
+
+v11 records the author's Stage 3a decisions of 2026-10-18: B2 is Llama with B1 as the baseline, `pp-v0.2` is the applied policy, the class-based ceiling is accepted for V1, the self-agreement check is set for 2026-10-22 or later, and the calibration pass is dropped unless that check shows a problem.
 
 v10 records `dev` labeling complete (478 of 478 eligible in run `20261018T173927Z`), the third real ingest, and the status line to match.
 
@@ -40,7 +42,7 @@ Done:
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 - `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
 
-Open: preregistration decisions (B2, policy version, thresholds) on `dev`. `dev` labeling is complete: 478 of 478 comments from others in run `20261018T173927Z` (2026-10-18), labeled by the author. Three real runs are ingested into the local store; B1 has classified all 478 and Llama the 458 stored before 2026-10-18. The dev-set evaluation of B1 and Llama under `pp-v0.1` and `pp-v0.2` on the first 302 labels is in `docs/benchmarks/2026-10-08-dev-set-evaluation.md`; the label summary, accrual estimate, and oracle ceilings on all 478 are in `docs/EVALUATION.md` (v16). No model or policy is chosen.
+Open: preregistration (Stage 3b). Decided on 2026-10-18 (`docs/EVALUATION.md` v17): B2 is Llama (`llama3.1:8b-instruct-q4_K_M`, pinned digest) with B1 (`hb-v0.2`) as the baseline; `pp-v0.2` is the applied policy; the class-based ceiling is accepted for V1, with thresholds to be set against the oracle under `pp-v0.2`. `dev` labeling is complete (478 of 478 in run `20261018T173927Z`), and three real runs are ingested; B1 and Llama have classified all 478. The labeler self-agreement check runs on or after 2026-10-22. What remains before preregistration is listed in `docs/friction-log/session-11.md` (session summary).
 
 ## Stage 0: Freeze the experiment
 
@@ -118,7 +120,7 @@ Goal: determine whether assisted triage is useful before building a large UI.
 - [x] Implement taxonomy prompt with schema-constrained output. (2026-10-03: classifier `pr-v0.1` with an incremental cache, `pr-v0.2` from 2026-10-04 without the code and link flags; Ollama provider, path signed off; Anthropic provider, path not signed off, tested against mocked HTTP only.)
 - [x] Implement priority policy. (2026-10-03: `pp-v0.1` as pure, tested code, recording `rule_applied` and `rules_fired`.)
 - [x] Implement heuristic baseline (B1). (2026-10-03: `hb-v0.1`, a draft until tuned on `dev`.)
-- [ ] Iterate on `dev` only. (Started 2026-10-07: B1 scored and `hb-v0.2` tuned on 302 labels; candidate `pp-v0.2`; `afterword evaluate`.)
+- [x] Iterate on `dev` only. (Started 2026-10-07: B1 scored and `hb-v0.2` tuned on 302 labels; candidate `pp-v0.2`; `afterword evaluate`. Decided 2026-10-18 on all 478 labels: B2 Llama, B1 baseline, `pp-v0.2` applied, ceiling accepted; further iteration only if the self-agreement check calls for it.)
 - [ ] Backlog: a read-only viewer that opens the comments in an ID list (such as an `afterword evaluate --misses` list) in the label UI, with no labeling controls and no records written. For the author's own miss review.
 - [ ] Run the adversarial set; fix injection handling. (2026-10-03: run once on both local models, synthetic sets only, `docs/benchmarks/2026-10-03-synthetic-local-models.md`. Rerun 2026-10-04 under `pr-v0.2`: injection tiers unchanged, 8 of 10 for both. The pre-check `pc-v0.1` has two known gaps, adv-109 and adv-110, not yet fixed.)
 
