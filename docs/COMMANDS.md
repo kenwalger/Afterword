@@ -1,6 +1,10 @@
 # Commands
 
-**Version:** 3 (2026-10-18)
+**Version:** 5 (2026-10-18)
+
+v5 adds `preregistration posts` and `preregistration exclude-post` (posts about Afterword are excluded from the test set; ADR-010, amended 2026-10-18).
+
+v4 adds `self-agreement draw` and `report`, `--set test` on the label tools, the `shadow` commands (`run`, `status`, `verify`, `reveal`, `score`), and `corpus export` and `verify`, all built in session 12. The order in which to use them is `PREREGISTRATION.md`.
 
 v3 makes `pp-v0.2` the default policy of `classify` and `evaluate` (adopted 2026-10-18).
 
@@ -38,6 +42,7 @@ uv run afterword label --run <run-id>
 - `uv run afterword label status --run <run-id>` prints labeling progress for the run: labeled, remaining, and labels by pass, by tool, and by post order (publication order or shuffled). Counts only, never classes or grades.
 - `--pass calibration` (either tool) re-labels comments that already have an initial label, from scratch, with the earlier label hidden; `--ids <file>` picks which. Nothing is overwritten (`LABELING-GUIDE.md`).
 - Either tool takes `--posts random --seed N`, which shuffles the order of posts reproducibly; comments within a post stay oldest first. Keep the same seed for a whole pass.
+- `--set dev` (the default) or `--set test` (either tool, and `label status`) chooses the corpus set (ADR-010). Before preregistration every comment is `dev` and `--set test` is refused. Once `registry/preregistration.json` exists, `test` is the comments on posts published after its `registered_at`, `dev` the comments on earlier posts that arrived by then, and the rest belong to neither set; the tools print the three counts. Labels record their set, and `label status` counts one set at a time.
 - The full labeling routine, including every shortcut, is in `WORKFLOW.md` (section 3).
 - `uv run afterword baseline --run <run-id>` prints a plain-language summary of your comment volume, each figure with one line saying what it means, and writes the full C-009 volume report under `reports/`.
 
@@ -70,5 +75,32 @@ uv run afterword bench --synthetic --model <ollama-model>
 - `dev-subset` draws a seeded, class-balanced subset of labeled `dev` comments and writes its IDs to a git-ignored file, for `classify --ids` and `evaluate --ids`. It prints counts only.
 - `dev-analysis` counts, offline, which rule decided each tier for B1 and B2 under each policy, how often the pre-check fired and on what labels, B2's class against your labels, and comments by detected language; counts only, to a git-ignored report.
 - `bench --synthetic` benchmarks a model on the committed synthetic sets only; its output is safe to share.
+- `classify` and `evaluate` work on `dev` only. Test comments are classified by `shadow run` alone, and test labels are scored by `shadow score` alone.
+
+## Self-agreement, the frozen corpus, and shadow mode
+
+```text
+uv run afterword self-agreement draw --seed 20261018
+uv run afterword self-agreement report
+uv run afterword preregistration posts
+uv run afterword preregistration exclude-post --post <post-id>
+uv run afterword corpus export --version v1
+uv run afterword corpus verify --version v1
+uv run afterword shadow run
+uv run afterword shadow status
+uv run afterword shadow verify
+uv run afterword shadow reveal
+uv run afterword shadow score
+```
+
+- `self-agreement draw --seed N` draws the self-agreement sample by the rule in `LABELING-GUIDE.md`: every analysis label at least 14 days old is pooled; the sample is every pooled comment graded 2 or 3 plus 25 drawn at random from the pool with the seed. The IDs go to `reports/eval/self-agreement-<date>-s<seed>.txt` (git-ignored), with a JSON record of the draw beside it; one draw per day and seed. Label them with `--pass self_agreement --ids <file>`. Options: `--set`, `--corpus-version`.
+- `self-agreement report` compares each self-agreement label with the comment's analysis label: Cohen's kappa on class, agreement on the consequential split (2 or 3 against 0 or 1) with its interval and the direction of each change, agreement on the grade, and relabels made less than 14 days after the original. Counts only on the console; the comment IDs of every disagreement, with what differs, go to a git-ignored file under `reports/eval/`.
+- `corpus export --version v1` freezes one corpus set (`--set`, default `dev`): its records, with normalized text, to `fixtures/corpus/v1/<set>.jsonl` (git-ignored), and its manifest, IDs and hashes only, to `registry/corpus-v1-<set>.json`, to commit. A version is written once. `corpus verify` checks the file against the manifest and reports matched, withdrawn (ADR-009), changed, missing, and extra records; it exits 1 unless nothing changed beyond withdrawals. Each `ingest` withdraws comments deleted upstream from every frozen corpus file: text removed, ID kept, logged in `reports/redactions.jsonl`.
+- `preregistration posts` lists the posts published after `registered_at`, newest first: post ID, publication date, `test` or `excluded`, the count of comments from others, and the title (the author's own text; nothing from a commenter). `preregistration exclude-post --post <id>` appends an exclusion to `registry/preregistration.json` with the time it was recorded (`--reason`, default "post about Afterword"), to commit. It refuses an unknown post, a post published before preregistration, a post already excluded, and a post whose test comments are already labeled unless `--after-labeling`, which records the exclusion as late. Comments on an excluded post belong to neither set: no labeling tool, `classify`, shadow run, export, count, or score includes them.
+- `shadow run` (needs `registry/preregistration.json`) classifies the test comments not yet sealed with the registered B1 and B2, applies the registered policy, and seals one record per comment and condition (classifier, versions, class, flags, outcome, tier, rule; no text or explanation) in a new git-ignored file under `reports/shadow/`. It prints the file, its SHA-256, and counts, never an output, and appends the hash to `registry/shadow-ledger.jsonl`, to commit that week. It refuses if the record's digest, context size, policy, or heuristic does not match the application, if a sealed file no longer matches the ledger, or after the reveal. A comment whose B2 output failed is held back and retried next run, unless `--seal-failed`. Option: `--ollama-host`.
+- `shadow status` prints weeks elapsed, test comments labeled, whether each stopping-rule target is met, and the ledger's state. It never shows outputs or the number of test comments graded 2 or 3.
+- `shadow verify` checks every sealed file against the ledger: matched, hash differs, missing, or not in the ledger. It exits 1 unless every file matches.
+- `shadow reveal` verifies the sealed files, applies the stopping rule (both 20 test comments graded 2 or 3 and 100 labeled, or 16 weeks), and only then writes `registry/reveal.json`, to commit. Once revealed, `shadow run` refuses.
+- `shadow score` (after the reveal) verifies the sealed files again and scores B1 and B2 with their sealed tiers against the test labels made before the reveal, with the five primary measures, by post order, and the oracle beside them. Counts on the console; the full counts to `reports/eval/shadow-score-<time>.json`.
 
 Every command takes `--help` for its full option list (`uv run afterword --help`, `uv run afterword probe --help`).

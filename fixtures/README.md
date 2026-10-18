@@ -14,7 +14,7 @@ Fixtures support repeatable ingestion and classification tests without live API 
 
 ## Layout
 
-Entries marked *(planned)* do not exist yet: the real corpus is not frozen until preregistration (ADR-010).
+The real corpus is not frozen until preregistration (ADR-010); `afterword corpus export` writes it then.
 
 ```text
 fixtures/
@@ -25,7 +25,7 @@ fixtures/
     MANIFEST.md        # public: every corpus file, how it was made, its SHA-256
     adversarial.jsonl  # synthetic, public: the adversarial set (EVALUATION.md)
     synthetic-bench.jsonl  # synthetic, public: class-balanced set for model benchmarks only
-    v1/                # git-ignored: real comment text (planned)
+    v1/                # git-ignored: real comment text, written by `afterword corpus export`
       dev.jsonl
       test.jsonl       # prospective, accrued after preregistration (ADR-010)
   labels/              # git-ignored, written by `afterword label`
@@ -46,7 +46,9 @@ Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries 
 {"comment_id": "1a2b", "source_object_id": "1a2b", "content_id": "p_017", "corpus_set": "test", "body_text": "...", "parent_comment_id": null, "context_as_of": "2026-03-14T09:12:00Z", "provenance": "public-real", "normalization_version": "norm-v0.1"}
 ```
 
-`comment_id` is the source comment ID (DEV `id_code`), which is stable across runs. It is a string, and some values are all digits. Before the corpus is frozen, labels exist without a corpus record and join to it later on `comment_id`.
+`comment_id` is the source comment ID (DEV `id_code`), which is stable across runs. It is a string, and some values are all digits. `content_id` is the post's source ID, `parent_comment_id` the parent's source ID (`null` for a top-level comment), and `context_as_of` the comment's creation time. Before the corpus is frozen, labels exist without a corpus record and join to it later on `comment_id`.
+
+A comment deleted upstream after the freeze is withdrawn at the next ingest (ADR-009): `body_text` becomes `null`, and `"withdrawn": true` and `"withdrawn_on"` (a date) are added. The record's ID and place stay.
 
 ## Label record (`labels/<corpus_version>/<pass>.jsonl`)
 
@@ -57,8 +59,8 @@ Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries 
 - `flags`: from `tax-v0.2`, the structural flags (`REPLY_TO_AUTHOR`, `CONTAINS_CODE`, `CONTAINS_LINK`) come first, set by the tool (code and link from `norm-v0.1` of the comment's source body), then the labeler's. Analysis uses the deterministic code and link flags for every label, whatever its `taxonomy_version` (`docs/TAXONOMY.md`).
 - `snapshot_run_id`: the probe run the comment and its context were read from. Provenance, not identity.
 - `normalization_version`: the text rendering the labeler saw. `display-v0.1` is the labeling tool's display rendering, not the Stage 2 classification normalization.
-- `corpus_version`: `unfrozen` until `dev` is frozen at preregistration.
-- `corpus_set`: `dev` (the default; every historical comment) or `test` (prospective comments, labeled with `--set test`; ADR-010).
+- `corpus_version`: the label directory, `unfrozen`, for every label: `dev` and `test` alike, before and after the corpus is frozen (decided 2026-10-18). It names where labels are kept, not a frozen corpus version; freezing the corpus as `v1` (`afterword corpus export`) moves no label, and every command reads `unfrozen` by default.
+- `corpus_set`: `dev` (the default; every historical comment) or `test` (prospective comments, labeled with `--set test`; ADR-010). Each label records its set, which is how analysis tells the two apart in the one directory. A label without the field predates it and is a `dev` label.
 - `sample_kind`: who produced the label and how the comment was sampled. Every V1 label is `researcher` (the author's own labeling of `dev` or `test`; `docs/EVALUATION.md`). Other sources, such as random collapsed-tier audits or targeted exercises, are a future design (`docs/LABELING-AT-SCALE.md`) and would add values, never reuse this one. Labels written before the field existed (2026-10-03, before session 5's change) have no `sample_kind`; they are researcher labels, and readers treat an absent value as `researcher`. Existing label records are never rewritten to add it.
 - `consequential_retrospective_state`: `PRESENT`, or `UNKNOWN` when the labeler skipped the retrospective grade (the grade is then `null`).
 - `context_reconstructed`: see `docs/LABELING-GUIDE.md`.
@@ -70,4 +72,4 @@ Schema, provenance, and hashes are in `corpus/MANIFEST.md`. Each record carries 
 
 ## Freezing
 
-`dev` is frozen by committing its manifest hashes at preregistration. The prospective `test` set is sealed differently (ADR-010): each week's shadow-mode classifier outputs are written to a git-ignored file whose hash is committed that week, and nothing is revealed until accrual stops. A changed hash means a new corpus version.
+`dev` is frozen by committing its manifest hashes at preregistration: `afterword corpus export --version v1` writes `fixtures/corpus/v1/dev.jsonl` and the manifest `registry/corpus-v1-dev.json`, which holds the corpus version and set, the preregistration time, the store's latest sync run, the normalization versions, the file's SHA-256, and, for each record, its comment ID, post ID, and record SHA-256. No text. The manifest lives under `registry/` with the other committed preregistration records, not beside the synthetic sets, whose `MANIFEST.md` is checked by a test. `afterword corpus verify --version v1` checks the file against it; a withdrawn record is reported apart from a changed one. The prospective `test` set is sealed differently (ADR-010): each week's shadow-mode classifier outputs are written to a git-ignored file whose hash is committed that week, and nothing is revealed until accrual stops. A changed hash means a new corpus version.

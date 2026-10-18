@@ -16,11 +16,12 @@ The documents are the source of truth for Afterword: the experiment was designed
 12. [`API-CAPABILITY-MATRIX.md`](API-CAPABILITY-MATRIX.md)
 13. [`ROADMAP.md`](ROADMAP.md): the stages, their gates, and the status log
 14. [`WORKFLOW.md`](WORKFLOW.md): the operating protocol: fresh probe, timing before labeling, labeling sessions, and the weekly routine of the test period
-15. [`COMMANDS.md`](COMMANDS.md): the full command reference
-16. [`LABELING-AT-SCALE.md`](LABELING-AT-SCALE.md): a future design note for labeling beyond V1 (not V1 scope)
-17. [`FUTURE-FEATURES.md`](FUTURE-FEATURES.md): candidate features after the Stage 3 gate, each with a proposed claim (not V1 scope)
-18. [`adr/`](adr/): the architecture decision records
-19. [`proposals/`](proposals/): changes under discussion, and accepted ones with their evidence
-20. [`FRICTION-LOG.md`](FRICTION-LOG.md): the index of the friction log, with the entries in one file per session under [`friction-log/`](friction-log/)
-21. [`benchmarks/`](benchmarks/): dated benchmark write-ups, informational only
-22. [`BRAND.md`](BRAND.md): how the name and logo are presented
+15. [`PREREGISTRATION.md`](PREREGISTRATION.md): the runbook from preregistration through the sealed test period to the result
+16. [`COMMANDS.md`](COMMANDS.md): the full command reference
+17. [`LABELING-AT-SCALE.md`](LABELING-AT-SCALE.md): a future design note for labeling beyond V1 (not V1 scope)
+18. [`FUTURE-FEATURES.md`](FUTURE-FEATURES.md): candidate features after the Stage 3 gate, each with a proposed claim (not V1 scope)
+19. [`adr/`](adr/): the architecture decision records
+20. [`proposals/`](proposals/): changes under discussion, and accepted ones with their evidence
+21. [`FRICTION-LOG.md`](FRICTION-LOG.md): the index of the friction log, with the entries in one file per session under [`friction-log/`](friction-log/)
+22. [`benchmarks/`](benchmarks/): dated benchmark write-ups, informational only
+23. [`BRAND.md`](BRAND.md): how the name and logo are presented

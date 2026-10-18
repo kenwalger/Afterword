@@ -5,8 +5,9 @@ JSONL file per pass plus ``batches.jsonl`` (``fixtures/README.md``). This module
 is the one place that counts them, so ``afterword label status``, the terminal
 tool's closing line, and the label UI's progress badge agree.
 
-Everything returned here is a count. No comment text, reason, note, or ID
-leaves this module, so its results are safe to print. Progress counts carry
+Everything returned here is a count, except the comment IDs of a
+self-agreement draw and of self-agreement disagreements, which only go to
+git-ignored files. No comment text, reason, or note leaves this module. Progress counts carry
 no class or grade distribution, so they can be shown while labeling;
 :func:`summarize` and :func:`calibration_differences` do carry distributions
 and are for analysis, never for a labeling screen.
@@ -15,9 +16,11 @@ and are for analysis, never for a labeling screen.
 from __future__ import annotations
 
 import json
+import random
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +41,8 @@ UNRECORDED_TOOL: str = "not recorded"
 # for a label whose batch start record is missing.
 POST_ORDERS: tuple[str, ...] = ("published", "random")
 UNKNOWN_ORDER: str = "unknown"
+# A label without a `corpus_set` predates the field and is a `dev` label.
+DEFAULT_SET: str = "dev"
 GRADES: tuple[int, ...] = (0, 1, 2, 3)
 # For recall, consequential means grade 2 or 3 (LABELING-GUIDE.md).
 CONSEQUENTIAL_FROM: int = 2
@@ -84,6 +89,27 @@ def read_batches(root: Path, corpus_version: str) -> list[dict[str, Any]]:
 
 def _pass_of(record: dict[str, Any]) -> str:
     return str(record.get("pass", "initial"))
+
+
+def set_of(record: dict[str, Any]) -> str:
+    """Return the corpus set a label was made for.
+
+    :param record: A label record.
+    :returns: Its ``corpus_set``; ``dev`` when absent (every label made before
+        preregistration is a ``dev`` label).
+    """
+    value = record.get("corpus_set")
+    return value if isinstance(value, str) and value else DEFAULT_SET
+
+
+def of_set(labels: Iterable[dict[str, Any]], corpus_set: str) -> list[dict[str, Any]]:
+    """Keep the labels made for one corpus set.
+
+    :param labels: Label records.
+    :param corpus_set: ``dev`` or ``test``.
+    :returns: The records of that set, in order.
+    """
+    return [r for r in labels if set_of(r) == corpus_set]
 
 
 def analysis_labels(labels: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -491,3 +517,208 @@ def summarize_by_post_order(
         out[UNKNOWN_ORDER] = summarize(split[UNKNOWN_ORDER])
     out["all"] = summarize(records)
     return out
+
+
+# Self-agreement (LABELING-GUIDE.md, "Self-agreement check") --------------------------
+
+SELF_AGREEMENT_PASS: str = "self_agreement"
+SELF_AGREEMENT_MIN_AGE: timedelta = timedelta(days=14)
+SELF_AGREEMENT_RANDOM: int = 25
+
+
+def _labeled_at(record: dict[str, Any]) -> datetime | None:
+    value = record.get("labeled_at")
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+@dataclass(frozen=True)
+class SelfAgreementDraw:
+    """A self-agreement sample. ``ids`` go to a git-ignored file and are never printed."""
+
+    seed: int
+    drawn_at: datetime
+    cutoff: datetime
+    corpus_set: str
+    pool: int
+    graded: int
+    random_drawn: int
+    random_also_graded: int
+    ids: list[str]
+
+    def counts(self) -> dict[str, Any]:
+        """Return the draw without its IDs, for printing and the sidecar record.
+
+        :returns: JSON-ready counts, times, and the seed.
+        """
+        out: dict[str, Any] = {k: v for k, v in self.__dict__.items() if k != "ids"}
+        out["drawn_at"] = self.drawn_at.isoformat()
+        out["cutoff"] = self.cutoff.isoformat()
+        out["sample"] = len(self.ids)
+        return out
+
+
+def draw_self_agreement(
+    labels: Iterable[dict[str, Any]],
+    *,
+    now: datetime,
+    seed: int,
+    corpus_set: str = DEFAULT_SET,
+    random_size: int = SELF_AGREEMENT_RANDOM,
+    min_age: timedelta = SELF_AGREEMENT_MIN_AGE,
+) -> SelfAgreementDraw:
+    """Draw the self-agreement sample by the guide's rule.
+
+    The pool is the analysis labels of one corpus set made at least ``min_age``
+    before ``now``. The sample is every pooled comment graded 2 or 3, plus
+    ``random_size`` pooled comments drawn at random from the whole pool (so some
+    may also be graded 2 or 3): ``random.Random(seed).sample`` over the pooled
+    IDs in sorted order, which makes the draw reproducible from the seed and the
+    labels alone.
+
+    :param labels: Label records from :func:`read_labels`.
+    :param now: When the draw is made.
+    :param seed: Recorded seed for the random part.
+    :param corpus_set: ``dev`` or ``test``.
+    :param random_size: Size of the random part (at most the pool).
+    :param min_age: How old an analysis label must be to be pooled.
+    :returns: The draw, with its IDs.
+    """
+    cutoff = now - min_age
+    chosen = analysis_labels(of_set(labels, corpus_set))
+    pool = sorted(
+        comment_id
+        for comment_id, record in chosen.items()
+        if (at := _labeled_at(record)) is not None and at <= cutoff
+    )
+    graded = {c for c in pool if _is_consequential(chosen[c].get("consequential_prospective"))}
+    drawn = random.Random(seed).sample(pool, min(random_size, len(pool)))
+    return SelfAgreementDraw(
+        seed=seed,
+        drawn_at=now,
+        cutoff=cutoff,
+        corpus_set=corpus_set,
+        pool=len(pool),
+        graded=len(graded),
+        random_drawn=len(drawn),
+        random_also_graded=len(graded & set(drawn)),
+        ids=sorted(graded | set(drawn)),
+    )
+
+
+def cohen_kappa(pairs: Iterable[tuple[str, str]]) -> float | None:
+    """Return Cohen's kappa for two ratings of the same items.
+
+    :param pairs: (first rating, second rating) per item.
+    :returns: Kappa; ``1.0`` when every item has the same single rating twice;
+        ``None`` for no items.
+    """
+    items = list(pairs)
+    n = len(items)
+    if n == 0:
+        return None
+    observed = sum(1 for a, b in items if a == b) / n
+    first = Counter(a for a, _ in items)
+    second = Counter(b for _, b in items)
+    expected = sum(first[k] * second[k] for k in first) / (n * n)
+    if expected == 1.0:
+        return 1.0 if observed == 1.0 else 0.0
+    return (observed - expected) / (1 - expected)
+
+
+@dataclass(frozen=True)
+class SelfAgreementReport:
+    """Self-agreement against the original labels. ``disagreements`` are never printed."""
+
+    corpus_set: str
+    compared: int
+    without_original: int
+    relabeled_too_soon: int
+    same_class: int
+    class_kappa: float | None
+    same_grade: int
+    same_consequential: int
+    became_consequential: int
+    stopped_being_consequential: int
+    # (comment ID, what differs), for the author's git-ignored list only.
+    disagreements: list[tuple[str, str]] = field(default_factory=list)
+
+    def counts(self) -> dict[str, Any]:
+        """Return the report without comment IDs, for printing and the JSON report.
+
+        :returns: JSON-ready counts, with the consequential agreement's Wilson interval.
+        """
+        out: dict[str, Any] = {k: v for k, v in self.__dict__.items() if k != "disagreements"}
+        low, high = wilson(self.same_consequential, self.compared)
+        out["same_consequential_wilson95"] = [round(low, 4), round(high, 4)]
+        out["comments_with_a_disagreement"] = len({c for c, _ in self.disagreements})
+        return out
+
+
+def self_agreement_report(
+    labels: Iterable[dict[str, Any]],
+    *,
+    corpus_set: str = DEFAULT_SET,
+    min_age: timedelta = SELF_AGREEMENT_MIN_AGE,
+) -> SelfAgreementReport:
+    """Compare each self-agreement label with the label analysis uses for that comment.
+
+    The original is the analysis label (:func:`analysis_labels`), as the guide
+    defines it; self-agreement labels never replace it. When a comment has more
+    than one self-agreement label, the latest is compared.
+
+    :param labels: Label records from :func:`read_labels`.
+    :param corpus_set: ``dev`` or ``test``.
+    :param min_age: The guide's minimum gap; relabels made sooner are counted.
+    :returns: Counts, Cohen's kappa on class, and every disagreement by comment ID.
+    """
+    records = of_set(labels, corpus_set)
+    original = analysis_labels(records)
+    latest: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if _pass_of(record) != SELF_AGREEMENT_PASS:
+            continue
+        comment_id = str(record["comment_id"])
+        prior = latest.get(comment_id)
+        if prior is None or str(record.get("labeled_at", "")) >= str(prior.get("labeled_at", "")):
+            latest[comment_id] = record
+    pairs = [(original[c], latest[c], c) for c in sorted(latest) if c in original]
+    disagreements: list[tuple[str, str]] = []
+    too_soon = became = stopped = same_class = same_grade = 0
+    for first, second, comment_id in pairs:
+        at_first, at_second = _labeled_at(first), _labeled_at(second)
+        if at_first is None or at_second is None or at_second - at_first < min_age:
+            too_soon += 1
+        if first.get("primary_class") == second.get("primary_class"):
+            same_class += 1
+        else:
+            disagreements.append((comment_id, "class"))
+        if first.get("consequential_prospective") == second.get("consequential_prospective"):
+            same_grade += 1
+        was = _is_consequential(first.get("consequential_prospective"))
+        is_now = _is_consequential(second.get("consequential_prospective"))
+        if not was and is_now:
+            became += 1
+            disagreements.append((comment_id, "consequential: no to yes"))
+        elif was and not is_now:
+            stopped += 1
+            disagreements.append((comment_id, "consequential: yes to no"))
+    return SelfAgreementReport(
+        corpus_set=corpus_set,
+        compared=len(pairs),
+        without_original=sum(1 for c in latest if c not in original),
+        relabeled_too_soon=too_soon,
+        same_class=same_class,
+        class_kappa=cohen_kappa(
+            (str(a.get("primary_class")), str(b.get("primary_class"))) for a, b, _ in pairs
+        ),
+        same_grade=same_grade,
+        same_consequential=len(pairs) - became - stopped,
+        became_consequential=became,
+        stopped_being_consequential=stopped,
+        disagreements=disagreements,
+    )

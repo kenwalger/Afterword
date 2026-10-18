@@ -103,6 +103,7 @@ Then, for the work itself:
 
 - [`docs/ROADMAP.md`](docs/ROADMAP.md): the stages, their gates, and the current status.
 - [`docs/WORKFLOW.md`](docs/WORKFLOW.md): the labeling and classification routine, in order, and why.
+- [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md): the runbook from preregistration through the test period to the result.
 - [`docs/COMMANDS.md`](docs/COMMANDS.md): every command, with what it reads and writes.
 - [`docs/PRIVACY-AND-BOUNDARIES.md`](docs/PRIVACY-AND-BOUNDARIES.md): the privacy rules and the model-boundary records.
 - [`docs/FRICTION-LOG.md`](docs/FRICTION-LOG.md): what surprised the project, session by session.

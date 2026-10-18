@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 11 (2026-10-18)
+**Version:** 12 (2026-10-18)
+
+v12 records session 12: the preregistration decisions on the pre-check gaps, duplicate flags, and secondary comparisons; the tools built for Stage 3b and 3c (`self-agreement`, `label --set test`, `shadow`, `corpus`); the runbook `PREREGISTRATION.md`; and the list of what remains before preregistration (3b).
 
 v11 records the author's Stage 3a decisions of 2026-10-18: B2 is Llama with B1 as the baseline, `pp-v0.2` is the applied policy, the class-based ceiling is accepted for V1, the self-agreement check is set for 2026-10-22 or later, and the calibration pass is dropped unless that check shows a problem.
 
@@ -42,7 +44,7 @@ Done:
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 - `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
 
-Open: preregistration (Stage 3b). Decided on 2026-10-18 (`docs/EVALUATION.md` v17): B2 is Llama (`llama3.1:8b-instruct-q4_K_M`, pinned digest) with B1 (`hb-v0.2`) as the baseline; `pp-v0.2` is the applied policy; the class-based ceiling is accepted for V1, with thresholds to be set against the oracle under `pp-v0.2`. `dev` labeling is complete (478 of 478 in run `20261018T173927Z`), and three real runs are ingested; B1 and Llama have classified all 478. The labeler self-agreement check runs on or after 2026-10-22. What remains before preregistration is listed in `docs/friction-log/session-11.md` (session summary).
+Open: preregistration (Stage 3b), by the runbook `docs/PREREGISTRATION.md`. Decided on 2026-10-18 (`docs/EVALUATION.md` v17 and v18): B2 is Llama (`llama3.1:8b-instruct-q4_K_M`, pinned digest) with B1 (`hb-v0.2`) as the baseline; `pp-v0.2` is the applied policy; the class-based ceiling is accepted for V1; the pre-check's two known gaps are registered limitations; duplicate flags stay strict; no secondary comparisons. `dev` labeling is complete (478 of 478 in run `20261018T173927Z`). The tools for the test period (`label --set test`, shadow mode, the corpus export, the self-agreement check) are built and tested on synthetic data (session 12). What remains is listed under 3b below.
 
 ## Stage 0: Freeze the experiment
 
@@ -58,7 +60,7 @@ Goal: define the question before implementation changes it.
 - [x] Measure volume baseline: comments per post and per week across the author's DEV history (C-009; 2026-10-02)
 - [x] Time chronological reviews of two weeks, a typical week and a busy week (C-009; `afterword label --mode chronological`; timed 2026-10-03, recorded in `CLAIMS.md` 2026-10-04: typical week 3.8 minutes, busy week 17.5 minutes, both re-reads)
 - [x] Define the fixture format and the synthetic corpus manifest (2026-10-03: `fixtures/README.md`, `fixtures/corpus/MANIFEST.md`, with hashes checked by a test)
-- [ ] Real corpus manifest: `dev` file hashes, committed when `dev` is frozen at preregistration (ADR-010)
+- [ ] Real corpus manifest: `dev` file hashes, committed when `dev` is frozen at preregistration (ADR-010) (the tool, `afterword corpus export`, is built as of 2026-10-18; the manifest itself is written at preregistration)
 - [x] Decide corpus targets (2026-10-02: historical `dev`, prospective `test`; ADR-010 amended, `docs/proposals/accepted/2026-10-02-corpus-targets.md`)
 - [x] Label the `dev` corpus (every historical comment from others) per the labeling guide (2026-10-18: 478 of 478 in run `20261018T173927Z`. Comments that arrive before preregistration also belong to `dev` and are labeled as they come.)
 - [x] Build the adversarial set, including injection cases (2026-10-03: synthetic, 24 cases, `fixtures/corpus/adversarial.jsonl`; hand-picked hard cases from labeling notes may be added as a new version)
@@ -122,20 +124,31 @@ Goal: determine whether assisted triage is useful before building a large UI.
 - [x] Implement heuristic baseline (B1). (2026-10-03: `hb-v0.1`, a draft until tuned on `dev`.)
 - [x] Iterate on `dev` only. (Started 2026-10-07: B1 scored and `hb-v0.2` tuned on 302 labels; candidate `pp-v0.2`; `afterword evaluate`. Decided 2026-10-18 on all 478 labels: B2 Llama, B1 baseline, `pp-v0.2` applied, ceiling accepted; further iteration only if the self-agreement check calls for it.)
 - [ ] Backlog: a read-only viewer that opens the comments in an ID list (such as an `afterword evaluate --misses` list) in the label UI, with no labeling controls and no records written. For the author's own miss review.
-- [ ] Run the adversarial set; fix injection handling. (2026-10-03: run once on both local models, synthetic sets only, `docs/benchmarks/2026-10-03-synthetic-local-models.md`. Rerun 2026-10-04 under `pr-v0.2`: injection tiers unchanged, 8 of 10 for both. The pre-check `pc-v0.1` has two known gaps, adv-109 and adv-110, not yet fixed.)
+- [x] Run the adversarial set; fix injection handling. (2026-10-03: run once on both local models, synthetic sets only, `docs/benchmarks/2026-10-03-synthetic-local-models.md`. Rerun 2026-10-04 under `pr-v0.2`: injection tiers unchanged, 8 of 10 for both. Decided 2026-10-18: the pre-check `pc-v0.1`'s two known gaps, adv-109 and adv-110, are registered as known limitations; a multilingual pre-check is a V2 item, `EVALUATION.md` v18.)
 
 ### 3b: Preregistration
 
-Prerequisite, before preregistration can happen:
+The runbook, step by step, is `docs/PREREGISTRATION.md`.
 
-- `afterword label --set test` selects only test-set comments (posts published after preregistration).
+Built (session 12, 2026-10-18; tested on synthetic fixtures only, not yet run on real data):
 
-Then:
+- [x] `afterword label --set test` and `label-ui --set test`: only comments on posts published after the recorded preregistration time (`registry/preregistration.json`); `dev` and "neither" per ADR-010.
+- [x] Shadow mode: `afterword shadow run` (weekly; sealed outputs, hash to the committed ledger), `shadow status`, `shadow verify`, `shadow reveal` (only after the stopping rule), `shadow score`.
+- [x] The corpus export and manifest: `afterword corpus export` and `corpus verify`, with ADR-009 withdrawal from corpus files at ingest.
+- [x] The self-agreement check's tools: `afterword self-agreement draw` and `report`.
 
-- Freeze all versions.
-- Recompute the accrual estimate from the observed `dev` consequential share and record it in `EVALUATION.md`.
-- Write registered thresholds into `EVALUATION.md`, with the accrual procedure and stopping rule.
-- Commit. The commit time starts accrual (ADR-010).
+Decided (2026-10-18, `EVALUATION.md` v18): pre-check gaps registered as known limitations; duplicate flags strict; no secondary comparisons in V1.
+
+What remains before preregistration:
+
+1. **Self-agreement check** (the author, on or after 2026-10-22): `self-agreement draw --seed 20261018`, relabel, `self-agreement report`. If agreement is poor, relabel under a revised guide first.
+2. ~~ADR-010 and the recorded time.~~ Decided 2026-10-18: ADR-010 amended to define test posts by the recorded `registered_at`, sealed by the commit (the runbook keeps the rule to publish nothing in between), and to exclude posts about Afterword itself (`excluded_posts`; `afterword preregistration exclude-post`).
+3. **Bring `dev` up to date** just before the date: probe, ingest, label any new comments, classify them with B1 and B2.
+4. **Accrual estimate and volume-split median,** recomputed from that last full run, recorded with its run ID.
+5. **Registered thresholds,** numeric, for all five measures relative to the oracle under `pp-v0.2`, and the rule for B2 beating B1 meaningfully, written into `EVALUATION.md` with the accrual procedure and stopping rule.
+6. **Freeze and record every version** (`tax-v0.2`, `lg-v0.6`, `norm-v0.1`, `pc-v0.1`, `pp-v0.2`, `hb-v0.2`, `pr-v0.2`, Llama's digest and options, the application version), and write `registry/preregistration.json`.
+7. **Freeze `dev`:** `afterword corpus export --version v1`, then `corpus verify`.
+8. **The preregistration commit,** which starts accrual. Optional before it: the label UI's read-only accrual panel (the runbook's Step 4 prompt).
 
 ### 3c: Accrual and measurement
 

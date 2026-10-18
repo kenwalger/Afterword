@@ -31,7 +31,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from afterword import label_records, normalize, taxonomy, timing
+from afterword import label_records, normalize, preregistration, taxonomy, timing
 from afterword.baseline import week_start
 from afterword.display import DISPLAY_VERSION, html_to_display_text, strip_controls
 from afterword.observations import ObservedComment, ObservedContent, RunObservations
@@ -42,8 +42,10 @@ TIMING_ROOT: Path = timing.TIMING_ROOT
 LABEL_GUIDE_VERSION: str = "lg-v0.6"
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
-# Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`.
-DEFAULT_CORPUS_SET: str = "dev"
+# Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`,
+# which needs the preregistration record (afterword.preregistration).
+DEFAULT_CORPUS_SET: str = preregistration.DEV
+CORPUS_SETS: tuple[str, ...] = preregistration.CORPUS_SETS
 # Who produced a label and how it was sampled. Every V1 label is the researcher's
 # own (EVALUATION.md); other sources are a future design (LABELING-AT-SCALE.md).
 SAMPLE_KIND: str = "researcher"
@@ -200,12 +202,25 @@ def _batch_ids(path: Path) -> set[str]:
 class Snapshot:
     """One run's comments arranged into threads, for display and labeling."""
 
-    def __init__(self, obs: RunObservations) -> None:
+    def __init__(
+        self,
+        obs: RunObservations,
+        *,
+        registered_at: datetime | None = None,
+        excluded_posts: frozenset[str] = frozenset(),
+    ) -> None:
         """Index a run's observations.
 
         :param obs: Observations loaded with text.
+        :param registered_at: The preregistration time, which splits comments into
+            ``dev`` and ``test`` (ADR-010); ``None`` before preregistration, when
+            every comment is ``dev``.
+        :param excluded_posts: Posts excluded from the test set (the preregistration
+            record's ``excluded_posts``).
         """
         self.obs = obs
+        self.registered_at = registered_at
+        self.excluded_posts = excluded_posts
         self.contents: dict[str, ObservedContent] = {c.content_ref: c for c in obs.contents}
         self.by_id: dict[str, ObservedComment] = {c.source_object_id: c for c in obs.comments}
         self.root_of: dict[str, str] = {}
@@ -232,8 +247,42 @@ class Snapshot:
             or c.created_at is None
         )
 
+    def corpus_set(self, c: ObservedComment) -> str | None:
+        """Return the corpus set of a comment from others (ADR-010).
+
+        :param c: A comment.
+        :returns: ``dev``, ``test``, or ``None`` for neither
+            (:func:`afterword.preregistration.corpus_set_of`).
+        """
+        content = self.contents.get(c.content_ref)
+        return preregistration.corpus_set_of(
+            published_at=content.published_at if content else None,
+            created_at=c.created_at,
+            registered_at=self.registered_at,
+            post_id=c.content_ref,
+            excluded=self.excluded_posts,
+        )
+
+    def set_counts(self) -> dict[str, int]:
+        """Count the labelable comments by corpus set.
+
+        :returns: ``dev``, ``test``, and ``neither`` (after preregistration,
+            comments on earlier posts that arrived later, and comments on posts
+            excluded from the test set; ADR-010).
+        """
+        sets = [self.corpus_set(c) for c in self.obs.comments if self.is_subject(c)]
+        return {
+            preregistration.DEV: sets.count(preregistration.DEV),
+            preregistration.TEST: sets.count(preregistration.TEST),
+            "neither": sets.count(None),
+        }
+
     def subjects(
-        self, *, post_order: str = "published", seed: int | None = None
+        self,
+        *,
+        post_order: str = "published",
+        seed: int | None = None,
+        corpus_set: str | None = DEFAULT_CORPUS_SET,
     ) -> list[ObservedComment]:
         """List the comments to label, post by post and oldest first within a post.
 
@@ -244,13 +293,23 @@ class Snapshot:
 
         :param post_order: ``published`` or ``random``.
         :param seed: Seed for ``random``; required for it, ignored otherwise.
+        :param corpus_set: ``dev`` (the default) or ``test``, or ``None`` for every
+            comment from others whatever its set (chronological timing).
         :returns: Labelable comments.
-        :raises ValueError: For an unknown order, or ``random`` without a seed.
+        :raises ValueError: For an unknown order or set, ``random`` without a seed,
+            or ``test`` before preregistration.
         """
         if post_order not in POST_ORDERS:
             raise ValueError(f"unknown post order: {post_order}")
         if post_order == "random" and seed is None:
             raise ValueError("random post order needs a seed")
+        if corpus_set is not None and corpus_set not in CORPUS_SETS:
+            raise ValueError(f"unknown corpus set: {corpus_set} (use dev or test)")
+        if corpus_set == preregistration.TEST and self.registered_at is None:
+            raise ValueError(
+                f"--set test needs the preregistration record ({preregistration.RECORD_PATH}); "
+                "test comments are those on posts published after it (ADR-010)"
+            )
         floor = datetime.min.replace(tzinfo=UTC)
 
         def post_key(ref: str) -> tuple[datetime, str]:
@@ -259,7 +318,7 @@ class Snapshot:
 
         by_post: dict[str, list[ObservedComment]] = defaultdict(list)
         for c in self.obs.comments:
-            if self.is_subject(c):
+            if self.is_subject(c) and (corpus_set is None or self.corpus_set(c) == corpus_set):
                 by_post[c.content_ref].append(c)
         posts = sorted(by_post, key=post_key)
         if post_order == "random":
@@ -726,8 +785,9 @@ class LabelBatch:
         :param post_panel: Whether the transport can show the post's body (the label
             UI's post panel, when the run captured post bodies), recorded on the batch.
         :param now: Wall clock.
-        :raises ValueError: For an unknown pass, order, or tool, an unsafe name, a
-            batch size out of range, or ``random`` without a seed.
+        :raises ValueError: For an unknown pass, order, tool, or corpus set, an unsafe
+            name, a batch size out of range, ``random`` without a seed, or ``test``
+            before preregistration.
         """
         if pass_name not in PASSES:
             raise ValueError(f"unknown pass: {pass_name}")
@@ -756,7 +816,7 @@ class LabelBatch:
             allowed = initial if only_ids is None else initial & only_ids
         self.queue = [
             c
-            for c in snap.subjects(post_order=post_order, seed=seed)
+            for c in snap.subjects(post_order=post_order, seed=seed, corpus_set=corpus_set)
             if c.source_object_id not in done and (allowed is None or c.source_object_id in allowed)
         ]
         self.items = self.queue[:batch_size]
@@ -871,10 +931,12 @@ class LabelBatch:
 
         :returns: Counts from :func:`afterword.label_records.progress`.
         """
-        eligible = {c.source_object_id for c in self.snap.subjects()}
+        eligible = {c.source_object_id for c in self.snap.subjects(corpus_set=self.corpus_set)}
         return label_records.progress(
             eligible,
-            label_records.read_labels(self.root, self.corpus_version),
+            label_records.of_set(
+                label_records.read_labels(self.root, self.corpus_version), self.corpus_set
+            ),
             label_records.read_batches(self.root, self.corpus_version),
         )
 
@@ -1200,7 +1262,7 @@ def run_chronological(
     items = sorted(
         (
             c
-            for c in snap.subjects()
+            for c in snap.subjects(corpus_set=None)
             if c.created_at and start <= c.created_at.astimezone(UTC).date() < end
         ),
         key=lambda c: (c.created_at, c.source_object_id),

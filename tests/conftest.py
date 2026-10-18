@@ -84,7 +84,12 @@ class FakeDev:
         if article_id not in listed:
             return httpx.Response(404, json={"error": "not found", "status": 404})
         body = copy.deepcopy(self.article)
-        body.update(id=article_id, comments_count=listed[article_id]["comments_count"])
+        # Like DEV, the single fetch carries the post's own publication time and count.
+        body.update(
+            id=article_id,
+            comments_count=listed[article_id]["comments_count"],
+            published_at=listed[article_id]["published_at"],
+        )
         return httpx.Response(200, json=body)
 
     def _article_by_path(self, request: httpx.Request) -> httpx.Response:

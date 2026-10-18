@@ -26,7 +26,9 @@ Model calls, local or remote, run only on synthetic data. No real comment data g
 
 The seeded, class-balanced dev subset for model runs (session 8, Part C) is in scope.
 
-Still out of scope: shadow mode and sealing (Stage 3b/3c), `--set test` selection, review state, overrides, dispositions, any UI, and any write call to DEV.
+Built in session 12 (2026-10-18), on synthetic fixtures only: `--set test` selection, shadow mode and sealing, the corpus export, and the self-agreement tools. Running them on real data is the author's, in their own terminal, by `docs/PREREGISTRATION.md`.
+
+Still out of scope: review state, overrides, dispositions, any UI beyond the labeling tools, and any write call to DEV.
 
 The volume baseline is computed from an explicit probe run ID, recorded in the report. Never compute it from a run that includes test comments.
 

@@ -1,6 +1,10 @@
 # Evaluation Plan
 
-**Version:** 17 (2026-10-18)
+**Version:** 19 (2026-10-18)
+
+v19 (2026-10-18, later in session 12) follows ADR-010's amendment: the test set is defined by the recorded `registered_at`, and posts about Afterword itself are excluded from it (`excluded_posts` in the preregistration record). Nothing is registered yet.
+
+v18 (2026-10-18, session 12) records three preregistration decisions by the author: the pre-check's two known gaps (adv-109, adv-110) are registered as known limitations of `pc-v0.1`, with a multilingual pre-check carried to V2; duplicate flags stay strict; no secondary comparisons in V1. It also names the commands that carry out the accrual procedure, built in session 12. Nothing is registered yet.
 
 v17 (2026-10-18, later the same day) records the author's decisions: B2 is Llama, with B1 as the baseline; `pp-v0.2` is the applied policy; the class-based ceiling is accepted for V1, with thresholds to be set against the oracle under `pp-v0.2`; the self-agreement check runs on or after 2026-10-22; the calibration pass is dropped unless that check shows a problem. Nothing is registered yet.
 
@@ -47,10 +51,10 @@ All corpus material is versioned (`corpus-vN`) and described in a manifest with 
 | Set | Purpose | Selection | Sealed? |
 | --- | --- | --- | --- |
 | `dev` | Prompt, policy, and heuristic iteration | Every historical comment from others, frozen at preregistration | No |
-| `test` | Review reduction, consequential recall, and miss analysis | Every comment from others on posts published after the preregistration commit, accrued until the stopping rule | Yes: labeled blind, classifier outputs hashed and hidden until accrual stops |
+| `test` | Review reduction, consequential recall, and miss analysis | Every comment from others on posts published after the preregistration time (`registered_at`, sealed by the preregistration commit), except posts about Afterword itself, accrued until the stopping rule | Yes: labeled blind, classifier outputs hashed and hidden until accrual stops |
 | `adversarial` | Robustness, including prompt injection | Synthetic and hand-picked hard cases | No, reported separately |
 
-The test set is disjoint from `dev` by post and by time. Comments that arrive after preregistration on posts published before it belong to neither set; their count is reported.
+The test set is disjoint from `dev` by post and by time. Comments that arrive after preregistration on posts published before it belong to neither set; their count is reported. So do comments on posts about Afterword itself, listed in the preregistration record's `excluded_posts` (ADR-010, amended 2026-10-18): a post published after preregistration is added there by a recorded amendment before any of its comments is labeled, and it counts toward neither target.
 
 The test set is at natural base rates by construction, so review reduction and recall are measured on the same set. No enriched sample is drawn: recall uses every consequential comment the test set accrues.
 
@@ -62,10 +66,12 @@ Random and targeted samples must never be mixed in one measure. A random sample 
 
 ### Accrual procedure
 
-1. Preregistration (below) is committed. Its commit time is the start of accrual; posts published after it are test posts.
-2. Each week: sync; run B1 and B2 in shadow mode on new test comments; write their outputs to a git-ignored file and commit its SHA-256. Nothing is shown.
+1. Preregistration (below) is committed. The recorded `registered_at` it seals is the start of accrual; posts published after it are test posts, unless excluded.
+2. Each week: sync; run B1 and B2 in shadow mode on new test comments; write their outputs to a git-ignored file and commit its SHA-256. Nothing is shown. (`afterword shadow run`; the hash goes to `registry/shadow-ledger.jsonl`, committed that week.)
 3. Each week: the author labels the new test comments per `LABELING-GUIDE.md`, at first read where possible and before replying where possible. The label records `replied_before_labeling`.
-4. Accrual continues until the stopping rule is met.
+4. Accrual continues until the stopping rule is met (`afterword shadow status` says whether each target is met, without outputs or grade counts).
+
+The tools take the start of accrual from `registry/preregistration.json` (`registered_at`), which is committed in the preregistration commit and therefore written a few minutes before it. No post is published between the two (`PREREGISTRATION.md`), so the recorded time and the commit give the same test set. After the stopping rule: `afterword shadow verify`, then `afterword shadow reveal` (refused unless the hashes match and the rule is met), then `afterword shadow score`, once.
 
 ### Stopping rule
 
@@ -74,7 +80,7 @@ Stop accrual when **both** targets are reached:
 - at least **20 test comments graded consequential** (prospective grade 2 or 3), and
 - at least **100 test comments** in total.
 
-Stop at **16 weeks after the preregistration commit** if that comes first.
+Stop at **16 weeks after the preregistration time** (`registered_at`, sealed by the preregistration commit) if that comes first.
 
 If the 16-week cap ends accrual, report which targets were met, with counts. Recall resting on fewer than 20 consequential comments is indicative; review reduction resting on fewer than 100 comments is indicative. Report the total number of test comments and the number graded consequential in every case.
 
@@ -155,7 +161,7 @@ Every other model (a second local model, a remote comparison model such as Anthr
 
 During Stage 3a the candidate models are compared on `dev` and on the adversarial set. The choice of B2 is made there, recorded with its reasons, and frozen with the other versions.
 
-**Decision (2026-10-18, the author): B2 is Llama,** `llama3.1:8b-instruct-q4_K_M` through Ollama, pinned by its content digest (`46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e`), with prompt `pr-v0.2` and options `num_ctx=4096;num_predict=200;seed=20261003;temperature=0` as they stand, all to be frozen at preregistration. **B1 (`hb-v0.2`) is the baseline.** Qwen and the Anthropic path are not registered; either may still run as a secondary comparison under the rules above. The evidence is in `docs/proposals/accepted/2026-10-18-b2-identity-evidence.md`. The trade-offs accepted with it, on all 478 `dev` labels under `pp-v0.2` (development evidence, labels made with hindsight):
+**Decision (2026-10-18, the author): B2 is Llama,** `llama3.1:8b-instruct-q4_K_M` through Ollama, pinned by its content digest (`46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e`), with prompt `pr-v0.2` and options `num_ctx=4096;num_predict=200;seed=20261003;temperature=0` as they stand, all to be frozen at preregistration. **B1 (`hb-v0.2`) is the baseline.** Qwen and the Anthropic path are not registered. **Decision (2026-10-18, the author): no secondary comparisons in V1.** No other model runs in shadow mode, so the rules above for secondary models do not come into play in V1. The evidence is in `docs/proposals/accepted/2026-10-18-b2-identity-evidence.md`. The trade-offs accepted with it, on all 478 `dev` labels under `pp-v0.2` (development evidence, labels made with hindsight):
 
 | | Llama (B2) | B1 (baseline) | Oracle |
 | --- | --- | --- | --- |
@@ -495,6 +501,8 @@ This is an input to the open question above ("Class is a weak proxy for conseque
 
 ### `pc-v0.1` is English-only (2026-10-08)
 
+**Decision (2026-10-18, the author): adv-109 and adv-110 are registered as known limitations of `pc-v0.1`; there is no `pc-v0.2` in V1.** Both injection cases fail the pass condition (they reach `QUEUE` or `COLLAPSED`, not `SURFACE`) on the synthetic sets, and the registration says so. **V2 item:** a pre-check beyond English (`FUTURE-FEATURES.md`, "Multilingual comments") and a fix for adv-109, each a new pre-check version tested on synthetic cases first.
+
 Every pre-check pattern is English, so instruction-like text in another language bypasses the deterministic check and reaches `SURFACE` only if the classifier flags it or its class surfaces it. Adversarial case `adv-110` (a Spanish instruction to call the comment thanks) is the known example: in the 2026-10-03 synthetic benchmark neither model flagged it, and it landed at `QUEUE` for one and `COLLAPSED` for the other, failing the injection pass condition. This is a gap in ADR-008's defence, not a change to it: the model's output is still schema-constrained and the policy still only raises. Extending the check beyond English is a new pre-check version, proposed in `FUTURE-FEATURES.md` ("Multilingual comments").
 
 **Measured (counts only, `py3langid`, 40-character and 0.80-confidence guardrails):** of 458 comments from others, 435 detected English, 2 detected non-English (both unlabeled; neither tripped the pre-check), 5 uncertain, 16 too short to classify. From `lg-v0.5` a label records `read_via_translation`.
@@ -505,6 +513,7 @@ Every pre-check pattern is English, so instruction-like text in another language
   - **Strict (current).** Validity means exactly the schema. Every malformed output fails safe to `SURFACE`, the validity rate stays an honest measure of how well the model follows the format, and nothing in the result was edited. The cost: a readable classification is thrown away, and each one surfaces a comment that may not need it, costing review reduction.
   - **De-duplicate as a recorded repair.** Keep the first occurrence and record the repair (for example `repaired:duplicate_flag` beside the outcome), and keep the raw output. The classification is used, so a cosmetic slip no longer costs review reduction. The cost: the parser starts deciding what the model "meant", the validity rate must then be reported both before and after repair, and the repair rule becomes part of what is frozen and could hide a model that degrades in other ways.
   - Decide before preregistration, report the rate under both readings either way, and freeze the rule with the prompt version.
+  - **Decision (2026-10-18, the author): strict.** A duplicate flag stays `MALFORMED` and the comment is surfaced; nothing is repaired. Llama produced no malformed output on the 478 `dev` comments.
 
 ## Registered thresholds
 

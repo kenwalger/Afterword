@@ -1,6 +1,8 @@
 # Workflow
 
-**Version:** 6 (2026-10-08)
+**Version:** 7 (2026-10-18)
+
+v7 replaces section 4's "not built yet" notes with the commands built in session 12 (`label --set test`, `shadow run`, `shadow status`) and points to the runbook, `PREREGISTRATION.md`. The weekly order follows the runbook: label before shadow mode.
 
 v6 adds the saved-run retention rule to the rules that apply throughout (ADR-009, amended 2026-10-08).
 
@@ -182,18 +184,20 @@ Re-labels comments that already have an initial label, from scratch, with the ea
 
 ## 4. The prospective period
 
-The test period starts at the preregistration commit (ADR-010) and runs until the stopping rule: both 20 consequential and 100 total test comments, or 16 weeks. The routine, once a week:
+The step-by-step runbook from preregistration to the result, with every command and what to commit, is [`PREREGISTRATION.md`](PREREGISTRATION.md). This section is the routine in brief.
 
-1. **Probe:** a fresh full run.
-2. **Shadow mode:** run B1 and B2 on the new test comments, write their outputs to a git-ignored file, and commit its SHA-256. Nothing is shown. (Stage 3; not built yet.)
-3. **Time (optional, first read):** time the week's comments with `--mode chronological` before reading them anywhere else. A test-period timing is a first-read measurement, unlike the historical re-reads.
-4. **Label:** label the new test comments with `--set test`, at first read where possible.
-5. **Reply:** only after labeling, where possible. A reply written first is recorded as `replied_before_labeling` and may carry hindsight into the prospective grade.
+The test period starts at the preregistration time recorded in `registry/preregistration.json` (ADR-010, amended 2026-10-18; the record is sealed by the preregistration commit) and runs until the stopping rule: both 20 consequential and 100 total test comments, or 16 weeks. Posts about Afterword itself are excluded from the test set. The routine, once a week:
+
+1. **Probe and ingest:** a fresh full run, then `afterword ingest --run <run-id>`.
+2. **Time (optional, first read):** time the week's comments with `--mode chronological` before reading them anywhere else. A test-period timing is a first-read measurement, unlike the historical re-reads. Timing covers every comment from others in the week, whatever its set.
+3. **Label:** if a post about Afterword was published, exclude it first (`afterword preregistration exclude-post --post <post-id>`, then commit `registry/preregistration.json`; ADR-010). Then label the new test comments with `afterword label-ui --run <run-id> --set test`, at first read where possible.
+4. **Reply:** only after labeling, where possible. A reply written first is recorded as `replied_before_labeling` and may carry hindsight into the prospective grade.
+5. **Shadow mode:** `afterword shadow run` classifies the new test comments with B1 and B2 and seals their outputs in a git-ignored file. It prints the file's SHA-256 and appends it to `registry/shadow-ledger.jsonl`; commit that file the same week. Nothing about the outputs is shown. The outputs are sealed whether this runs before or after labeling.
+6. **Progress:** `afterword shadow status` says whether each stopping-rule target is met, without showing outputs or the number of comments graded 2 or 3.
 
 Practical rules for the period:
 
 - Label weekly. A missed week delays labels but does not unblind anything; do not catch up by labeling after reading replies.
 - Reading a notification on DEV is a first read. Where you can, leave new comments unread until the weekly session.
-- Comments arriving on posts published before preregistration belong to neither set. They are counted, not labeled as `test`.
-
-Not built yet, needed before preregistration: `afterword label` cannot yet restrict a batch to test comments (posts published after the preregistration commit). Until it can, `--set test` must not be used.
+- Comments arriving on posts published before preregistration belong to neither set. They are counted (the label tools print them as "neither"), not labeled as `test`.
+- An ordinary `afterword classify` never touches test comments, and `afterword evaluate` never reads test labels. Only shadow mode classifies test comments, and only `afterword shadow score`, after `afterword shadow reveal`, scores them.

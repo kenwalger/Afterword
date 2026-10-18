@@ -28,6 +28,7 @@ from afterword import (
     baseline,
     bench,
     classifier,
+    corpus,
     domain,
     heuristic,
     label_records,
@@ -36,7 +37,9 @@ from afterword import (
     normalize,
     policy,
     precheck,
+    preregistration,
     scoring,
+    shadow,
     taxonomy,
     timing,
 )
@@ -259,32 +262,69 @@ class LabelingSession:
     stale: bool
     subjects: int
     excluded: dict[str, int] = field(default_factory=dict)
+    # Labelable comments by corpus set (ADR-010): dev, test, and neither.
+    sets: dict[str, int] = field(default_factory=dict)
+    corpus_set: str = labeling.DEFAULT_CORPUS_SET
+
+
+def load_preregistration(root: Path) -> preregistration.Preregistration | None:
+    """Read the committed preregistration record, if there is one.
+
+    :param root: Repository root.
+    :returns: The record, or ``None`` before preregistration.
+    :raises ServiceError: If the record exists but is invalid.
+    """
+    try:
+        return preregistration.load(root)
+    except preregistration.PreregistrationError as exc:
+        raise ServiceError(str(exc), code=2) from None
 
 
 def open_for_labeling(
-    root: Path, run_id: str, *, now: Callable[[], datetime] = lambda: datetime.now(UTC)
+    root: Path,
+    run_id: str,
+    *,
+    corpus_set: str = labeling.DEFAULT_CORPUS_SET,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> LabelingSession:
     """Load a full-scope run with text for the author's labeling terminal.
 
+    The preregistration record, when it exists, splits the run's comments into
+    ``dev`` and ``test`` (ADR-010); the session labels one set.
+
     :param root: Repository root.
     :param run_id: Full-scope probe run ID.
+    :param corpus_set: ``dev`` or ``test``.
     :param now: Wall clock, for the run's age.
     :returns: The snapshot, its age, whether it is too old to label from (ADR-009),
-        and counts of labelable and excluded comments.
-    :raises ServiceError: If the run is missing, scoped, or failed.
+        and counts of labelable comments in the set, by set, and excluded.
+    :raises ServiceError: If the run is missing, scoped, or failed, the set is
+        unknown, ``test`` is asked for before preregistration, or the
+        preregistration record is invalid.
     """
     problem = _full_run_problem(root, run_id)
     if problem:
         raise ServiceError(problem)
-    snap = labeling.Snapshot(records.load_run(root / RAW_ROOT / run_id, include_text=True))
+    record = load_preregistration(root)
+    snap = labeling.Snapshot(
+        records.load_run(root / RAW_ROOT / run_id, include_text=True),
+        registered_at=record.registered_at if record else None,
+        excluded_posts=record.excluded_ids if record else frozenset(),
+    )
+    try:
+        subjects = snap.subjects(corpus_set=corpus_set)
+    except ValueError as exc:
+        raise ServiceError(str(exc), code=2) from None
     finished = snap.obs.finished_at
     age = None if finished is None else now() - finished
     return LabelingSession(
         snapshot=snap,
         age=age,
         stale=age is None or age > labeling.STALE_AFTER,
-        subjects=len(snap.subjects()),
+        subjects=len(subjects),
         excluded=snap.excluded_counts(),
+        sets=snap.set_counts(),
+        corpus_set=corpus_set,
     )
 
 
@@ -344,12 +384,12 @@ def label_batch(
 
 
 def labelable_ids(session: LabelingSession) -> set[str]:
-    """Return the IDs of comments that can be labeled from a run.
+    """Return the IDs of comments that can be labeled from a run, in the session's set.
 
     :param session: An opened run.
     :returns: Comment IDs.
     """
-    return {c.source_object_id for c in session.snapshot.subjects()}
+    return {c.source_object_id for c in session.snapshot.subjects(corpus_set=session.corpus_set)}
 
 
 def label_progress(
@@ -372,7 +412,7 @@ def label_progress(
         raise ServiceError(str(exc), code=2) from None
     return label_records.progress(
         labelable_ids(session),
-        label_records.read_labels(root, corpus_version),
+        label_records.of_set(label_records.read_labels(root, corpus_version), session.corpus_set),
         label_records.read_batches(root, corpus_version),
     )
 
@@ -566,6 +606,8 @@ class IngestResult:
     counts: dict[str, int]
     limitations: tuple[str, ...]
     saved_runs: SavedRunRedaction
+    # Records withdrawn from frozen corpus files, for comments deleted upstream (ADR-009).
+    corpus_withdrawn: int = 0
 
 
 @dataclass(frozen=True)
@@ -591,7 +633,8 @@ def ingest_run(
 
     Runs are ingested oldest first, each once. The connection is the one for the
     run's account; it is created on first ingest. After the store is updated,
-    the saved runs are redacted (:func:`redact_saved_runs`).
+    the saved runs are redacted (:func:`redact_saved_runs`) and comments deleted
+    upstream are withdrawn from frozen corpus files (:func:`withdraw_from_corpus`).
 
     :param root: Repository root.
     :param run_id: Probe run ID.
@@ -669,6 +712,7 @@ def ingest_run(
     saved = redact_saved_runs(
         root, withdrawn, latest_ingested=run_id, keep_runs=keep_runs, on=domain.utc(now()).date()
     )
+    corpus_withdrawn = withdraw_from_corpus(root, withdrawn, on=domain.utc(now()).date())
     return IngestResult(
         connection_id=cid,
         created_connection=created,
@@ -676,6 +720,7 @@ def ingest_run(
         counts=dict(plan.counts),
         limitations=plan.sync_run.limitations_observed,
         saved_runs=saved,
+        corpus_withdrawn=corpus_withdrawn,
     )
 
 
@@ -1015,6 +1060,29 @@ def _subjects(repo: Repository, cid: str) -> list[_Subject]:
     return out
 
 
+def _store_sets(
+    repo: Repository,
+    cid: str,
+    subjects: Iterable[_Subject],
+    record: preregistration.Preregistration | None,
+) -> dict[str, str | None]:
+    """Map each subject to its corpus set (ADR-010), from its post's publication time."""
+    contents = repo.contents(cid)
+    registered = record.registered_at if record else None
+    excluded = record.excluded_ids if record else frozenset()
+    out: dict[str, str | None] = {}
+    for s in subjects:
+        content = contents.get(s.comment.content_id)
+        out[s.comment.comment_id] = preregistration.corpus_set_of(
+            published_at=content.published_at if content else None,
+            created_at=s.comment.created_at,
+            registered_at=registered,
+            post_id=content.source_object_id if content else None,
+            excluded=excluded,
+        )
+    return out
+
+
 def _b1_hash(inp: classifier.ClassifierInput) -> str:
     # B1 sees the comment only, so only the comment is in its key.
     canonical = json.dumps({"comment": inp.comment}, ensure_ascii=False)
@@ -1138,6 +1206,7 @@ def classify_comments(
     heuristic_version: str = heuristic.HEURISTIC_VERSION,
     only_ids: set[str] | None = None,
     progress: Callable[[int, int], None] | None = None,
+    corpus_set: str = preregistration.DEV,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> ClassifyResult:
     """Classify the store's comments from others with B1 or B2, then apply the policy.
@@ -1157,16 +1226,22 @@ def classify_comments(
     :param heuristic_version: Heuristic version for ``b1``.
     :param only_ids: Restrict to these comment IDs, such as a fixed dev subset.
     :param progress: Called with the number done and the total.
+    :param corpus_set: ``dev`` (the default) or ``test``. Before preregistration
+        every comment is ``dev``. Test comments are classified only by shadow
+        mode (:func:`shadow_run`), whose outputs are sealed; an ordinary
+        ``classify`` never touches them, so its tier counts reveal nothing.
     :param now: Wall clock.
     :returns: Counts of reuse, outcomes, errors, and tiers.
-    :raises ServiceError: For an unknown condition or heuristic version, an
-        unsigned boundary path, a model that fails verification, or an
-        ambiguous connection.
+    :raises ServiceError: For an unknown condition, heuristic version, or set,
+        an unsigned boundary path, a model that fails verification, an invalid
+        preregistration record, or an ambiguous connection.
     """
     if condition not in CONDITIONS:
         raise ServiceError(f"unknown condition: {condition}")
     if heuristic_version not in heuristic.HEURISTIC_VERSIONS:
         raise ServiceError(f"unknown heuristic version: {heuristic_version}")
+    _safe_set(corpus_set)
+    record = load_preregistration(root)
     provider: Provider | None = None
     if condition == "b2":
         if provider_name not in SIGNED_OFF_PATHS:
@@ -1184,8 +1259,13 @@ def classify_comments(
         else:
             identity = ModelIdentity("afterword", heuristic_version, None, domain.NOT_EXPOSED)
             prompt_version = None
+        everything = _subjects(repo, cid)
+        sets = _store_sets(repo, cid, everything, record)
         subjects = [
-            s for s in _subjects(repo, cid) if only_ids is None or s.comment.comment_id in only_ids
+            s
+            for s in everything
+            if (only_ids is None or s.comment.comment_id in only_ids)
+            and sets[s.comment.comment_id] == corpus_set
         ]
         reused = 0
         outcomes: Counter[str] = Counter()
@@ -1279,9 +1359,16 @@ class EvaluationResult:
 
 
 def _labels_with_content_flags(
-    root: Path, corpus_version: str, subjects: dict[str, _Subject]
+    root: Path,
+    corpus_version: str,
+    subjects: dict[str, _Subject],
+    corpus_set: str = preregistration.DEV,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str], int]:
-    labels = label_records.read_labels(root, labeling.safe_name(corpus_version))
+    # Dev labels by default: test labels are scored once, from the sealed outputs,
+    # after the reveal (ADR-010; `shadow score`), never by the dev tools.
+    labels = label_records.of_set(
+        label_records.read_labels(root, labeling.safe_name(corpus_version)), corpus_set
+    )
     batches = label_records.read_batches(root, corpus_version)
     chosen = label_records.analysis_labels(labels)
     orders = label_records.batch_post_orders(batches)
@@ -1999,3 +2086,963 @@ def run_benchmark(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return BenchResult(identity, report, path)
+
+
+# Self-agreement (LABELING-GUIDE.md) --------------------------------------------------
+
+
+def _stamp(when: datetime) -> str:
+    return when.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _safe_set(corpus_set: str) -> str:
+    if corpus_set not in preregistration.CORPUS_SETS:
+        raise ServiceError(f"unknown corpus set: {corpus_set} (use dev or test)", code=2)
+    return corpus_set
+
+
+def draw_self_agreement(
+    root: Path,
+    *,
+    seed: int,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    corpus_set: str = preregistration.DEV,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> tuple[label_records.SelfAgreementDraw, Path]:
+    """Draw the self-agreement sample and write its IDs to a git-ignored file.
+
+    The rule is the guide's (:func:`afterword.label_records.draw_self_agreement`).
+    The IDs go to ``reports/eval/self-agreement-<date>-s<seed>.txt``, for
+    ``--pass self_agreement --ids``; a JSON record beside it holds the seed, the
+    cutoff, and the counts, so the draw can be checked and repeated.
+
+    :param root: Repository root.
+    :param seed: Seed for the random part, recorded with the draw.
+    :param corpus_version: Label directory.
+    :param corpus_set: ``dev`` or ``test``.
+    :param now: Wall clock: the draw's time, from which the 14 days count back.
+    :returns: The draw and the ID file.
+    :raises ServiceError: For an unsafe version, an unknown set, an empty pool,
+        or a draw already made that day with that seed.
+    """
+    try:
+        version = labeling.safe_name(corpus_version)
+    except ValueError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    draw = label_records.draw_self_agreement(
+        label_records.read_labels(root, version),
+        now=domain.utc(now()),
+        seed=seed,
+        corpus_set=_safe_set(corpus_set),
+    )
+    if not draw.pool:
+        raise ServiceError(
+            f"no {corpus_set} label is 14 days old yet (cutoff {draw.cutoff.isoformat()})"
+        )
+    out = root / EVAL_ROOT
+    out.mkdir(parents=True, exist_ok=True)
+    stem = f"self-agreement-{draw.drawn_at:%Y%m%d}-s{seed}"
+    path = out / f"{stem}.txt"
+    if path.exists():
+        raise ServiceError(f"{path.name} exists: one draw per day and seed", code=2)
+    path.write_text("".join(f"{i}\n" for i in draw.ids), encoding="utf-8")
+    record = draw.counts() | {
+        "corpus_version": version,
+        "rule": "analysis labels at least 14 days old; every pooled comment graded 2 or 3, "
+        "plus a random sample of the pool (random.Random(seed).sample over sorted IDs)",
+        "ids_file": path.name,
+    }
+    (out / f"{stem}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return draw, path
+
+
+def report_self_agreement(
+    root: Path,
+    *,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    corpus_set: str = preregistration.DEV,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> tuple[label_records.SelfAgreementReport, Path, Path]:
+    """Compare self-agreement labels with the originals and write the report.
+
+    Counts go to a JSON report; every disagreement goes, by comment ID and what
+    differs only, to a separate list for the author's review. Both are under
+    ``reports/eval/`` (git-ignored).
+
+    :param root: Repository root.
+    :param corpus_version: Label directory.
+    :param corpus_set: ``dev`` or ``test``.
+    :param now: Wall clock, for the file names.
+    :returns: The report, the JSON report's path, and the disagreement list's path.
+    :raises ServiceError: For an unsafe version, an unknown set, or no
+        self-agreement label to compare.
+    """
+    try:
+        version = labeling.safe_name(corpus_version)
+    except ValueError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    report = label_records.self_agreement_report(
+        label_records.read_labels(root, version), corpus_set=_safe_set(corpus_set)
+    )
+    if not report.compared:
+        raise ServiceError(f"no {corpus_set} self-agreement label has an original to compare")
+    out = root / EVAL_ROOT
+    out.mkdir(parents=True, exist_ok=True)
+    stem = f"self-agreement-report-{_stamp(now())}"
+    counts_path = out / f"{stem}.json"
+    counts_path.write_text(
+        json.dumps(report.counts() | {"corpus_version": version}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ids_path = out / f"{stem}-disagreements.txt"
+    ids_path.write_text(
+        "".join(f"{comment_id}\t{what}\n" for comment_id, what in report.disagreements),
+        encoding="utf-8",
+    )
+    return report, counts_path, ids_path
+
+
+# Shadow mode on the test set (ADR-010) -------------------------------------------------
+
+
+def _registered(root: Path) -> preregistration.Preregistration:
+    record = load_preregistration(root)
+    if record is None:
+        raise ServiceError(
+            f"shadow mode needs the preregistration record ({preregistration.RECORD_PATH})", code=2
+        )
+    if record.policy_version not in policy.POLICY_VERSIONS:
+        raise ServiceError(f"registered policy {record.policy_version} is unknown", code=2)
+    if record.b1_heuristic not in heuristic.HEURISTIC_VERSIONS:
+        raise ServiceError(f"registered heuristic {record.b1_heuristic} is unknown", code=2)
+    if record.b2_provider not in PROVIDERS:
+        raise ServiceError(f"registered provider {record.b2_provider} is unknown", code=2)
+    if record.b2_provider == ollama.PROVIDER:
+        if ollama.PINNED_DIGESTS.get(record.b2_model) != record.b2_model_digest:
+            raise ServiceError(
+                f"registered digest for {record.b2_model} differs from the application's pin",
+                code=2,
+            )
+        if (record.num_ctx or ollama.NUM_CTX) != ollama.NUM_CTX:
+            raise ServiceError(
+                f"registered context size {record.num_ctx} differs from the application's "
+                f"{ollama.NUM_CTX}",
+                code=2,
+            )
+    return record
+
+
+def _identities(
+    record: preregistration.Preregistration,
+) -> list[tuple[str, tuple[str, str, str | None], bool, str | None, str]]:
+    """(condition, identity, is_b1, model options, flag source) for the registered conditions."""
+    options = None
+    if record.b2_provider == ollama.PROVIDER:
+        options = ollama.options_key(record.num_ctx or ollama.NUM_CTX)
+    return [
+        ("b1", ("afterword", record.b1_heuristic, None), True, None, "heuristic"),
+        (
+            "b2",
+            (record.b2_provider, record.b2_model, classifier.PROMPT_VERSION),
+            False,
+            options,
+            "model",
+        ),
+    ]
+
+
+def _sealed_ids(root: Path) -> set[str]:
+    sealed_dir = root / shadow.SEALED_ROOT
+    ids: set[str] = set()
+    for entry in shadow.read_ledger(root):
+        path = sealed_dir / str(entry["file"])
+        if path.exists():
+            ids |= {str(r["comment_id"]) for r in shadow.read_sealed(path)}
+    return ids
+
+
+def _verified(root: Path) -> shadow.Verification:
+    result = shadow.verify(root)
+    if not result.ok:
+        raise ServiceError(
+            "sealed outputs do not match the committed ledger: "
+            f"{len(result.mismatched)} differ, {len(result.missing)} missing, "
+            f"{len(result.unlisted)} not in the ledger"
+        )
+    return result
+
+
+@dataclass(frozen=True)
+class ShadowRun:
+    """What one shadow run sealed. Counts, the file, and its hash; never an output."""
+
+    sealed_file: Path | None
+    sha256: str | None
+    comments_sealed: int
+    records: int
+    held_back_failed: int
+    test_comments: int
+    already_sealed: int
+    week_start: date
+
+
+def shadow_run(
+    root: Path,
+    *,
+    host: str = ollama.DEFAULT_HOST,
+    connection_id: str | None = None,
+    seal_failed: bool = False,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> ShadowRun:
+    """Classify the new test comments with the registered B1 and B2, and seal the outputs.
+
+    New means: a live test comment from others (ADR-010) not in any sealed
+    file yet. Both conditions classify it (incrementally, from the cache), the
+    registered policy assigns its tier, and one record per condition goes into
+    a new git-ignored file under ``reports/shadow/``. Its SHA-256 is appended to
+    the committed ledger, for the author to commit that week. Nothing about the
+    outputs is returned: no class, flag, or tier, not even as a count.
+
+    A comment whose B2 classification ``FAILED`` (a transient error, say) is
+    held back for the next run, where it is retried, unless ``seal_failed``;
+    a ``FAILED`` output is still surfaced by policy if it is sealed.
+
+    :param root: Repository root.
+    :param host: Ollama base URL (loopback only).
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :param seal_failed: Seal ``FAILED`` B2 outputs instead of holding them back.
+    :param now: Wall clock.
+    :returns: The sealed file, its hash, and counts.
+    :raises ServiceError: Without a valid preregistration record, after the
+        reveal, when sealed files do not match the ledger, or when a
+        classification is missing or comes from another model digest.
+    """
+    record = _registered(root)
+    if shadow.read_reveal(root) is not None:
+        raise ServiceError("the sealed outputs were revealed: accrual has stopped", code=2)
+    _verified(root)
+    sealed = _sealed_ids(root)
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = {s.comment.comment_id: s for s in _subjects(repo, cid)}
+        sets = _store_sets(repo, cid, subjects.values(), record)
+    finally:
+        repo.close()
+    test_ids = {i for i, v in sets.items() if v == preregistration.TEST}
+    new = test_ids - sealed
+    sealed_at = domain.utc(now())
+    week = baseline.week_start(sealed_at.date())
+    if not new:
+        return ShadowRun(None, None, 0, 0, 0, len(test_ids), len(test_ids & sealed), week)
+    classify_comments(
+        root,
+        condition="b1",
+        heuristic_version=record.b1_heuristic,
+        only_ids=new,
+        corpus_set=preregistration.TEST,
+        connection_id=connection_id,
+        now=now,
+    )
+    b2 = classify_comments(
+        root,
+        condition="b2",
+        provider_name=record.b2_provider,
+        model=record.b2_model,
+        host=host,
+        only_ids=new,
+        corpus_set=preregistration.TEST,
+        connection_id=connection_id,
+        now=now,
+    )
+    if record.b2_provider == ollama.PROVIDER and b2.model_digest != record.b2_model_digest:
+        raise ServiceError("B2 ran with a digest other than the registered one; nothing sealed")
+    records_out: list[dict[str, Any]] = []
+    held_back = 0
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        for comment_id in sorted(new):
+            s = subjects[comment_id]
+            pair: list[dict[str, Any]] = []
+            for condition, identity, is_b1, options, source in _identities(record):
+                k = _cached(repo, cid, s, identity, is_b1, options)
+                if k is None:
+                    raise ServiceError(f"no {condition} classification for a test comment")
+                decision = _decision(
+                    k.outcome, k.primary_class, frozenset(k.flags), s.comment, record.policy_version
+                )
+                pair.append(
+                    {
+                        "condition": condition,
+                        "comment_id": comment_id,
+                        "sealed_at": sealed_at.isoformat(),
+                        "classification_id": k.classification_id,
+                        "classified_at": k.classified_at.isoformat(),
+                        "input_hash": k.key.input_hash,
+                        "model_provider": k.key.model_provider,
+                        "model_id": k.key.model_id,
+                        "model_digest": k.key.model_digest,
+                        "prompt_version": k.key.prompt_version,
+                        "model_options": k.key.model_options,
+                        "taxonomy_version": k.key.taxonomy_version,
+                        "normalization_version": k.normalization_version,
+                        "precheck_version": k.precheck_version,
+                        "policy_version": record.policy_version,
+                        "outcome": k.outcome,
+                        "error": k.error,
+                        "primary_class": k.primary_class,
+                        "flags": list(k.flags),
+                        "classifier_flags": sorted(
+                            set(k.flags_by_source.get(source, [])) & set(taxonomy.FLAGS)
+                        ),
+                        "confidence": k.confidence,
+                        "edited": s.comment.lifecycle_state == domain.EDITED,
+                        "tier": decision.tier.name,
+                        "rule_applied": decision.rule_applied,
+                        "rules_fired": list(decision.rules_fired),
+                    }
+                )
+            if not seal_failed and any(
+                r["condition"] == "b2" and r["outcome"] == domain.FAILED for r in pair
+            ):
+                held_back += 1
+                continue
+            records_out += pair
+    finally:
+        repo.close()
+    if not records_out:
+        return ShadowRun(None, None, 0, 0, held_back, len(test_ids), len(test_ids & sealed), week)
+    data = shadow.canonical_bytes(records_out)
+    sealed_dir = root / shadow.SEALED_ROOT
+    sealed_dir.mkdir(parents=True, exist_ok=True)
+    path = sealed_dir / shadow.sealed_file_name(sealed_at)
+    if path.exists():
+        raise ServiceError(f"{path.name} exists; run again in a second", code=2)
+    path.write_bytes(data)
+    digest = shadow.sha256(data)
+    comments = len({r["comment_id"] for r in records_out})
+    shadow.append_ledger(
+        root,
+        {
+            "file": path.name,
+            "sha256": digest,
+            "sealed_at": sealed_at.isoformat(),
+            "week_start": week.isoformat(),
+            "comments": comments,
+            "records": len(records_out),
+            "registered_at": record.registered_at.isoformat(),
+        },
+    )
+    return ShadowRun(
+        path,
+        digest,
+        comments,
+        len(records_out),
+        held_back,
+        len(test_ids),
+        len(test_ids & sealed),
+        week,
+    )
+
+
+def write_shadow_score(
+    root: Path, result: dict[str, Any], *, now: Callable[[], datetime] = lambda: datetime.now(UTC)
+) -> Path:
+    """Write a shadow score under ``reports/eval/`` (git-ignored), counts only.
+
+    :param root: Repository root.
+    :param result: Output of :func:`shadow_score`.
+    :param now: Wall clock, for the file name.
+    :returns: The report's path.
+    """
+    out = root / EVAL_ROOT
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"shadow-score-{_stamp(now())}.json"
+    path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+@dataclass(frozen=True)
+class ShadowStatus:
+    """Accrual progress without revealing anything: no output, and no grade counts."""
+
+    registered_at: datetime
+    weeks_elapsed: float
+    cap_reached_at: datetime
+    test_labels: int
+    total_target_met: bool
+    consequential_target_met: bool
+    stopping_rule_met: bool
+    sealed_comments: int
+    ledger_entries: int
+    verified: bool
+    revealed: bool
+
+
+def shadow_status(
+    root: Path,
+    *,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> ShadowStatus:
+    """Report accrual progress toward the stopping rule, without revealing anything.
+
+    It says whether each target is met, never how many test comments are graded
+    2 or 3: a running count of grades could steer the next label
+    (``LABELING-GUIDE.md``; progress while labeling is totals only).
+
+    :param root: Repository root.
+    :param corpus_version: Label directory.
+    :param now: Wall clock.
+    :returns: Weeks elapsed, test labels, which targets are met, and the ledger's state.
+        Without a valid preregistration record, :func:`_registered` raises
+        :class:`ServiceError`.
+    """
+    record = _registered(root)
+    test_ids = _current_test_ids(root, record)
+    labels, _ = _test_label_counts(root, corpus_version, test_ids)
+    consequential = sum(1 for r in labels.values() if _is_consequential_label(r))
+    decision = shadow.stopping_rule(
+        test_labels=len(labels),
+        consequential=consequential,
+        registered_at=record.registered_at,
+        now=domain.utc(now()),
+    )
+    verified = shadow.verify(root)
+    return ShadowStatus(
+        registered_at=record.registered_at,
+        weeks_elapsed=decision.weeks_elapsed,
+        cap_reached_at=decision.cap_reached_at,
+        test_labels=len(labels),
+        total_target_met=len(labels) >= shadow.TARGET_TOTAL,
+        consequential_target_met=consequential >= shadow.TARGET_CONSEQUENTIAL,
+        stopping_rule_met=decision.met,
+        sealed_comments=len(_sealed_ids(root) & test_ids),
+        ledger_entries=verified.entries,
+        verified=verified.ok,
+        revealed=shadow.read_reveal(root) is not None,
+    )
+
+
+def shadow_verify(root: Path) -> shadow.Verification:
+    """Check every sealed file against the committed ledger. File names and counts only.
+
+    :param root: Repository root.
+    :returns: The verification.
+    """
+    return shadow.verify(root)
+
+
+def _current_test_ids(root: Path, record: preregistration.Preregistration) -> set[str]:
+    """Return the live comments from others in the test set now, exclusions applied."""
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, None)
+        subjects = _subjects(repo, cid)
+        sets = _store_sets(repo, cid, subjects, record)
+    finally:
+        repo.close()
+    return {i for i, v in sets.items() if v == preregistration.TEST}
+
+
+def _test_label_counts(
+    root: Path,
+    corpus_version: str,
+    test_ids: set[str],
+    revealed_at: datetime | None = None,
+) -> tuple[dict[str, dict[str, Any]], int]:
+    """Return current test comments' analysis labels made before ``revealed_at``.
+
+    Also returns how many were made after it. A label made on a post excluded
+    later (an amendment), or on a comment deleted upstream since, no longer counts.
+    """
+    labels = {
+        comment_id: record
+        for comment_id, record in label_records.analysis_labels(
+            label_records.of_set(
+                label_records.read_labels(root, labeling.safe_name(corpus_version)),
+                preregistration.TEST,
+            )
+        ).items()
+        if comment_id in test_ids
+    }
+    if revealed_at is None:
+        return labels, 0
+    kept: dict[str, dict[str, Any]] = {}
+    late = 0
+    for comment_id, record in labels.items():
+        at = str(record.get("labeled_at", ""))
+        if at and datetime.fromisoformat(at.replace("Z", "+00:00")) > revealed_at:
+            late += 1
+        else:
+            kept[comment_id] = record
+    return kept, late
+
+
+def shadow_reveal(
+    root: Path,
+    *,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> dict[str, Any]:
+    """Reveal the sealed outputs, once, after the stopping rule is met.
+
+    Checks every sealed file against the ledger, applies the stopping rule to
+    the test labels (counts only), and writes the reveal record
+    (``registry/reveal.json``, for the author to commit). From then on shadow
+    runs are refused and :func:`shadow_score` may read the outputs.
+
+    :param root: Repository root.
+    :param corpus_version: Label directory.
+    :param now: Wall clock.
+    :returns: The reveal record (counts and times).
+    :raises ServiceError: Without a preregistration record, if already revealed,
+        if verification fails, or if the stopping rule is not met.
+    """
+    record = _registered(root)
+    if shadow.read_reveal(root) is not None:
+        raise ServiceError("the sealed outputs were already revealed", code=2)
+    verified = _verified(root)
+    test_ids = _current_test_ids(root, record)
+    labels, _ = _test_label_counts(root, corpus_version, test_ids)
+    consequential = sum(1 for r in labels.values() if _is_consequential_label(r))
+    when = domain.utc(now())
+    decision = shadow.stopping_rule(
+        test_labels=len(labels),
+        consequential=consequential,
+        registered_at=record.registered_at,
+        now=when,
+    )
+    if not decision.met:
+        raise ServiceError(
+            f"the stopping rule is not met: {decision.test_labels} of {shadow.TARGET_TOTAL} "
+            f"test comments labeled, {decision.consequential} of {shadow.TARGET_CONSEQUENTIAL} "
+            f"graded 2 or 3, {decision.weeks_elapsed} of 16 weeks; outputs stay sealed"
+        )
+    sealed_all = _sealed_ids(root)
+    sealed = sealed_all & test_ids
+    reveal = {
+        "revealed_at": when.isoformat(),
+        "reason": decision.reason,
+        "test_labels": decision.test_labels,
+        "consequential": decision.consequential,
+        "weeks_elapsed": decision.weeks_elapsed,
+        "ledger_entries": verified.entries,
+        "sealed_comments": len(sealed),
+        "sealed_without_label": len(sealed - set(labels)),
+        "labeled_without_sealed_output": len(set(labels) - sealed),
+        "sealed_no_longer_in_test_set": len(sealed_all - test_ids),
+        "excluded_posts": len(record.excluded_posts),
+    }
+    shadow.write_reveal(root, reveal)
+    return reveal
+
+
+def shadow_score(
+    root: Path,
+    *,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    connection_id: str | None = None,
+) -> dict[str, Any]:
+    """Score the revealed outputs against the test labels, after checking them again.
+
+    Only labels made before the reveal count (blind labeling, ADR-010); later
+    ones are counted and excluded. B1 and B2 are scored with the tiers sealed at
+    the time, under the registered policy, with the five primary measures by
+    post order, and the oracle beside them.
+
+    :param root: Repository root.
+    :param corpus_version: Label directory.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :returns: Counts only.
+    :raises ServiceError: Before the reveal, or if verification fails.
+    """
+    record = _registered(root)
+    reveal = shadow.read_reveal(root)
+    if reveal is None:
+        raise ServiceError("the sealed outputs are not revealed (afterword shadow reveal)", code=2)
+    _verified(root)
+    revealed_at = datetime.fromisoformat(str(reveal["revealed_at"]))
+    blind, late = _test_label_counts(
+        root, corpus_version, _current_test_ids(root, record), revealed_at
+    )
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = {s.comment.comment_id: s for s in _subjects(repo, cid)}
+    finally:
+        repo.close()
+    labels, order_of, _ = _labels_with_content_flags(
+        root, corpus_version, subjects, corpus_set=preregistration.TEST
+    )
+    labels = {i: r for i, r in labels.items() if i in blind}
+    sealed_dir = root / shadow.SEALED_ROOT
+    by_condition: dict[str, dict[str, dict[str, Any]]] = {"b1": {}, "b2": {}}
+    for entry in shadow.read_ledger(root):
+        for r in shadow.read_sealed(sealed_dir / str(entry["file"])):
+            by_condition[str(r["condition"])][str(r["comment_id"])] = r
+    out: dict[str, Any] = {
+        "policy_version": record.policy_version,
+        "revealed_at": reveal["revealed_at"],
+        "labels_before_reveal": len(blind),
+        "labels_after_reveal_excluded": late,
+        "conditions": {},
+    }
+    for condition, sealed in by_condition.items():
+        items = []
+        for comment_id, label in sorted(labels.items()):
+            sealed_record = sealed.get(comment_id)
+            if sealed_record is None:
+                continue
+            own = frozenset(sealed_record["classifier_flags"])
+            base = policy.assign(
+                policy.PolicyInput(
+                    outcome=sealed_record["outcome"],
+                    primary_class=(
+                        sealed_record["primary_class"]
+                        if sealed_record["outcome"] == domain.OK
+                        else None
+                    ),
+                    flags=frozenset(sealed_record["flags"]) - own,
+                    confidence=None,
+                    edited_since_review=bool(sealed_record["edited"]),
+                ),
+                policy_version=record.policy_version,
+            )
+            items.append(
+                scoring.Scored(
+                    comment_id=comment_id,
+                    label=label,
+                    post_order=order_of.get(comment_id, label_records.UNKNOWN_ORDER),
+                    outcome=sealed_record["outcome"],
+                    primary_class=sealed_record["primary_class"],
+                    classifier_flags=own,
+                    tier=sealed_record["tier"],
+                    base_tier=base.tier.name,
+                )
+            )
+        scored = scoring.score_by_post_order(items)
+        out["conditions"][condition] = {
+            "scored": len(items),
+            "labeled_without_output": len(set(labels) - set(sealed)),
+            "scores": {k: v.counts for k, v in scored.items()},
+        }
+    out["oracle"] = label_records.oracle_ceiling(
+        list(labels.values()), policy_version=record.policy_version
+    )
+    return out
+
+
+# The frozen corpus (fixtures/README.md, "Freezing") -------------------------------------
+
+
+@dataclass(frozen=True)
+class CorpusExport:
+    """What a corpus export wrote. Counts and paths only."""
+
+    version: str
+    corpus_set: str
+    records: int
+    data_file: Path
+    manifest_file: Path
+    file_sha256: str
+    store_as_of: str | None
+
+
+def export_corpus(
+    root: Path,
+    *,
+    version: str,
+    corpus_set: str = preregistration.DEV,
+    connection_id: str | None = None,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> CorpusExport:
+    """Freeze one corpus set: write its records (git-ignored) and its manifest (committed).
+
+    The records are the store's live comments from others in the set (ADR-010),
+    with their normalized text (``fixtures/README.md``, "Corpus record"). The
+    manifest holds IDs and hashes only. A version is written once: an existing
+    data file or manifest is never overwritten, since a changed hash means a new
+    corpus version.
+
+    :param root: Repository root.
+    :param version: Corpus version, ``v1`` and so on.
+    :param corpus_set: ``dev`` or ``test``.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :param now: Wall clock, for the manifest's ``created_at``.
+    :returns: Counts, the two paths, and the file's SHA-256.
+    :raises ServiceError: For a bad version or set, an existing version, an
+        invalid preregistration record, or an empty set.
+    """
+    try:
+        corpus.check_version(version)
+    except ValueError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    _safe_set(corpus_set)
+    data_rel = corpus.data_path(version, corpus_set)
+    manifest_rel = corpus.manifest_path(version, corpus_set)
+    for rel in (data_rel, manifest_rel):
+        if (root / rel).exists():
+            raise ServiceError(
+                f"{rel.as_posix()} exists: corpus {version} is frozen; use a new version", code=2
+            )
+    record = load_preregistration(root)
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        subjects = _subjects(repo, cid)
+        sets = _store_sets(repo, cid, subjects, record)
+        comments = repo.comments(cid)
+        contents = repo.contents(cid)
+        latest = repo.latest_sync_run(cid)
+    finally:
+        repo.close()
+    rows: list[dict[str, Any]] = []
+    for s in subjects:
+        c = s.comment
+        if sets[c.comment_id] != corpus_set or c.created_at is None:
+            continue
+        parent = comments.get(c.parent_comment_id) if c.parent_comment_id else None
+        content = contents.get(c.content_id)
+        rows.append(
+            {
+                "comment_id": c.source_object_id,
+                "source_object_id": c.source_object_id,
+                "content_id": content.source_object_id if content else c.content_id,
+                "corpus_set": corpus_set,
+                "body_text": c.body_text,
+                "parent_comment_id": parent.source_object_id if parent else None,
+                "context_as_of": domain.utc(c.created_at).isoformat(),
+                "provenance": corpus.PROVENANCE,
+                "normalization_version": c.normalization_version,
+            }
+        )
+    if not rows:
+        raise ServiceError(f"no {corpus_set} comments in the store to freeze")
+    data = corpus.file_bytes(rows)
+    made = corpus.manifest(
+        rows,
+        version=version,
+        corpus_set=corpus_set,
+        created_at=domain.utc(now()).isoformat(),
+        store_as_of=latest.sync_run_id if latest else None,
+        registered_at=record.registered_at.isoformat() if record else None,
+    )
+    (root / data_rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / data_rel).write_bytes(data)
+    (root / manifest_rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / manifest_rel).write_text(json.dumps(made, indent=2) + "\n", encoding="utf-8")
+    return CorpusExport(
+        version=version,
+        corpus_set=corpus_set,
+        records=len(rows),
+        data_file=data_rel,
+        manifest_file=manifest_rel,
+        file_sha256=made["file_sha256"],
+        store_as_of=made["store_as_of_sync_run"],
+    )
+
+
+def verify_corpus(
+    root: Path, *, version: str, corpus_set: str = preregistration.DEV
+) -> corpus.CorpusCheck:
+    """Check a frozen corpus file against its committed manifest. Counts only.
+
+    :param root: Repository root.
+    :param version: Corpus version.
+    :param corpus_set: ``dev`` or ``test``.
+    :returns: Matched, withdrawn (ADR-009), changed, missing, and extra records.
+    :raises ServiceError: For a bad version or set, or no manifest.
+    """
+    try:
+        corpus.check_version(version)
+    except ValueError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    _safe_set(corpus_set)
+    path = root / corpus.manifest_path(version, corpus_set)
+    if not path.exists():
+        raise ServiceError(f"no manifest for corpus {version} ({corpus_set})", code=2)
+    made = json.loads(path.read_text(encoding="utf-8"))
+    return corpus.check(
+        made["comments"], str(made["file_sha256"]), root / corpus.data_path(version, corpus_set)
+    )
+
+
+def withdraw_from_corpus(root: Path, withdrawn: Iterable[str], *, on: date) -> int:
+    """Withdraw comments deleted upstream from every frozen corpus file (ADR-009), and log it.
+
+    :param root: Repository root.
+    :param withdrawn: Source IDs of comments deleted upstream.
+    :param on: Date of the withdrawal.
+    :returns: Records withdrawn in this call, across all corpus files.
+    """
+    ids = set(withdrawn)
+    base = root / corpus.CORPUS_ROOT
+    if not ids or not base.exists():
+        return 0
+    entries: list[dict[str, Any]] = []
+    for path in sorted(base.glob("v*/*.jsonl")):
+        if not corpus.is_version(path.parent.name):
+            continue
+        for comment_id in corpus.withdraw(path, ids, on=on):
+            entries.append(
+                {
+                    "date": on.isoformat(),
+                    "reason": "deleted_upstream_corpus",
+                    "corpus_file": path.relative_to(root).as_posix(),
+                    "comment_id": comment_id,
+                }
+            )
+    if entries:
+        log = root / REDACTION_LOG
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
+    return len(entries)
+
+
+# Exclusions from the test set (ADR-010, amended 2026-10-18) ----------------------------
+
+
+@dataclass(frozen=True)
+class PeriodPost:
+    """A post published after preregistration, for choosing exclusions. No comment data."""
+
+    post_id: str
+    published_at: datetime | None
+    title: str | None
+    comments_from_others: int
+    excluded: bool
+
+
+def list_test_period_posts(root: Path, *, connection_id: str | None = None) -> list[PeriodPost]:
+    """List the posts published after ``registered_at``: the candidates for the test set.
+
+    The title is the author's own published text; nothing from a commenter is
+    returned, only a count of comments from others.
+
+    :param root: Repository root.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :returns: Posts, newest first.
+    :raises ServiceError: Without a valid preregistration record.
+    """
+    record = load_preregistration(root)
+    if record is None:
+        raise ServiceError(f"no preregistration record ({preregistration.RECORD_PATH})", code=2)
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        contents = repo.contents(cid)
+        subjects = _subjects(repo, cid)
+    finally:
+        repo.close()
+    counts: Counter[str] = Counter(s.comment.content_id for s in subjects)
+    rows = [
+        PeriodPost(
+            post_id=c.source_object_id,
+            published_at=c.published_at,
+            title=c.title,
+            comments_from_others=counts[key],
+            excluded=c.source_object_id in record.excluded_ids,
+        )
+        for key, c in contents.items()
+        if c.published_at is not None and c.published_at > record.registered_at
+    ]
+    return sorted(
+        rows, key=lambda r: (r.published_at or record.registered_at, r.post_id), reverse=True
+    )
+
+
+@dataclass(frozen=True)
+class Exclusion:
+    """What recording an exclusion did. Counts and the post's ID only."""
+
+    post_id: str
+    recorded_at: datetime
+    after_labeling: bool
+    test_labels_on_post: int
+    sealed_on_post: int
+
+
+def exclude_post(
+    root: Path,
+    *,
+    post_id: str,
+    reason: str,
+    after_labeling: bool = False,
+    corpus_version: str = labeling.DEFAULT_CORPUS_VERSION,
+    connection_id: str | None = None,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> Exclusion:
+    """Exclude a post from the test set by a recorded amendment to the preregistration record.
+
+    The runbook's rule is that a post about Afterword is excluded before any of
+    its comments is labeled. If test labels already exist on the post, the
+    exclusion is refused unless ``after_labeling`` says so, and is then recorded
+    as made after labeling. Sealed outputs for the post's comments stay in their
+    files (their hashes are committed) and are left out of every count and score.
+
+    :param root: Repository root.
+    :param post_id: The post's source ID (``afterword preregistration posts`` lists them).
+    :param reason: Why it is excluded.
+    :param after_labeling: Acknowledge that test comments on the post were labeled.
+    :param corpus_version: Label directory.
+    :param connection_id: Connection; may be omitted when the store has exactly one.
+    :param now: Wall clock: the amendment's ``recorded_at``.
+    :returns: The exclusion, with counts of labels and sealed outputs on the post.
+    :raises ServiceError: Without a valid record, for an unknown post or one
+        published before preregistration, for a post already excluded, or for a
+        labeled post without ``after_labeling``.
+    """
+    record = load_preregistration(root)
+    if record is None:
+        raise ServiceError(f"no preregistration record ({preregistration.RECORD_PATH})", code=2)
+    repo = open_store(root)
+    try:
+        cid = _pick_connection(repo, connection_id)
+        contents = {c.source_object_id: c for c in repo.contents(cid).values()}
+        subjects = _subjects(repo, cid)
+    finally:
+        repo.close()
+    content = contents.get(post_id)
+    if content is None:
+        raise ServiceError(f"post {post_id} is not in the store; ingest a recent run first", code=2)
+    if content.published_at is None or content.published_at <= record.registered_at:
+        raise ServiceError(
+            f"post {post_id} was published before preregistration: it is not a test post", code=2
+        )
+    on_post = {s.comment.comment_id for s in subjects if s.comment.content_id == content.content_id}
+    labeled = {
+        str(r["comment_id"])
+        for r in label_records.of_set(
+            label_records.read_labels(root, labeling.safe_name(corpus_version)),
+            preregistration.TEST,
+        )
+    }
+    already = len(on_post & labeled)
+    if already and not after_labeling:
+        raise ServiceError(
+            f"{already} test comments on post {post_id} are already labeled; the runbook says to "
+            "exclude a post before labeling. Pass --after-labeling to record a late exclusion.",
+            code=2,
+        )
+    when = domain.utc(now())
+    try:
+        made = preregistration.add_exclusion(
+            root,
+            post_id=post_id,
+            reason=reason,
+            recorded_at=when,
+            after_labeling=after_labeling and bool(already),
+        )
+    except preregistration.PreregistrationError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    return Exclusion(
+        post_id=post_id,
+        recorded_at=made.recorded_at,
+        after_labeling=made.after_labeling,
+        test_labels_on_post=already,
+        sealed_on_post=len(on_post & _sealed_ids(root)),
+    )

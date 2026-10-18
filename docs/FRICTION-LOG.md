@@ -19,6 +19,7 @@ This file is the index of the public friction log. The entries are in one file p
 | 9: public readiness (README, privacy statement for other authors, command reference) | 2026-10-08 | [`session-9.md`](friction-log/session-9.md) | "The deletion purge does not reach saved probe runs"; "Fresh clone: everything passes, nothing assumes the author's machine". |
 | 10: pre-publication fixes (saved-run redaction and retention, baseline console, read-only store commands) | 2026-10-08 | [`session-10.md`](friction-log/session-10.md) | "Saved runs are redacted, never deleted; a retention rule bounds how long they keep text". |
 | 11: store brought up to date, final label summary, then design analysis | 2026-10-18 | [`session-11.md`](friction-log/session-11.md) | "Two deletion placeholders first seen as placeholders"; "With all labels, the C-010 contrast is not about shuffled order"; "Third real ingest: retention reduced eight old runs"; "Stage 3a decided: Llama as B2, `pp-v0.2` applied, the ceiling accepted"; "What remains before preregistration". |
+| 12: preregistration tooling (self-agreement, `--set test`, shadow mode, corpus export) | 2026-10-18 | [`session-12.md`](friction-log/session-12.md) | "Tools built: what each does, and the choices inside them"; "ADR-010 says "after the commit"; the tools use a recorded time"; "The test fake gave every post the same publication time"; "ADR-010 amended: the recorded time, and posts about Afterword excluded". |
 
 ## Adding a session
 

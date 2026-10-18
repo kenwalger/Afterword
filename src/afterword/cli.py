@@ -22,7 +22,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from afterword import baseline, bench, heuristic, label_ui, labeling, policy, service
+from afterword import baseline, bench, heuristic, label_ui, labeling, policy, service, shadow
 from afterword.progress import StatusLine
 from afterword.providers import ollama
 
@@ -128,7 +128,7 @@ def _open_labeling(args: argparse.Namespace) -> service.LabelingSession | int:
         print(str(exc), file=sys.stderr)
         return 2
     try:
-        session = service.open_for_labeling(Path(args.root), args.run)
+        session = service.open_for_labeling(Path(args.root), args.run, corpus_set=args.corpus_set)
     except service.ServiceError as exc:
         return _fail(exc)
     if session.stale:
@@ -138,8 +138,15 @@ def _open_labeling(args: argparse.Namespace) -> service.LabelingSession | int:
             "then are still shown (ADR-009). Run a fresh full probe before labeling."
         )
     excluded = session.excluded
+    if session.snapshot.registered_at is not None:
+        sets = session.sets
+        print(
+            f"corpus sets (ADR-010): dev {sets['dev']}, test {sets['test']}, "
+            f"neither {sets['neither']} (arrived after preregistration on earlier posts)"
+        )
     print(
-        f"run {args.run}: {session.subjects} comments to label; not labeled: "
+        f"run {args.run}: {session.subjects} comments to label in set {session.corpus_set}; "
+        "not labeled: "
         f"{excluded['by_author']} by the author, {excluded['deletion_placeholders']} deletion "
         f"placeholders, {excluded['unexpected_shapes']} unexpected shapes, "
         f"{excluded['undated']} undated"
@@ -298,7 +305,14 @@ def _labeling_options(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--pass", dest="pass_name", choices=labeling.PASSES, default="initial")
     parser.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
-    parser.add_argument("--set", dest="corpus_set", default=labeling.DEFAULT_CORPUS_SET)
+    parser.add_argument(
+        "--set",
+        dest="corpus_set",
+        choices=labeling.CORPUS_SETS,
+        default=labeling.DEFAULT_CORPUS_SET,
+        help="dev (default) or test: comments on posts published after the "
+        "preregistration record (ADR-010)",
+    )
     parser.add_argument("--ids", help="file of comment IDs to restrict to, one per line")
     parser.add_argument(
         "--posts",
@@ -330,6 +344,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         print("warning: unexpected shapes need a friction entry before this run is used (ADR-009)")
     saved = result.saved_runs
     print(f"saved runs: deleted comments redacted {saved.withdrawn_redactions} (counted per run)")
+    if result.corpus_withdrawn:
+        print(f"corpus files: deleted comments withdrawn {result.corpus_withdrawn} (ADR-009)")
     if saved.runs_reduced:
         print(f"saved runs reduced to structure (retention): {', '.join(saved.runs_reduced)}")
     if saved.runs_kept_for_labels:
@@ -555,6 +571,306 @@ def cmd_dev_subset(args: argparse.Namespace) -> int:
     print(f"by class: {classes}")
     print(f"graded 2 or 3: {subset.consequential}; by post order: {subset.by_post_order}")
     print(f"IDs: {path}")
+    return 0
+
+
+def cmd_self_agreement_draw(args: argparse.Namespace) -> int:
+    """Draw the self-agreement sample; counts on the console, IDs to a git-ignored file.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        draw, path = service.draw_self_agreement(
+            Path(args.root),
+            seed=args.seed,
+            corpus_version=args.corpus_version,
+            corpus_set=args.corpus_set,
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(
+        f"self-agreement draw ({draw.corpus_set}), seed {draw.seed}: pool {draw.pool} labels "
+        f"made on or before {draw.cutoff.isoformat(timespec='seconds')}"
+    )
+    print(
+        f"sample {len(draw.ids)}: graded 2 or 3 {draw.graded}, random {draw.random_drawn} "
+        f"({draw.random_also_graded} of them also graded 2 or 3)"
+    )
+    print(f"IDs: {path}")
+    print(
+        f"label with: uv run afterword label-ui --run <run-id> --pass self_agreement --ids {path}"
+    )
+    return 0
+
+
+def cmd_self_agreement_report(args: argparse.Namespace) -> int:
+    """Compare self-agreement labels with the originals; counts only on the console.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        report, counts_path, ids_path = service.report_self_agreement(
+            Path(args.root), corpus_version=args.corpus_version, corpus_set=args.corpus_set
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    n = report.compared
+    kappa = "n/a" if report.class_kappa is None else f"{report.class_kappa:.3f}"
+    counts = report.counts()
+    low, high = counts["same_consequential_wilson95"]
+    print(f"self-agreement ({report.corpus_set}): {n} comments compared with their originals")
+    print(f"class: same {report.same_class} of {n}; Cohen's kappa {kappa}")
+    print(
+        f"consequential (2 or 3): same {report.same_consequential} of {n} "
+        f"(Wilson 95% {100 * low:.1f}% to {100 * high:.1f}%); became consequential "
+        f"{report.became_consequential}, stopped being consequential "
+        f"{report.stopped_being_consequential}"
+    )
+    print(f"prospective grade: same {report.same_grade} of {n}")
+    if report.relabeled_too_soon:
+        print(
+            f"warning: {report.relabeled_too_soon} relabeled less than 14 days after the original"
+        )
+    if report.without_original:
+        print(f"self-agreement labels without an original: {report.without_original}")
+    print(f"report: {counts_path}")
+    print(f"disagreements, by comment ID only: {ids_path}")
+    return 0
+
+
+def cmd_shadow_run(args: argparse.Namespace) -> int:
+    """Seal this week's new test-comment outputs; print the file, its hash, and counts only.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        result = service.shadow_run(
+            Path(args.root), host=args.ollama_host, seal_failed=args.seal_failed
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(
+        f"test comments in the store: {result.test_comments}; "
+        f"sealed before: {result.already_sealed}"
+    )
+    if result.held_back_failed:
+        print(f"held back (B2 failed; retried next run): {result.held_back_failed}")
+    if result.sealed_file is None:
+        print("nothing new to seal")
+        return 0
+    print(
+        f"sealed {result.comments_sealed} comments ({result.records} records, B1 and B2), "
+        f"week of {result.week_start.isoformat()}"
+    )
+    print(f"sealed file (git-ignored, never shown): {result.sealed_file}")
+    print(f"sha256: {result.sha256}")
+    print(f"commit the ledger this week: {shadow.LEDGER_PATH.as_posix()}")
+    return 0
+
+
+def cmd_shadow_status(args: argparse.Namespace) -> int:
+    """Print accrual progress toward the stopping rule; never an output or a grade count.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        st = service.shadow_status(Path(args.root), corpus_version=args.corpus_version)
+    except service.ServiceError as exc:
+        return _fail(exc)
+
+    def met(flag: bool) -> str:
+        return "met" if flag else "not yet"
+
+    print(
+        f"registered {st.registered_at.isoformat()}; {st.weeks_elapsed} weeks elapsed; "
+        f"16-week cap on {st.cap_reached_at.date().isoformat()}"
+    )
+    print(
+        f"test comments labeled: {st.test_labels} (target {shadow.TARGET_TOTAL}: "
+        f"{met(st.total_target_met)}); {shadow.TARGET_CONSEQUENTIAL} graded 2 or 3: "
+        f"{met(st.consequential_target_met)}"
+    )
+    print(f"stopping rule: {met(st.stopping_rule_met)}")
+    print(
+        f"sealed comments {st.sealed_comments} in {st.ledger_entries} ledger entries; "
+        f"{'verified' if st.verified else 'NOT verified'}; "
+        f"{'revealed' if st.revealed else 'sealed'}"
+    )
+    return 0
+
+
+def cmd_shadow_verify(args: argparse.Namespace) -> int:
+    """Check every sealed file against the committed ledger; file names and counts only.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status: 0 when every file matches, 1 otherwise.
+    """
+    result = service.shadow_verify(Path(args.root))
+    print(f"ledger entries {result.entries}: matched {result.matched}")
+    for label, names in (
+        ("hash differs", result.mismatched),
+        ("missing", result.missing),
+        ("not in the ledger", result.unlisted),
+    ):
+        for name in names:
+            print(f"{label}: {name}")
+    print("verified" if result.ok else "NOT verified: do not score")
+    return 0 if result.ok else 1
+
+
+def cmd_shadow_reveal(args: argparse.Namespace) -> int:
+    """Reveal the sealed outputs once the stopping rule is met.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        reveal = service.shadow_reveal(Path(args.root), corpus_version=args.corpus_version)
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(
+        f"revealed at {reveal['revealed_at']} ({reveal['reason']}): "
+        f"{reveal['test_labels']} test comments labeled, {reveal['consequential']} graded 2 or 3, "
+        f"{reveal['weeks_elapsed']} weeks"
+    )
+    print(
+        f"sealed comments {reveal['sealed_comments']}; sealed without a label "
+        f"{reveal['sealed_without_label']}; labeled without a sealed output "
+        f"{reveal['labeled_without_sealed_output']}"
+    )
+    print(f"commit the reveal record: {shadow.REVEAL_PATH.as_posix()}")
+    return 0
+
+
+def cmd_shadow_score(args: argparse.Namespace) -> int:
+    """Score the revealed outputs against the test labels, once, after verifying them.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        result = service.shadow_score(Path(args.root), corpus_version=args.corpus_version)
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(
+        f"test labels made before the reveal: {result['labels_before_reveal']} "
+        f"(made after it, excluded: {result['labels_after_reveal_excluded']}); "
+        f"policy {result['policy_version']}"
+    )
+    for condition, data in result["conditions"].items():
+        counts = data["scores"]["all"]
+        if not counts.get("total"):
+            print(f"{condition}: nothing scored")
+            continue
+        recall = counts["consequential_recall"]
+        reduction = counts["review_reduction"]
+        precision = counts["surface_precision"]
+        capture = counts["surface_capture"]
+        print(
+            f"{condition}: recall {recall['count']} of {recall['of']}; collapsed "
+            f"{reduction['count']} of {reduction['of']}; SURFACE {counts['surface_size']}; "
+            f"precision {precision['count']} of {precision['of']}; "
+            f"capture {capture['count']} of {capture['of']}"
+        )
+    path = service.write_shadow_score(Path(args.root), result)
+    print(f"report: {path}")
+    return 0
+
+
+def cmd_corpus_export(args: argparse.Namespace) -> int:
+    """Freeze a corpus set: records to a git-ignored file, IDs and hashes to the manifest.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        made = service.export_corpus(
+            Path(args.root), version=args.version, corpus_set=args.corpus_set
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(
+        f"corpus {made.version} ({made.corpus_set}): {made.records} records, "
+        f"store as of run {made.store_as_of}"
+    )
+    print(f"records (git-ignored): {made.data_file.as_posix()}")
+    print(f"manifest (commit it): {made.manifest_file.as_posix()}")
+    print(f"sha256: {made.file_sha256}")
+    return 0
+
+
+def cmd_corpus_verify(args: argparse.Namespace) -> int:
+    """Check a frozen corpus file against its manifest; counts only.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status: 0 when nothing changed beyond ADR-009 withdrawals.
+    """
+    try:
+        result = service.verify_corpus(
+            Path(args.root), version=args.version, corpus_set=args.corpus_set
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(
+        f"corpus {args.version} ({args.corpus_set}): {result.records} records; matched "
+        f"{result.matched}, withdrawn upstream {result.withdrawn}, changed {result.changed}, "
+        f"missing {result.missing}, extra {result.extra}; file hash "
+        f"{'matches' if result.file_matches else 'differs'}"
+    )
+    print("verified" if result.ok else "NOT verified")
+    return 0 if result.ok else 1
+
+
+def cmd_preregistration_posts(args: argparse.Namespace) -> int:
+    """List the posts published after preregistration, with their IDs, for exclusions.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        rows = service.list_test_period_posts(Path(args.root))
+    except service.ServiceError as exc:
+        return _fail(exc)
+    if not rows:
+        print("no post published after preregistration in the store")
+        return 0
+    for row in rows:
+        when = row.published_at.date().isoformat() if row.published_at else "unknown"
+        mark = "excluded" if row.excluded else "test"
+        print(
+            f"{row.post_id}  {when}  {mark:8}  comments from others {row.comments_from_others}  "
+            f"{row.title or '(no title)'}"
+        )
+    return 0
+
+
+def cmd_preregistration_exclude(args: argparse.Namespace) -> int:
+    """Exclude a post from the test set by a recorded amendment.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        made = service.exclude_post(
+            Path(args.root),
+            post_id=args.post,
+            reason=args.reason,
+            after_labeling=args.after_labeling,
+        )
+    except service.ServiceError as exc:
+        return _fail(exc)
+    late = " (after labeling: a deviation, recorded)" if made.after_labeling else ""
+    print(f"post {made.post_id} excluded from the test set at {made.recorded_at.isoformat()}{late}")
+    if made.test_labels_on_post or made.sealed_on_post:
+        print(
+            f"left out of every count and score: {made.test_labels_on_post} test labels, "
+            f"{made.sealed_on_post} sealed comments"
+        )
+    print("commit the amendment: registry/preregistration.json")
     return 0
 
 
@@ -790,6 +1106,87 @@ def build_parser() -> argparse.ArgumentParser:
     subset.add_argument("--seed", type=int, required=True)
     subset.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
     subset.set_defaults(func=cmd_dev_subset)
+
+    agreement = sub.add_parser(
+        "self-agreement", help="labeler self-agreement check (LABELING-GUIDE.md)"
+    )
+    agreement_sub = agreement.add_subparsers(dest="self_agreement_command", required=True)
+    draw = agreement_sub.add_parser(
+        "draw", help="draw the sample by the guide's rule (IDs to a git-ignored file)"
+    )
+    draw.add_argument("--seed", type=int, required=True, help="recorded with the draw")
+    report = agreement_sub.add_parser(
+        "report", help="compare self-agreement labels with the originals (counts only)"
+    )
+    for p in (draw, report):
+        p.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
+        p.add_argument("--set", dest="corpus_set", choices=labeling.CORPUS_SETS, default="dev")
+    draw.set_defaults(func=cmd_self_agreement_draw)
+    report.set_defaults(func=cmd_self_agreement_report)
+
+    shadow_cmd = sub.add_parser(
+        "shadow", help="shadow mode on the sealed test set (ADR-010; needs preregistration)"
+    )
+    shadow_sub = shadow_cmd.add_subparsers(dest="shadow_command", required=True)
+    shadow_run = shadow_sub.add_parser(
+        "run", help="classify new test comments with B1 and B2 and seal the outputs (weekly)"
+    )
+    shadow_run.add_argument("--ollama-host", default=ollama.DEFAULT_HOST, help=host_help)
+    shadow_run.add_argument(
+        "--seal-failed",
+        action="store_true",
+        help="seal failed B2 outputs instead of holding them back for a retry",
+    )
+    shadow_run.set_defaults(func=cmd_shadow_run)
+    shadow_status = shadow_sub.add_parser(
+        "status", help="progress toward the stopping rule (no outputs, no grade counts)"
+    )
+    shadow_status.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
+    shadow_status.set_defaults(func=cmd_shadow_status)
+    shadow_verify = shadow_sub.add_parser(
+        "verify", help="check every sealed file against the committed ledger"
+    )
+    shadow_verify.set_defaults(func=cmd_shadow_verify)
+    shadow_reveal = shadow_sub.add_parser(
+        "reveal", help="reveal the sealed outputs, once, after the stopping rule"
+    )
+    shadow_score = shadow_sub.add_parser(
+        "score", help="score the revealed outputs against the test labels"
+    )
+    for p in (shadow_reveal, shadow_score):
+        p.add_argument("--corpus-version", default=labeling.DEFAULT_CORPUS_VERSION)
+    shadow_reveal.set_defaults(func=cmd_shadow_reveal)
+    shadow_score.set_defaults(func=cmd_shadow_score)
+
+    prereg = sub.add_parser(
+        "preregistration", help="the preregistration record: test-period posts and exclusions"
+    )
+    prereg_sub = prereg.add_subparsers(dest="preregistration_command", required=True)
+    posts = prereg_sub.add_parser("posts", help="list posts published after preregistration")
+    posts.set_defaults(func=cmd_preregistration_posts)
+    exclude = prereg_sub.add_parser(
+        "exclude-post", help="exclude a post from the test set (a recorded amendment)"
+    )
+    exclude.add_argument("--post", required=True, help="post ID (from `preregistration posts`)")
+    exclude.add_argument("--reason", default="post about Afterword", help="recorded with it")
+    exclude.add_argument(
+        "--after-labeling",
+        action="store_true",
+        help="record a late exclusion of a post whose test comments are already labeled",
+    )
+    exclude.set_defaults(func=cmd_preregistration_exclude)
+
+    corpus_cmd = sub.add_parser("corpus", help="the frozen corpus and its committed manifest")
+    corpus_sub = corpus_cmd.add_subparsers(dest="corpus_command", required=True)
+    export = corpus_sub.add_parser(
+        "export", help="freeze a corpus set: records git-ignored, IDs and hashes committed"
+    )
+    check = corpus_sub.add_parser("verify", help="check a frozen corpus file against its manifest")
+    for p in (export, check):
+        p.add_argument("--version", required=True, help="corpus version: v1, v2, ...")
+        p.add_argument("--set", dest="corpus_set", choices=labeling.CORPUS_SETS, default="dev")
+    export.set_defaults(func=cmd_corpus_export)
+    check.set_defaults(func=cmd_corpus_verify)
 
     models = sub.add_parser("models", help="local model checks")
     models_sub = models.add_subparsers(dest="models_command", required=True)

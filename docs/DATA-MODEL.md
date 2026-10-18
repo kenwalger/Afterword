@@ -1,6 +1,8 @@
 # Data Model
 
-**Version:** 13 (2026-10-08)
+**Version:** 14 (2026-10-18)
+
+v14 (2026-10-18, session 12) records three file-based records outside the store, none holding comment text except the git-ignored corpus file: the preregistration record, sealed shadow records with their committed ledger, and the frozen corpus with its committed manifest (section "Outside the store"). The store's records are unchanged; a label now records its corpus set as before, and analysis treats a missing set as `dev`.
 
 v13 (2026-10-08, later the same day) records that the purge also redacts saved probe runs, outside the store (ADR-009, amended 2026-10-08). The store's records are unchanged.
 
@@ -300,3 +302,11 @@ If introduced later, a Person must be separate from PlatformIdentity, and identi
 ## Provenance rule
 
 Every normalized record traces to source evidence. Every interpretation traces to the model, prompt, taxonomy, and policy versions that produced it. Every human judgment remains separately visible, and nothing derived ever overwrites it.
+
+## Outside the store (v14)
+
+Files, not store rows. Each is described with its format in the module named.
+
+- **Preregistration record** (`registry/preregistration.json`, committed; `afterword.preregistration`): `registered_at` (UTC), `b1_heuristic`, `b2_provider`, `b2_model`, `b2_model_digest`, `policy_version`, `num_ctx`, and `excluded_posts` (each `post_id`, `reason`, `recorded_at`, and `after_labeling` when recorded late; appended, never edited). It defines corpus-set membership (ADR-010, amended 2026-10-18): `test` for comments on posts published after `registered_at` and not excluded, `dev` for comments by then on earlier posts, neither for the rest.
+- **Sealed shadow record** (`reports/shadow/shadow-<time>.jsonl`, git-ignored; `afterword.shadow`): one per test comment and condition, with the classification's ID, input hash, provider, model, digest, prompt, options, taxonomy, normalization, pre-check and policy versions, outcome, error category, class, flags (all and the classifier's own), confidence, edit state, and the registered policy's tier, `rule_applied`, and `rules_fired`. No text, explanation, or raw output. The file's SHA-256 is in the **ledger** (`registry/shadow-ledger.jsonl`, committed) with its sealing time, week, and counts; the **reveal record** (`registry/reveal.json`, committed) says when and why the outputs were revealed.
+- **Corpus record and manifest** (`fixtures/corpus/<version>/<set>.jsonl`, git-ignored, and `registry/corpus-<version>-<set>.json`, committed; `afterword.corpus`): the record format of `fixtures/README.md`, plus `withdrawn` and `withdrawn_on` once a comment is deleted upstream (ADR-009). The manifest holds IDs and hashes only.
