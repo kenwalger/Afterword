@@ -20,6 +20,7 @@ When evidence changes a claim, append the result and date. Do not rewrite the or
 
 - 2026-10-02: Measurement linked to labeler self-agreement (`LABELING-GUIDE.md`) and `UNCERTAIN` rate. No evidence yet.
 - 2026-10-08: Provisional, from 302 `dev` labels. The categories are usable (1 `UNCERTAIN` in 302), but class is a weak proxy for consequence: 49 of the 84 comments graded 2 or 3 are `TECHNICAL_EXTENSION`, a `QUEUE` class, and 22 of the 46 `TECHNICAL_QUESTION` comments, a `SURFACE` class, are graded 1 (`EVALUATION.md`, "Class is a weak proxy for consequence"). The claim says categories help decide what to inspect next; on this evidence they decide whether to inspect, not well what to inspect first. The claim text is unchanged.
+- 2026-10-18: Provisional, from all 478 `dev` labels. 2 `UNCERTAIN` in 478. The weak-proxy reading holds: 65 of the 129 comments graded 2 or 3 are `TECHNICAL_EXTENSION` (a `QUEUE` class), and 25 of the 66 `TECHNICAL_QUESTION` comments (a `SURFACE` class) are graded below 2. The claim text is unchanged.
 
 ## C-002: Prioritization can reduce review workload
 
@@ -34,6 +35,7 @@ When evidence changes a claim, append the result and date. Do not rewrite the or
 - 2026-10-02: Priority is now policy-computed (ADR-007). Measured on `test-natural` for reduction and `test-enriched` for recall. No evidence yet.
 - 2026-10-02 (later): ADR-010 amended. `test-natural` and `test-enriched` are replaced by one prospective `test` set (comments on posts published after preregistration), which measures both reduction and recall. No evidence yet.
 - 2026-10-08: Provisional, from 302 `dev` labels (not the test set). Under `pp-v0.1` even perfect classification collapses at most 57 of 302 (18.9%) and places 54 of the 84 consequential comments at `QUEUE`, not `SURFACE`, because class is a weak proxy for consequence. The reduction available from class-based priority is therefore modest by construction, and the ordering within the review threshold carries little of the consequence. SURFACE size, precision, and capture are now co-primary measures (`EVALUATION.md` v13). How consequence should reach the tier is the open design question for session 9, in tension with ADR-007. The claim text is unchanged.
+- 2026-10-18: Provisional, from all 478 `dev` labels. Under `pp-v0.1` perfect classification collapses at most 111 of 478 with class defaults alone (23.2%; 57 of 302 before) and 94 of 478 with the labeled flags (19.7%; 44 of 302 before); under `pp-v0.2`, 103 (21.5%). None of them is consequential. 75 of the 129 consequential comments still sit at `QUEUE` under perfect classification (SURFACE capture 54 of 129). The reduction available from class-based priority stays modest, and how consequence reaches the tier stays open. The claim text is unchanged.
 
 ## C-003: Explanations improve oversight
 
@@ -147,6 +149,7 @@ Claims below were added on 2026-10-02 during scoping v2.
 **Status:** UNTESTED
 
 - 2026-10-07: Provisional, from 302 of 458 `dev` labels (`EVALUATION.md`, 2026-10-07 label summary). Where both grades exist (293), the consequential binary agrees in 262; 4 comments are consequential only in hindsight and 27 only prospectively. By label order: publication order (first 150) 140 of 147 agree, 3 only in hindsight, 4 only prospectively; shuffled order (next 152) 122 of 146 agree, 1 only in hindsight, 23 only prospectively. The direction named in the falsifier (consequential only in hindsight) is rare in both. The shuffled labels show more disagreement in the other direction, whose cause (sample, guide version, or labeler experience) these labels cannot separate. These are historical comments, mostly labeled after replying, so they say little about the prospective test set, where C-010 is measured.
+- 2026-10-18: Provisional, from all 478 `dev` labels (labeling complete; `EVALUATION.md` v16). Where both grades exist (465), the consequential binary agrees in 426 (91.6%); 4 comments are consequential only in hindsight and 35 only prospectively. The shuffled labels now span two parts: the first 152 (`lg-v0.3`) agree in 122 of 146 (23 only prospectively), the next 176 (`lg-v0.6`) in 164 of 172 (8 only prospectively, 0 only in hindsight), against 140 of 147 in publication order. The 2026-10-07 entry's contrast between orders is therefore not a property of shuffled labels: the next 176 agree as often as the publication-order labels, and the disagreement sits in the first shuffled 152. The direction named in the falsifier stays rare (4 of 465). Still historical comments, mostly labeled after replying.
 
 ---
 

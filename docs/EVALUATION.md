@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 15 (2026-10-08)
+**Version:** 16 (2026-10-18)
+
+v16 (2026-10-18, `dev` labeling complete on run `20261018T173927Z`) records the label summary of all 478 `dev` labels, the recomputed accrual estimate, and the oracle ceilings of `pp-v0.1` and `pp-v0.2` with SURFACE measures. Nothing registered changes; nothing is chosen.
 
 v15 (2026-10-08, later the same day) records that the author's pre-check hypothesis was refuted, and adds an observation for the session 9 design question: Llama's mistaken challenge calls on technical extensions concentrate consequential comments. Nothing registered changes; nothing is chosen.
 
@@ -102,6 +104,21 @@ Once `dev` labeling is complete, recompute this estimate with the observed conse
 - **The shuffled labels are the better estimate of the share**, because their posts are a seeded random order rather than the earliest-published posts. Their share is 3.6 points above the publication-order share, well inside both intervals.
 - **Hindsight:** 192 of the 302 (63.6%) were labeled after the author had replied (`replied_before_labeling`): 108 of 150 (72.0%) in publication order, 84 of 152 (55.3%) shuffled.
 - **Still provisional:** one labeler, 302 of 458 comments, prospective grades of historical comments made with hindsight available.
+
+**2026-10-18, `dev` labeling complete (478 of 478 eligible in run `20261018T173927Z`; recomputed again only if `dev` grows before preregistration).**
+
+| Labels | Graded 2 or 3 | Share (Wilson 95%) | Comments needed for 20 consequential (at the interval's low end) |
+| --- | --- | --- | --- |
+| All 478 | 129 | 27.0% (23.2% to 31.1%) | 75 (87) |
+| Publication order (150) | 39 | 26.0% (19.6% to 33.6%) | 77 (102) |
+| Shuffled posts (328, seed 20261004) | 90 | 27.4% (22.9% to 32.5%) | 73 (88) |
+
+- **The 100-comment target binds** at every share in the table, including the shuffled labels' low end, which are the better estimate (seeded post order). Only the publication-order low end (102) is above 100.
+- **Volume basis.** The 2026-10-07 entry used the trailing 13 weeks of run `20261002T171152Z` (mean 17.0 per week, median 7). On run `20261018T173927Z`, the trailing 13 complete weeks (2026-07-13 to 2026-10-11) have mean 21.85 and median 19 per week, because the weeks since the C-009 baseline were busy (42 and 28 comments from others). At the new mean, 100 comments take about 5 weeks; at the new median, about 6. On the old basis it was about 6 and 15.
+- **Replay** of the new trailing 13 weeks (start at each week in turn, wrap around, stop when both targets are met at the share): 3 to 8 weeks, median 5, the same at each share and at its low end, since the 100-comment target binds. All inside the 16-week cap.
+- **Arrival:** 427 of 478 comments from others (89.3%) arrived within 7 days of their post (91% in the C-009 baseline). Comments on earlier posts after preregistration belong to neither set (ADR-010).
+- **Which basis to register** is a preregistration decision: the volume of the trailing 13 weeks before the preregistration commit, from the last full probe run, recorded with its run ID.
+- **Still provisional:** prospective grades of historical comments, made with hindsight available (286 of 478, 59.8%, after the author's reply existed: 108 of 150 in publication order, 178 of 328 shuffled). The test period is the first prospective volume.
 
 ### Risks to accrual
 
@@ -304,6 +321,70 @@ B1 classified all 458 stored comments from others (`afterword classify --conditi
 ### Scoring offline (2026-10-07)
 
 `afterword evaluate --condition b1|b2 [--heuristic V | --model M] --policy pp-v0.1|pp-v0.2` scores cached classifications against the analysis labels without running a model: each labeled comment's classification is found by its current input hash and the classifier's identity (provider, model ID, prompt version, taxonomy version), and the chosen policy is applied in memory. Any cached B2 run can therefore be re-scored under any policy version. Comments without a cached classification are counted, not scored. Reports go to `reports/eval/` (git-ignored, counts only); `--misses` adds a git-ignored list of the IDs of consequential comments collapsed, for the author's own review.
+
+### Label summary and oracle ceilings, all 478 labels (2026-10-18, `dev` labeling complete)
+
+Every comment from others in run `20261018T173927Z` (478 eligible) has an analysis label: 478 initial, 0 calibration, 0 self-agreement. Labeled from three runs: 302 from `20261003T141450Z`, 80 from `20261007T224849Z`, 96 from `20261018T173927Z`. Counts from `afterword.label_records`, code and link flags deterministic as before. The shuffled labels are reported in two parts as well, because they span two guide versions: the first 152 (`lg-v0.3`, 2026-10-04 to 2026-10-07) and the next 176 (`lg-v0.6`, 2026-10-08 to 2026-10-18), all under one seed (20261004).
+
+| Primary class | All 478 | Publication order (150) | Shuffled (328) | Shuffled, first 152 | Shuffled, next 176 | Default tier |
+| --- | --- | --- | --- | --- | --- | --- |
+| `CORRECTION` | 3 | 2 | 1 | 0 | 1 | `SURFACE` |
+| `CHALLENGE_OR_COUNTEREXAMPLE` | 11 | 2 | 9 | 2 | 7 | `SURFACE` |
+| `TECHNICAL_QUESTION` | 66 | 23 | 43 | 23 | 20 | `SURFACE` |
+| `OPPORTUNITY` | 1 | 0 | 1 | 1 | 0 | `SURFACE` |
+| `DIRECT_QUESTION` | 6 | 5 | 1 | 0 | 1 | `QUEUE` |
+| `TECHNICAL_EXTENSION` | 131 | 49 | 82 | 51 | 31 | `QUEUE` |
+| `CONVERSATIONAL` | 147 | 42 | 105 | 44 | 61 | `QUEUE` |
+| `LIGHTWEIGHT_ACKNOWLEDGMENT` | 71 | 19 | 52 | 21 | 31 | `COLLAPSED` |
+| `LIKELY_SPAM_OR_NOISE` | 40 | 8 | 32 | 9 | 23 | `COLLAPSED` |
+| `UNCERTAIN` | 2 | 0 | 2 | 1 | 1 | `SURFACE` |
+
+| Prospective grade | All 478 | Publication order | Shuffled | Shuffled, first 152 | Shuffled, next 176 |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 158 | 53 | 105 | 50 | 55 |
+| 1 | 191 | 58 | 133 | 57 | 76 |
+| 2 | 100 | 34 | 66 | 34 | 32 |
+| 3 | 29 | 5 | 24 | 11 | 13 |
+| 2 or 3 | 129 (27.0%; Wilson 23.2% to 31.1%) | 39 (26.0%; 19.6% to 33.6%) | 90 (27.4%; 22.9% to 32.5%) | 45 (29.6%; 22.9% to 37.3%) | 45 (25.6%; 19.7% to 32.5%) |
+
+Where the consequential comments sit by class (all 478): `TECHNICAL_EXTENSION` 65, `TECHNICAL_QUESTION` 41, `CONVERSATIONAL` 9, `CHALLENGE_OR_COUNTEREXAMPLE` 9, `CORRECTION` 3, `OPPORTUNITY` 1, `DIRECT_QUESTION` 1; none among acknowledgments, spam, or `UNCERTAIN`.
+
+**Prospective against retrospective (C-010),** where both grades exist:
+
+| | All | Publication order | Shuffled | Shuffled, first 152 | Shuffled, next 176 |
+| --- | --- | --- | --- | --- | --- |
+| Both grades present | 465 | 147 | 318 | 146 | 172 |
+| Same grade | 369 | 135 | 234 | 97 | 137 |
+| Same consequential binary | 426 (91.6%) | 140 (95.2%) | 286 | 122 (83.6%) | 164 (95.3%) |
+| Consequential only in hindsight | 4 | 3 | 1 | 1 | 0 |
+| Consequential only prospectively | 35 | 4 | 31 | 23 | 8 |
+
+The 2026-10-07 reading ("the shuffled labels disagree with hindsight more often") does not survive the next 176: they agree as often as the publication-order labels (95.3% against 95.2%). The disagreement is concentrated in the first 152 shuffled labels (23 of the 35 "only prospectively"), not in shuffled labels as such. Those 152 differ from both other groups in labeling period and guide version (`lg-v0.3`), so the cause still cannot be separated, but post order is no longer a candidate.
+
+**Other fields:**
+
+- `replied_before_labeling`: 286 of 478 (59.8%); 108 of 150 in publication order, 178 of 328 shuffled (84 of 152, 94 of 176).
+- `read_via_translation`: 5 true, 171 false, 302 not recorded (labels from before `lg-v0.5`). All 5 are in the next 176.
+- `ai_self_disclosed`: 4 true, 172 false, 302 not recorded (before `lg-v0.6`). All 4 are in the next 176.
+- `context_reconstructed: false`: 110 (85 in publication order, 25 shuffled).
+- Labeled judgment flags: `REFERENCES_SPECIFIC_CLAIM` 111 (82 of 150 `tax-v0.1` labels, 29 of 328 `tax-v0.2`), `NEEDS_THREAD_CONTEXT` 104.
+
+**Oracle ceilings,** all 478 labels (perfect classes and labeled flags):
+
+| Policy, ceiling | SURFACE / QUEUE / COLLAPSED | Review reduction | SURFACE precision | SURFACE capture | Consequential surfaced |
+| --- | --- | --- | --- | --- | --- |
+| `pp-v0.1`, class only | 83 / 284 / 111 | 111 (23.2%; 19.7% to 27.2%) | 54 of 83 | 54 of 129 | 129 of 129 |
+| `pp-v0.1`, class and flags | 84 / 300 / 94 | 94 (19.7%; 16.3% to 23.5%) | 54 of 84 (64.3%; 53.6% to 73.7%) | 54 of 129 (41.9%; 33.7% to 50.5%) | 129 of 129 |
+| `pp-v0.1`, without `tax-v0.1` `REFERENCES_SPECIFIC_CLAIM` raises | 84 / 299 / 95 | 95 (19.9%) | 54 of 84 | 54 of 129 | 129 of 129 |
+| `pp-v0.1`, without any `REFERENCES_SPECIFIC_CLAIM` raises | 84 / 293 / 101 | 101 (21.1%) | 54 of 84 | 54 of 129 | 129 of 129 |
+| `pp-v0.2`, class and flags | 84 / 291 / 103 | 103 (21.5%; 18.1% to 25.5%) | 54 of 84 | 54 of 129 | 129 of 129 |
+
+By post order, class and flags: `pp-v0.1` collapses 19 of 150 (12.7%) in publication order and 75 of 328 (22.9%) shuffled; `pp-v0.2` 22 (14.7%) and 81 (24.7%). SURFACE is 28 (16 consequential, capture 16 of 39) and 56 (38 consequential, capture 38 of 90) under both.
+
+- **Recall is still not the constraint; the shape is.** Perfect classes surface all 129 consequential comments under every ceiling, but 75 of them (58%) sit at `QUEUE`, not `SURFACE`. SURFACE capture at the oracle is 41.9%, against 35.7% on the 302.
+- **The ceiling on reduction rose** from 14.6% (302 labels) to 19.7% under `pp-v0.1`, because the next 176 hold more acknowledgments and spam (54 of 176). The shuffled labels' 22.9% is the better estimate of the ceiling on new posts, with the caveat that the test set's mix is unknown.
+- **`pp-v0.2` costs nothing at the oracle:** 9 more collapses than `pp-v0.1` (103 against 94), none consequential, SURFACE unchanged. Whether to adopt it is a separate decision, with its own proposal.
+- **What this does not say:** anything about a classifier.
 
 ## Adversarial set
 

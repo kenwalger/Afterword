@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 9 (2026-10-08)
+**Version:** 10 (2026-10-18)
+
+v10 records `dev` labeling complete (478 of 478 eligible in run `20261018T173927Z`), the third real ingest, and the status line to match.
 
 v9 takes over the status log from the README (section "Status" below), unchanged, so the README can serve as a front door.
 
@@ -38,7 +40,7 @@ Done:
 - Stage 1 to 3a groundwork, independent of labels and real data (sessions 4 and 5): the store with ingest, lifecycle, purge, and forget; the classifier wrapper (`pr-v0.1`, now `pr-v0.2`); the Ollama and Anthropic providers; and classification normalization (`norm-v0.1`) with edit detection by normalized text, the instruction pre-check (`pc-v0.1`), the priority policy (`pp-v0.1`) as tested code, the heuristic baseline B1 (`hb-v0.1`, a draft until tuned on `dev`), and the synthetic adversarial set. The Anthropic provider is tested against mocked HTTP only.
 - `tax-v0.2` (session 7): no class changes; self-promotion as spam when promotion is the primary function; `CONTAINS_CODE` and `CONTAINS_LINK` set from normalization, never by a labeler or a model (prompt `pr-v0.2`); a stricter test for `REFERENCES_SPECIFIC_CLAIM`.
 
-Open: labeling the `dev` corpus (the author; 302 of 458 on 2026-10-07). Both real probe runs are ingested into the local store, and B1 has been scored against the labels on `dev` (`docs/EVALUATION.md`). The author ran both local models on a 50-comment `dev` subset and Llama over all 458 stored comments from others, on their own machine; the dev-set evaluation of B1 and Llama under `pp-v0.1` and `pp-v0.2` is in `docs/benchmarks/2026-10-08-dev-set-evaluation.md`. No model or policy is chosen.
+Open: preregistration decisions (B2, policy version, thresholds) on `dev`. `dev` labeling is complete: 478 of 478 comments from others in run `20261018T173927Z` (2026-10-18), labeled by the author. Three real runs are ingested into the local store; B1 has classified all 478 and Llama the 458 stored before 2026-10-18. The dev-set evaluation of B1 and Llama under `pp-v0.1` and `pp-v0.2` on the first 302 labels is in `docs/benchmarks/2026-10-08-dev-set-evaluation.md`; the label summary, accrual estimate, and oracle ceilings on all 478 are in `docs/EVALUATION.md` (v16). No model or policy is chosen.
 
 ## Stage 0: Freeze the experiment
 
@@ -56,7 +58,7 @@ Goal: define the question before implementation changes it.
 - [x] Define the fixture format and the synthetic corpus manifest (2026-10-03: `fixtures/README.md`, `fixtures/corpus/MANIFEST.md`, with hashes checked by a test)
 - [ ] Real corpus manifest: `dev` file hashes, committed when `dev` is frozen at preregistration (ADR-010)
 - [x] Decide corpus targets (2026-10-02: historical `dev`, prospective `test`; ADR-010 amended, `docs/proposals/accepted/2026-10-02-corpus-targets.md`)
-- [ ] Label the `dev` corpus (every historical comment from others) per the labeling guide
+- [x] Label the `dev` corpus (every historical comment from others) per the labeling guide (2026-10-18: 478 of 478 in run `20261018T173927Z`. Comments that arrive before preregistration also belong to `dev` and are labeled as they come.)
 - [x] Build the adversarial set, including injection cases (2026-10-03: synthetic, 24 cases, `fixtures/corpus/adversarial.jsonl`; hand-picked hard cases from labeling notes may be added as a new version)
 
 **Gate:** if C-009 shows trivial volume, decide explicitly whether to continue as a methodology study. Otherwise continue.
