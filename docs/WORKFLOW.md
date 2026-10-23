@@ -114,7 +114,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 ### The screen
 
 - **Left:** the post title, when the comment was posted, the context status, a "Show post" panel, and the thread as it stood when the comment was posted (later comments hidden). The context status says whether any known gap exists (a deleted earlier comment, a post edited after the comment), whether the comment replies to you (`REPLY_TO_AUTHOR` is then set automatically), and whether your reply already exists in the snapshot (`replied_before_labeling`). By default only the reply chain is shown; `t` shows every earlier comment in the thread. `p` opens the post panel: the post's body as saved in the run, as plain text with no live links, with a warning when the post was edited after the comment (`LABELING-GUIDE.md`, `lg-v0.4`). Runs from before `dev-probe-0.2` have no post bodies, and the panel says so.
-- **Right:** the class (radio buttons), flags (checkboxes), the prospective grade, the retrospective grade (shown only after the prospective grade is set), the reason, "Read via a translation" (`v`), "Says it was written by an AI" (`a`), a hard-to-label note, and the shortcut legend. Hovering a class or flag shows its definition; `h` shows all of them.
+- **Right:** the class (radio buttons), flags (checkboxes), the prospective grade, the retrospective grade (shown only after the prospective grade is set), the reason, "Read via a translation" (`v`), "Says it was written by an AI" (`a`), a hard-to-label note, and the shortcut legend. Hovering a class or flag shows its definition; `h` shows all of them, then the labeling guide's two tests (`lg-v0.7`: grade 2 against grade 1, extension against conversational).
 - **Header:** pass, batch, position in the batch, labels saved this session, and comments still unlabeled in the pass. A badge on the right shows the totals for the run: comments labeled (initial pass), relabeled (calibration pass), and eligible. It never shows classes or grades.
 
 ### Keyboard shortcuts
@@ -137,7 +137,7 @@ The options are those of `afterword label`: `--batch-size`, `--pass`, `--corpus-
 | Enter | Save the label and show the next comment (also from inside a text field) |
 | `t` | Toggle the reply chain and the full thread as of the comment |
 | `p` | Show or hide the post (from the saved run) |
-| `h` or `?` | Show or hide every class and flag with its definition |
+| `h` or `?` | Show or hide every class and flag with its definition, and the labeling guide's two tests |
 | `s` | Skip this comment without a label (a typed note is kept) |
 | `q` | Stop the session (asks to confirm while a comment is open) |
 | `b` | After a batch: start the next batch |

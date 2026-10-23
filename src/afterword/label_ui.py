@@ -59,7 +59,8 @@ COMMAND_KEYS: frozenset[str] = frozenset("htpsqgewva")
 def taxonomy_payload() -> dict[str, Any]:
     """Describe the classes and labeler flags with their keys and one-line definitions.
 
-    :returns: JSON-ready lists, classes in precedence order, flags in table order.
+    :returns: JSON-ready lists, classes in precedence order, flags in table order,
+        then the labeling guide's tests (:data:`afterword.labeling.GUIDE_TESTS`).
     """
     return {
         "classes": [
@@ -75,6 +76,8 @@ def taxonomy_payload() -> dict[str, Any]:
             for name in taxonomy.FLAGS
             if name in taxonomy.STRUCTURAL_FLAGS
         ],
+        "guide_version": labeling.LABEL_GUIDE_VERSION,
+        "guide_tests": [{"name": name, "text": text} for name, _, text in labeling.GUIDE_TESTS],
     }
 
 

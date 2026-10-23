@@ -222,6 +222,10 @@ def test_state_shows_as_of_context_with_pseudonyms_only(tmp_path, fake_dev):
     for name in NAMES:
         assert name not in text
     assert {c["key"] for c in state["taxonomy"]["classes"]} == set("0123456789")
+    assert state["taxonomy"]["guide_version"] == labeling.LABEL_GUIDE_VERSION
+    assert [t["name"] for t in state["taxonomy"]["guide_tests"]] == [
+        name for name, _, _ in labeling.GUIDE_TESTS
+    ]
 
 
 def test_invalid_labels_are_refused_and_nothing_is_written(tmp_path, fake_dev):

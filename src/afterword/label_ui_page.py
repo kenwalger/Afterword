@@ -478,6 +478,10 @@ function renderHelp() {
   for (const f of tx.structural_flags) {
     dl.append(el("dt", {text: "auto  " + f.name}), el("dd", {text: f.definition}));
   }
+  dl.append(el("h2", {text: "Tests (LABELING-GUIDE.md, " + tx.guide_version + ")"}));
+  for (const t of tx.guide_tests) {
+    dl.append(el("dt", {text: t.name}), el("dd", {text: t.text}));
+  }
   h.replaceChildren(el("div", {class: "muted", text: "h or Esc closes"}), dl);
 }
 

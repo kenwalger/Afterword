@@ -40,6 +40,25 @@ LABEL_ROOT: Path = label_records.LABEL_ROOT
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
 LABEL_GUIDE_VERSION: str = "lg-v0.7"
+# The labeling guide's tests shown in both tools' help, after the taxonomy:
+# (section heading in LABELING-GUIDE.md, phrase quoted from that section, help
+# line). tests/test_taxonomy.py checks the heading and phrase against the guide.
+# Kept out of afterword.taxonomy, which also feeds the classifier prompt.
+GUIDE_TESTS: tuple[tuple[str, str, str], ...] = (
+    (
+        "Grade 2 versus grade 1",
+        "If I saw this two weeks late",
+        'A 2 needs a named consequence: finish "If I saw this two weeks late, ..." with '
+        'something that would go wrong or be lost. "Nothing much" or "I would reply to be '
+        'polite" means 1.',
+    ),
+    (
+        "Technical extension versus conversational",
+        "opinion, agreement, praise, and general experience",
+        "Strike the opinion, agreement, praise, and general experience. Something technical "
+        "another reader could use is left: TECHNICAL_EXTENSION. Nothing is: CONVERSATIONAL.",
+    ),
+)
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`,
@@ -563,6 +582,16 @@ def _flags(answer: str) -> list[str]:
     return [f for f in LABELER_FLAGS if f in picked]
 
 
+def help_text() -> str:
+    """Render the terminal help: the taxonomy, then the labeling guide's tests.
+
+    :returns: Plain text for a terminal.
+    """
+    lines = [taxonomy.help_text(), "", f"Tests (LABELING-GUIDE.md, {LABEL_GUIDE_VERSION}):"]
+    lines += [f"  {name}: {text}" for name, _, text in GUIDE_TESTS]
+    return "\n".join(lines)
+
+
 def _ask_valid[T](
     console: Console, prompt: str, parse: Callable[[str], T], *, help_text: str | None = None
 ) -> T:
@@ -1018,7 +1047,7 @@ def _ask_label(
                 f"Class [1-{len(CLASSES)}], h = help, t = toggle full thread, s = skip: "
             )
             if answer.lower() == "h":
-                console.say(taxonomy.help_text())
+                console.say(help_text())
                 continue
             if answer.lower() == "t":
                 full = not full
@@ -1038,12 +1067,13 @@ def _ask_label(
             console,
             "Flags [numbers, comma-separated; Enter for none; h = help]: ",
             _flags,
-            help_text=taxonomy.help_text(),
+            help_text=help_text(),
         )
         prospective = _ask_valid(
             console,
-            "Prospective grade, as of when it was posted [0-3]: ",
+            "Prospective grade, as of when it was posted [0-3; h = help]: ",
             lambda a: _grade(a, optional=False),
+            help_text=help_text(),
         )
         assert prospective is not None  # not optional
         retrospective = _ask_valid(

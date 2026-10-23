@@ -407,13 +407,15 @@ def test_redo_restarts_the_label(tmp_path, fake_dev):
 
 def test_help_lists_every_class_and_flag_with_a_definition(tmp_path, fake_dev):
     snap = snapshot(tmp_path)
-    script = Script(["h", "1", "h", "2", "2", "3", "needs an answer", "", ""])
+    script = Script(["h", "1", "h", "2", "h", "2", "3", "needs an answer", "", ""])
     run(snap, tmp_path, script)
-    helps = [o for o in script.out if o == taxonomy.help_text()]
-    assert len(helps) == 2  # once at the class prompt, once at the flags prompt
+    helps = [o for o in script.out if o == labeling.help_text()]
+    assert len(helps) == 3  # at the class, flags, and prospective grade prompts
     for name in (*taxonomy.CLASSES, *taxonomy.FLAGS):
         assert name in helps[0]
     assert taxonomy.CLASS_DEFINITIONS["CORRECTION"] in helps[0]
+    for name, _, text in labeling.GUIDE_TESTS:
+        assert f"{name}: {text}" in helps[0]
     assert "h = help" in script.prompts[0]
     (label,) = lines(tmp_path / labeling.LABEL_ROOT / "unfrozen" / "initial.jsonl")
     assert label["primary_class"] == "CORRECTION"

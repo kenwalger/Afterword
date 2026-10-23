@@ -231,3 +231,36 @@ A diagnosis of the `dev` self-agreement report (80 compared; consequential agree
 **Scope pressure:** The label tools' `h` help shows `TAXONOMY.md` definitions only, so the reuse test and the named-consequence test are not on screen while labeling; adding them is a tool change, not made. `CLAUDE.md`'s "Current stage" still says the calibration pass is dropped; left for the author.
 
 **Next smallest useful step:** The calibration pass on the 150 (`PREREGISTRATION.md`, Step 1a).
+
+## Session 13, part C: the guide's tests in the help, and CLAUDE.md (2026-10-23)
+
+### 2026-10-23 20:10 - lg-v0.7's two tests in both tools' help
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Show the named-consequence test and the reuse test on `h` in the label UI and the terminal tool, kept in step with `LABELING-GUIDE.md` by the existing sync test; update `CLAUDE.md`'s "Current stage".
+
+**Expectation:** Add two lines to the taxonomy help.
+
+**Observation:**
+- **Not in `afterword.taxonomy`.** That module also feeds the classifier prompt, so adding guide text there could change the prompt and its cache key. The tests live in `labeling.GUIDE_TESTS` beside `LABEL_GUIDE_VERSION`, each as (guide heading, phrase quoted from the guide, help line). `labeling.help_text()` is the taxonomy help plus the tests; the UI's taxonomy payload carries `guide_version` and `guide_tests`, and the help page lists them under the flags.
+- **Terminal:** `h` now also works at the prospective grade prompt (`[0-3; h = help]`), where the grade test is needed; before, `h` worked only at the class and flag prompts.
+- **Sync test (`tests/test_taxonomy.py`):** the guide's version matches `LABEL_GUIDE_VERSION` (no test checked that before), and each help entry's heading exists in the guide and its key phrase appears in both that section and the help line. A renamed heading and a changed phrase were each tried against the test, and it failed both times.
+- **Docs:** `LABELING-GUIDE.md` (what `h` lists, no version change: it describes the tool, not the labels) and `WORKFLOW.md` (section 3). `CLAUDE.md`: the self-agreement check is done, and the calibration pass on the 150 under `lg-v0.7` is in progress, no longer dropped.
+- A heredoc turned `"\n"` into real line breaks in three places in new code; caught by reading the result before running tests.
+
+**Evidence:** `src/afterword/labeling.py`, `label_ui.py`, `label_ui_page.py`; `tests/test_taxonomy.py`, `test_labeling.py`, `test_label_ui.py`.
+
+**Workaround:** None.
+
+**Consequence:** The two tests are on screen while labeling the calibration pass.
+
+**Follow-up:** None.
+
+### 2026-10-23 20:15 - Session summary, part C
+
+The help change and the `CLAUDE.md` update are done and tested on synthetic fixtures. Check list: ruff, format, mypy, pydoclint clean; 771 tests pass on 3.14 and on 3.12 (isolated). Not committed. Claims affected: none. ADRs affected: none. Scope pressure: none. Next smallest useful step: the calibration pass on the 150 (`PREREGISTRATION.md`, Step 1a).

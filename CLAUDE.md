@@ -18,7 +18,10 @@ Rules for any session working in this repository.
   - B2 is Llama, `llama3.1:8b-instruct-q4_K_M` through Ollama, pinned digest, `pr-v0.2`, `num_ctx=4096`. B1 `hb-v0.2` is the baseline.
   - The applied policy is `pp-v0.2`: model-set `NEEDS_THREAD_CONTEXT` and `REFERENCES_SPECIFIC_CLAIM` are informational. `pp-v0.1` stays available for rescoring.
   - The class-based ceiling is accepted for V1; registered thresholds are set against the oracle under `pp-v0.2`. Class-default remaps are rejected; the extension split and a model consequence signal are V2 candidates (`docs/FUTURE-FEATURES.md`).
-  - The labeler self-agreement check runs on or after 2026-10-22, by the rule in `LABELING-GUIDE.md` (pool: labels at least 14 days old when drawn; every pooled comment graded 2 or 3 plus 25 at random, seed 20261018). The calibration pass on the first 150 is dropped unless that check shows a problem.
+- **Self-agreement check done (2026-10-23; `docs/EVALUATION.md` v20):** 112 of 112 drawn (pool: labels at least 14 days old; every pooled comment graded 2 or 3 plus 25 at random, seed 20261018). Consequential split 80 of 112 (the first, rushed sitting 53 of 80; the second, unhurried one 27 of 32), class kappa 0.358. Decided the same day:
+  - The labeling guide is `lg-v0.7` (named-consequence test for grade 2, reuse test for extension against conversational); `LABELING-FIELD-GUIDE.md` v5.
+  - **The calibration pass on the 150 publication-order labels under `lg-v0.7` is in progress** (the author, in their own terminal; IDs in `reports/eval/calibration-first150-lg-v0.7.txt`; `docs/PREREGISTRATION.md` Step 1a). It is no longer dropped. Analysis uses the latest non-self-agreement label per comment, and every `dev` result is recomputed after the pass.
+  - No second self-agreement cycle before preregistration; the C-011 relabel at the end of accrual is the long-term check.
 
 Orientation checks open items at their source, not in earlier session summaries: count the valid timing records under `reports/timing/` (`afterword.timing.load_valid`, aggregates only) and the label records under `fixtures/labels/` (`afterword.label_records`, counts only). Never print record contents. A summary that lists an item as open can be out of date.
 

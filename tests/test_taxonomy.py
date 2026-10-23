@@ -5,7 +5,9 @@ from pathlib import Path
 
 from afterword import labeling, policy, taxonomy
 
-DOC = (Path(__file__).resolve().parents[1] / "docs" / "TAXONOMY.md").read_text(encoding="utf-8")
+DOCS = Path(__file__).resolve().parents[1] / "docs"
+DOC = (DOCS / "TAXONOMY.md").read_text(encoding="utf-8")
+GUIDE = (DOCS / "LABELING-GUIDE.md").read_text(encoding="utf-8")
 
 
 def test_version_matches_the_document():
@@ -56,3 +58,18 @@ def test_structural_flags_are_the_ones_the_document_says_are_set_structurally():
     assert structural == taxonomy.STRUCTURAL_FLAGS
     assert {"CONTAINS_CODE", "CONTAINS_LINK"} == taxonomy.CONTENT_FLAGS
     assert not set(labeling.LABELER_FLAGS) & taxonomy.STRUCTURAL_FLAGS
+
+
+def test_guide_version_matches_the_labeling_guide():
+    assert f"`{labeling.LABEL_GUIDE_VERSION}`" in GUIDE.split("\n", 4)[2]
+
+
+def test_guide_tests_in_the_help_agree_with_the_labeling_guide():
+    for name, phrase, text in labeling.GUIDE_TESTS:
+        heading = re.search(rf"^#+ {re.escape(name)}( \(`lg-v[0-9.]+`\))?$", GUIDE, re.MULTILINE)
+        assert heading is not None, name
+        section = GUIDE[heading.end() :].split("\n#", 1)[0]
+        # The help line shortens the section but quotes its key phrase.
+        assert phrase in section, name
+        assert phrase in text, name
+        assert "\n" not in text and len(text) <= 200
