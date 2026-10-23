@@ -39,7 +39,7 @@ from afterword.observations import ObservedComment, ObservedContent, RunObservat
 LABEL_ROOT: Path = label_records.LABEL_ROOT
 TIMING_ROOT: Path = timing.TIMING_ROOT
 
-LABEL_GUIDE_VERSION: str = "lg-v0.6"
+LABEL_GUIDE_VERSION: str = "lg-v0.7"
 TAXONOMY_VERSION: str = taxonomy.TAXONOMY_VERSION
 DEFAULT_CORPUS_VERSION: str = "unfrozen"
 # Every historical comment is `dev` (ADR-010); prospective test labels pass `--set test`,

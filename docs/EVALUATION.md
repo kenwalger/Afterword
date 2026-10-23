@@ -1,6 +1,8 @@
 # Evaluation Plan
 
-**Version:** 19 (2026-10-18)
+**Version:** 20 (2026-10-23)
+
+v20 (2026-10-23, session 13) records the `dev` self-agreement check (all 112 drawn; consequential agreement 80 of 112, class kappa 0.358) with its pace evidence, and the author's decisions: the guide is revised to `lg-v0.7`, the 150 publication-order labels are relabeled under it with the calibration pass, and no second self-agreement cycle runs before preregistration. Nothing is registered yet.
 
 v19 (2026-10-18, later in session 12) follows ADR-010's amendment: the test set is defined by the recorded `registered_at`, and posts about Afterword itself are excluded from it (`excluded_posts` in the preregistration record). Nothing is registered yet.
 
@@ -230,7 +232,7 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 - Stability across model or prompt versions on `dev`.
 - Prospective versus retrospective agreement (C-010), separately for `dev` (hindsight available when labeled) and `test` (labeled at first read).
 - Grades given after replying versus before (`replied_before_labeling`).
-- Labeler self-agreement (see `LABELING-GUIDE.md`). **On `dev` (decided 2026-10-18):** the check runs on or after 2026-10-22, by the guide's rule: the pool is the analysis labels at least 14 days old when the list is drawn, and the sample is every pooled comment graded 2 or 3 plus 25 at random (seed 20261018). On 2026-10-22 that is about 104 comments, covering the first 150 and the first 152 shuffled labels. **The calibration pass on the first 150 is dropped** unless this check shows a problem: under `pp-v0.2` no first-150 label's tier depends on the judgment flags the pass was meant to correct (none, against 1 under `pp-v0.1`), and the C-010 outlier is the first 152 shuffled labels, not the first 150 (`docs/proposals/accepted/2026-10-18-relabeling-scope.md`).
+- Labeler self-agreement (see `LABELING-GUIDE.md`). **On `dev` (decided 2026-10-18):** the check runs on or after 2026-10-22, by the guide's rule: the pool is the analysis labels at least 14 days old when the list is drawn, and the sample is every pooled comment graded 2 or 3 plus 25 at random (seed 20261018). On 2026-10-22 that is about 104 comments, covering the first 150 and the first 152 shuffled labels. **The calibration pass on the first 150 is dropped** unless this check shows a problem: under `pp-v0.2` no first-150 label's tier depends on the judgment flags the pass was meant to correct (none, against 1 under `pp-v0.1`), and the C-010 outlier is the first 152 shuffled labels, not the first 150 (`docs/proposals/accepted/2026-10-18-relabeling-scope.md`). **Done 2026-10-23,** with the result and the decisions that follow in "Labeler self-agreement on `dev`" below: the calibration pass on the first 150 is reinstated, under `lg-v0.7`.
 - **Volume split (C-012).** Review reduction, consequential recall, and, where weeks are timed, review time per week, reported separately for test-period weeks above the trailing-13-week median volume of comments from others and for weeks at or below it. The median is computed from the last full probe run before preregistration, recorded with the run ID, and frozen with the other versions; weeks are Monday to Sunday, UTC, as in the C-009 baseline. Each group reports its number of weeks and comments. With at most 16 weeks the groups are small, so the split is indicative and reported in counts.
 
 ## Provisional observations on `dev`
@@ -407,6 +409,31 @@ By post order, class and flags: `pp-v0.1` collapses 19 of 150 (12.7%) in publica
 - **The ceiling on reduction rose** from 14.6% (302 labels) to 19.7% under `pp-v0.1`, because the next 176 hold more acknowledgments and spam (54 of 176). The shuffled labels' 22.9% is the better estimate of the ceiling on new posts, with the caveat that the test set's mix is unknown.
 - **`pp-v0.2` costs nothing at the oracle:** 9 more collapses than `pp-v0.1` (103 against 94), none consequential, SURFACE unchanged. Whether to adopt it is a separate decision, with its own proposal.
 - **What this does not say:** anything about a classifier.
+
+### Labeler self-agreement on `dev` (2026-10-23)
+
+By the guide's rule (`LABELING-GUIDE.md`, "Self-agreement check"), drawn 2026-10-23 17:19 UTC with seed 20261018: a pool of 342 analysis labels at least 14 days old, and a sample of 112 (all 92 pooled comments graded 2 or 3, plus 25 at random, 5 of which were also graded 2 or 3). All 112 were relabeled the same day in the label UI, in three batches, posts in publication order, with the originals 16 to 20 days old (made 2026-10-03 to 2026-10-09). Counts from `afterword self-agreement report` (`reports/eval/self-agreement-report-20261023T191354Z.json`) and `afterword.label_records`; the 63 comments with a disagreement are listed by ID in the git-ignored report beside it, for the author's own review, and are not discussed here one by one.
+
+| | All 112 | First sitting (80) | Second sitting (32) |
+| --- | --- | --- | --- |
+| Consequential split, same | 80 (71.4%; 62.5% to 79.0%) | 53 (66.3%; 55.4% to 75.7%) | 27 (84.4%; 68.2% to 93.1%) |
+| Left consequential / entered | 31 / 1 | 26 / 1 | 5 / 0 |
+| Same prospective grade | 53 | 35 | 18 |
+| Same class; Cohen's kappa | 55; 0.358 | 38; 0.344 | 17; 0.398 |
+| Median seconds per comment (originals, same comments) | 32.8 (42.2) | 25.1 (42.2) | 44.8 (42.5) |
+
+- **Direction.** Grade transitions, original to relabel: 0 to 0: 6, 0 to 1: 3, 1 to 0: 1, 1 to 1: 9, 1 to 2: 1, 2 to 0: 1, 2 to 1: 25, 2 to 2: 26, 2 to 3: 20, 3 to 0: 1, 3 to 1: 4, 3 to 2: 3, 3 to 3: 12. Of the 92 originally graded 2 or 3, 61 stayed (66.3%; 56.2% to 75.1%); of the 20 graded 0 or 1, 1 rose. The disagreement is almost all one way, at the 1/2 line.
+- **By original labels.** Publication order (`lg-v0.2`): 35 of 50 on the split, 25 of 39 consequential kept, 24 of 50 on class. Shuffled `lg-v0.3`: 35 of 50, 30 of 45, 22 of 50. Shuffled `lg-v0.6`: 10 of 12, 6 of 8, 9 of 12.
+- **Class.** 57 changed. The largest moves: `TECHNICAL_EXTENSION` to `CONVERSATIONAL` 23, to `TECHNICAL_QUESTION` 9, to `CHALLENGE_OR_COUNTEREXAMPLE` 5; `CHALLENGE_OR_COUNTEREXAMPLE` to `CORRECTION` 3. Of 55 original extensions, 14 stayed extensions. 18 of the 31 that left consequential went from `TECHNICAL_EXTENSION` to `CONVERSATIONAL`. Both classes default to `QUEUE`, so that move changes class agreement, not a tier.
+- **Pace.** The first sitting was two batches of 40 back to back: 17:24 to 18:03 and 18:03 to 18:19 UTC, 17 seconds apart. The median time per comment fell by quarter of the sitting: 43.0, 29.9, 28.9, 17.2 seconds. Within each group of originals, the later half of that sitting moved more comments out of consequential (publication order 4 of 19, then 10 of 20; shuffled `lg-v0.3` 4 of 12, then 7 of 13). The second sitting began 17 minutes after the first ended, one batch of 32 from 18:36 to 19:13, at a median of 44.8 seconds, close to the originals' pace.
+- **What the pace comparison can and cannot separate.** The batches follow publication order, so the second sitting holds only shuffled originals (23 `lg-v0.3`, 9 `lg-v0.6`). Holding the original group fixed, the `lg-v0.3` originals agree on the split in 16 of 27 in the first sitting and 19 of 23 in the second. Class agreement is low in both sittings (kappa 0.344 and 0.398), so pace does not account for the class result.
+- **Not measured:** whether the labels were right either time. Agreement measures consistency only.
+
+**Decisions (the author, 2026-10-23):**
+
+1. **The guide is revised to `lg-v0.7`.** Grade 2 against grade 1 needs a named consequence ("If I saw this two weeks late, ..."), with synthetic worked examples; an explicit reuse test separates `TECHNICAL_EXTENSION` from `CONVERSATIONAL`. The classes (`tax-v0.2`) are unchanged. `LABELING-FIELD-GUIDE.md` v5 matches it, and the label tools record `lg-v0.7` from now on.
+2. **The 150 publication-order labels are relabeled under `lg-v0.7`** with the existing calibration pass (ID list `reports/eval/calibration-first150-lg-v0.7.txt`, git-ignored; the same 150 as the 2026-10-18 list). Analysis uses the latest label from any pass other than `self_agreement`, as documented, so the calibration labels replace those 150 in analysis while the originals stay on disk. Afterwards the analysis labels span three guide versions (150 `lg-v0.7`, 152 `lg-v0.3`, 176 `lg-v0.6`), and every result says how many are calibration labels. 50 of the 150 were read in the self-agreement check on 2026-10-23, so for them the calibration label is a third reading within days. The shuffled `lg-v0.3` labels are not relabeled. Everything computed from `dev` labels (label summary, oracle ceilings, B1 and B2 scores, the accrual estimate, and the thresholds still to be registered) is recomputed after the pass.
+3. **No second 14-day self-agreement cycle before preregistration.** The author's reason: the careful sitting met the bar (27 of 32) and the rushed one did not (53 of 80), and the C-011 relabel at the end of accrual remains the long-term check. The guide sets no numeric bar; the judgment is the author's. Consequence: the `lg-v0.7` calibration labels enter analysis without a self-agreement check of their own.
 
 ## Adversarial set
 

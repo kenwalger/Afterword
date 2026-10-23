@@ -1,6 +1,8 @@
 # Labeling Field Guide
 
-**Version:** 4 (2026-10-08). Written against `tax-v0.2` and `lg-v0.6`.
+**Version:** 5 (2026-10-23). Written against `tax-v0.2` and `lg-v0.7`.
+
+v5 matches `lg-v0.7`: name the consequence before grading 2, the reuse test for `TECHNICAL_EXTENSION` against `CONVERSATIONAL`, and a break between batches, from the pace evidence of the 2026-10-23 self-agreement check. Reviewed against `lg-v0.7` and `tax-v0.2`; nothing else needed to change.
 
 v4 adds explicit AI self-disclosure (`lg-v0.6`, `ai_self_disclosed`). Reviewed against `lg-v0.6` and `tax-v0.2`; nothing else needed to change.
 
@@ -33,6 +35,8 @@ The prospective grade (0 to 3) is the most important thing you enter. Recall is 
 
 - **Grade prospectively.** Ask: "If this comment had just arrived, would I want to see it before the others?" Set aside how the thread turned out, including your own reply. That knowledge belongs in the retrospective grade, which the tools ask for separately.
 - **Grade separately from class.** Do not let the class decide the grade. A technical extension can be a 0. Occasionally a short acknowledgment matters, for example from someone you had hoped to hear from. If class and grade always move together, the analysis of where consequential comments sit loses its meaning.
+- **Name the consequence before you enter 2 (`lg-v0.7`).** Finish the sentence "If I saw this two weeks late, ..." with something that would go wrong or be lost: a claim left unchecked, a question only you can answer left hanging, someone waiting on you, a lead for work gone cold. If the honest ending is "nothing much" or "I'd reply to be polite", it is a 1. Put the ending in the reason. The worked examples are in `LABELING-GUIDE.md`.
+- **Substance is not consequence.** A good technique or result that asks nothing and claims nothing you must check is a 1. In the self-agreement check, most grades that moved went from 2 to 1, and most of those were extensions.
 - **Enter the retrospective grade honestly** when it differs. The gap between the two grades is evidence in its own right (C-010).
 
 ## Boundaries that change a tier
@@ -75,6 +79,14 @@ Pick your best reading and move on:
 - technical versus direct question (both are seen)
 - which of several queue-raising flags applies
 
+## Technical extension versus conversational
+
+Both default to `QUEUE`, so this does not change a tier, but it is the class boundary you crossed most often between readings (`LABELING-GUIDE.md`, `lg-v0.7`).
+
+- **The reuse test.** Strike the opinion, agreement, praise, and general experience. Is something technical left that another reader could use without asking the commenter: a technique, a tool and what it did, a configuration, a number, a failure mode, what was done and what happened? Yes: extension. No: conversational.
+- "Same here, it took us ages" is conversational. "Same here; pinning the pool size to the worker count fixed it" is an extension.
+- Decide the class with the test, then grade separately: an extension is usually a 1.
+
 ## Comments in another language
 
 - **Read it in the original first.** If you can grade it from the original, do; translation adds a layer that can lose a correction's detail or flip a joke's tone.
@@ -98,11 +110,12 @@ Pick your best reading and move on:
 
 - Batches of at most 40.
 - Stop when you notice yourself speeding up or skimming.
+- **Take a real break between batches.** In the 2026-10-23 self-agreement check, two batches run back to back (17 seconds apart) sped up from a median 43 to 17 seconds a comment by the last quarter, and agreed with the original labels on the consequential split for 53 of 80. A later batch, taken unhurried at a median 45 seconds, agreed on 27 of 32. If your pace drops well below your usual, stop.
 - Shorter, fresher sessions beat long ones. Label quality drifts with fatigue in ways that are hard to see afterward.
 
 ## Correcting earlier labels
 
-Labels are never overwritten. If you believe earlier labels were wrong (most labelers' first few dozen are), use the calibration pass (`--pass calibration`): it re-offers labeled comments with the earlier label hidden, records a new label, and analysis uses the latest non-self-agreement pass. Do it once the definitions feel natural, not while you are still learning them.
+Labels are never overwritten. If you believe earlier labels were wrong (most labelers' first few dozen are), use the calibration pass (`--pass calibration`): it re-offers labeled comments with the earlier label hidden, records a new label, and analysis uses the latest non-self-agreement pass. Do it once the definitions feel natural, not while you are still learning them. The 150 publication-order `dev` labels are relabeled this way under `lg-v0.7` (decided 2026-10-23).
 
 ## For new labelers
 

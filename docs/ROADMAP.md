@@ -1,6 +1,8 @@
 # Roadmap
 
-**Version:** 12 (2026-10-18)
+**Version:** 13 (2026-10-23)
+
+v13 records session 13: the `dev` self-agreement check is done (80 of 112 on the consequential split, class kappa 0.358; `EVALUATION.md` v20); the guide is revised to `lg-v0.7`; the 150 publication-order labels are relabeled under it with the calibration pass; no second self-agreement cycle before preregistration.
 
 v12 records session 12: the preregistration decisions on the pre-check gaps, duplicate flags, and secondary comparisons; the tools built for Stage 3b and 3c (`self-agreement`, `label --set test`, `shadow`, `corpus`); the runbook `PREREGISTRATION.md`; and the list of what remains before preregistration (3b).
 
@@ -53,7 +55,7 @@ Goal: define the question before implementation changes it.
 - [x] Project brief and scope (v2)
 - [x] Provisional taxonomy (`tax-v0.1`; `tax-v0.2` from 2026-10-04, no class changes)
 - [x] Provisional priority policy (`pp-v0.1`)
-- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel; `lg-v0.5` from 2026-10-08 adds `read_via_translation`; `lg-v0.6` the same day adds `ai_self_disclosed`)
+- [x] Labeling guide (`lg-v0.2`; `lg-v0.3` from 2026-10-04 adds the calibration pass and the analysis-label rule; `lg-v0.4` from 2026-10-07 adds the label UI's post panel; `lg-v0.5` from 2026-10-08 adds `read_via_translation`; `lg-v0.6` the same day adds `ai_self_disclosed`; `lg-v0.7` from 2026-10-23 adds the named-consequence test for grade 2 and the reuse test for extension against conversational)
 - [x] ADR-001 to ADR-013 (ADR-001 to ADR-011 with the design; ADR-012, the service layer, and ADR-013, local-first with a hosted path preserved, added 2026-10-03)
 - [x] Friction log started
 - [x] Verify DEV capabilities marked `DOCUMENTED` in the capability matrix (2026-10-02; matrix v3)
@@ -141,12 +143,13 @@ Decided (2026-10-18, `EVALUATION.md` v18): pre-check gaps registered as known li
 
 What remains before preregistration:
 
-1. **Self-agreement check** (the author, on or after 2026-10-22): `self-agreement draw --seed 20261018`, relabel, `self-agreement report`. If agreement is poor, relabel under a revised guide first.
+1. ~~Self-agreement check.~~ Done 2026-10-23: 80 of 112 on the consequential split, class kappa 0.358 (`EVALUATION.md` v20). Decided the same day: guide revised to `lg-v0.7`; no second cycle before preregistration.
+   - **Next: the calibration pass on the 150 publication-order labels under `lg-v0.7`** (the author): `label-ui --pass calibration --ids reports/eval/calibration-first150-lg-v0.7.txt` (`PREREGISTRATION.md`, Step 1a). Every `dev` result is recomputed after it.
 2. ~~ADR-010 and the recorded time.~~ Decided 2026-10-18: ADR-010 amended to define test posts by the recorded `registered_at`, sealed by the commit (the runbook keeps the rule to publish nothing in between), and to exclude posts about Afterword itself (`excluded_posts`; `afterword preregistration exclude-post`).
 3. **Bring `dev` up to date** just before the date: probe, ingest, label any new comments, classify them with B1 and B2.
 4. **Accrual estimate and volume-split median,** recomputed from that last full run, recorded with its run ID.
 5. **Registered thresholds,** numeric, for all five measures relative to the oracle under `pp-v0.2`, and the rule for B2 beating B1 meaningfully, written into `EVALUATION.md` with the accrual procedure and stopping rule.
-6. **Freeze and record every version** (`tax-v0.2`, `lg-v0.6`, `norm-v0.1`, `pc-v0.1`, `pp-v0.2`, `hb-v0.2`, `pr-v0.2`, Llama's digest and options, the application version), and write `registry/preregistration.json`.
+6. **Freeze and record every version** (`tax-v0.2`, `lg-v0.7`, `norm-v0.1`, `pc-v0.1`, `pp-v0.2`, `hb-v0.2`, `pr-v0.2`, Llama's digest and options, the application version), and write `registry/preregistration.json`.
 7. **Freeze `dev`:** `afterword corpus export --version v1`, then `corpus verify`.
 8. **The preregistration commit,** which starts accrual. Optional before it: the label UI's read-only accrual panel (the runbook's Step 4 prompt).
 

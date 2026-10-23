@@ -1,6 +1,8 @@
 # Labeling Guide
 
-**Version:** `lg-v0.6`
+**Version:** `lg-v0.7`
+
+`lg-v0.7` (2026-10-23, after the `dev` self-agreement check: consequential agreement 80 of 112, class kappa 0.358, `EVALUATION.md` v20) sharpens the line between grade 2 and grade 1 with a named-consequence test and synthetic worked examples, and adds an explicit test for `TECHNICAL_EXTENSION` against `CONVERSATIONAL`. The scale, the classes (`tax-v0.2`, unchanged), blinding, and the passes are unchanged. The 150 publication-order labels are relabeled under it with the calibration pass; other labels keep their version, and every result reports labels by guide version.
 
 `lg-v0.6` (2026-10-08, later the same day) adds `ai_self_disclosed`: the labeler records that a comment says explicitly that it was written by an AI. Grades, definitions, tests, blinding, and the passes are unchanged; earlier labels lack the field, which analysis treats as "not recorded".
 
@@ -48,6 +50,57 @@ Working tests. Answer yes to any and the comment is likely consequential:
 | 3 | Critical: a correction or risk that should be handled promptly |
 
 For recall, **consequential means grade 2 or 3.**
+
+### Grade 2 versus grade 1 (`lg-v0.7`)
+
+The line between 1 and 2 decides recall, and it is where grades moved most between two readings of the same comments: in the `dev` self-agreement check, 25 of the 31 comments that left consequential went from 2 to 1. Apply it as a test, not an impression.
+
+**A 2 needs a named consequence.** Before entering 2, complete the sentence "If I saw this two weeks late, ..." with something concrete that would go wrong or be lost:
+
+- a claim in the post would stay wrong or unchecked while readers act on it (working tests 2 and 5);
+- a question only the author can answer would sit unanswered, and the silence would read as an answer (test 3);
+- someone would be left waiting on the author: a request, an offer, a commitment (tests 1 and 3);
+- a concrete lead for a correction, an experiment, a code change, or new work would go cold (test 5).
+
+If the honest completion is "nothing much", "I would have enjoyed it later", or "I would reply to be polite", the grade is 1, or 0 when it is not even worth seeing.
+
+**These do not make a 2 on their own:**
+
+- **Technical substance.** A useful technique, tool, number, or experience that asks nothing and claims nothing the author must check is a 1. Substance decides the class (`TECHNICAL_EXTENSION`), not the grade.
+- **Relevance, length, or care.** An on-topic, thoughtful, long comment without a named consequence is a 1.
+- **A courtesy reply.** That replying would be friendly does not mean silence costs anything. Working test 4 counts only when, without a reply, a reader would be left misled or a question visibly unanswered.
+- **Hindsight.** Your own later reply, or how the thread went, belongs in the retrospective grade.
+
+**Grade 3 is unchanged:** a 2 whose consequence is a correction or a risk that should be handled promptly.
+
+**The reason states the consequence.** For every 2 or 3, the one-line reason is the completed sentence, for example "setup question only I can answer; readers stuck at step 2". A reason that only describes the comment ("good extension", "interesting point") is a sign the grade is a 1.
+
+#### Worked examples
+
+Synthetic, written for this guide; none is taken from a real comment. Each is a comment on an imagined post about caching database queries in a web service.
+
+| Comment | Class | Grade | Why |
+| --- | --- | --- | --- |
+| "Same here: our pages were slow for months before we sorted it out. Nice write-up." | `CONVERSATIONAL` | 1 | An experience with nothing a reader could reuse (no technique, no result), and nothing to check or answer. Seeing it late costs nothing. |
+| "Keying the cache on the raw query string blew up our memory; hashing the normalized query fixed it." | `TECHNICAL_EXTENSION` | 1 | Real substance a reader could use, but it disputes nothing in the post and asks nothing. Nice to see. |
+| "I measured this on our service: p95 went from 180 ms to 40 ms. Happy to share the script." | `TECHNICAL_EXTENSION` | 1 | A specific result, and an open offer nobody is waiting on. It would be a 2 if the post had asked readers for measurements, since the author would then owe a response. |
+| "Does the invalidation still work when two services write to the same table? That is our setup and I cannot see how it would." | `TECHNICAL_QUESTION` | 2 | Only the author can answer, about the post's own approach; silence leaves the reader stuck and reads as "it does not". |
+| "This contradicts the database's documentation on connection pooling under load. Have you measured it?" | `CHALLENGE_OR_COUNTEREXAMPLE` | 2 | A claim about the post that the author should check before others rely on it. |
+| "Would you be open to us translating this post for our community blog, with credit?" | `OPPORTUNITY` | 2 | A request waiting on the author; a two-week silence is an answer. |
+| "Step 3 sets the expiry to 0, which in most clients means never expire. Anyone copying it will cache forever." | `CORRECTION` | 3 | A concrete error readers will copy: handle promptly. |
+| "Thanks, bookmarked for our team." | `LIGHTWEIGHT_ACKNOWLEDGMENT` | 0 | Nothing beyond appreciation. |
+
+## Technical extension versus conversational (`lg-v0.7`)
+
+`TAXONOMY.md` (`tax-v0.2`) defines both classes; this test applies those definitions and changes neither. It was the boundary most often crossed in the `dev` self-agreement check (23 of 57 class changes went from `TECHNICAL_EXTENSION` to `CONVERSATIONAL`). Both classes default to `QUEUE`, so the choice does not move a tier, but it moves class agreement and anything that splits extensions later.
+
+**The reuse test.** Strike every sentence of opinion, agreement, praise, and general experience. If what is left gives another reader something technical they could use without asking the commenter (a technique, a tool, a configuration, a number, a failure mode, or an experience with what was done and what happened), the comment is `TECHNICAL_EXTENSION`. If nothing usable is left, it is `CONVERSATIONAL` (or `LIGHTWEIGHT_ACKNOWLEDGMENT`, when only appreciation remains).
+
+- "We had the same problem" is conversational; "we had the same problem and fixed it by pinning the pool size to the worker count" is an extension.
+- Naming a tool is not enough ("we use a cache too"); saying what was done and what happened is ("we moved to a write-through cache and the stale reads stopped"). `TAXONOMY.md`'s own example, "We did something similar with event sourcing and it also helped with audit", passes for the same reason.
+- An opinion about the approach with a reason but no technical content ("I prefer this to the usual pattern, it reads more clearly") is conversational.
+- A question, a dispute, or a correction takes precedence as usual (`TAXONOMY.md`, precedence rule); the test only separates these two classes.
+- The class does not set the grade: most extensions are 1 under the test above.
 
 ## Prospective versus retrospective
 
@@ -122,6 +175,8 @@ At least 14 days after the initial labeling pass:
 4. Discuss each disagreement in the evaluation notes.
 
 Original labels are not changed after this check. If agreement is poor, the corpus is relabeled as a new version under a revised guide, and the poor agreement is reported as a finding.
+
+On `dev` (2026-10-23; `EVALUATION.md` v20) the author applied this by revising the guide to `lg-v0.7` and relabeling the 150 publication-order labels with the calibration pass, in the same label directory, rather than relabeling the whole corpus as a new version. No second self-agreement cycle runs before preregistration; the long-term relabel for C-011 at the end of accrual is the later check.
 
 ## Labeling sessions
 

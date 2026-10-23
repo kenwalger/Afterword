@@ -156,3 +156,78 @@ A diagnosis of the `dev` self-agreement report (80 compared; consequential agree
 **Scope pressure:** A grade-only pass (option (a)) would be a new tool; not built. A "drawn vs labeled" line in the report; not built.
 
 **Next smallest useful step:** The author's decision among the options, possibly after labeling the 32 remaining comments of the draw.
+
+## Session 13, part B: the check completed, and the author's decisions (2026-10-23)
+
+### 2026-10-23 19:30 - Self-agreement complete: the unhurried sitting agrees far more
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Record the completed `dev` self-agreement check, with the pace evidence.
+
+**Expectation:** The remaining 32 would look like the first 80.
+
+**Observation:**
+- **All 112 compared** (`self-agreement-report-20261023T191354Z.json`): consequential split 80 of 112 (71.4%, Wilson 62.5% to 79.0%); 31 left consequential (2 to 1: 25, 3 to 1: 4, 2 to 0: 1, 3 to 0: 1), 1 entered (1 to 2); same grade 53; same class 55, kappa 0.358.
+- **First sitting (80):** two batches back to back (17:24 to 18:03, 18:03 to 18:19 UTC, 17 seconds apart), median 25.1 seconds per comment, falling by quarter from 43.0 to 17.2; 53 of 80 on the split, kappa 0.344.
+- **Second sitting (32):** began 17 minutes after the first ended, one batch 18:36 to 19:13 UTC, median 44.8 seconds (the same comments' originals: 42.5); 27 of 32 (84.4%, Wilson 68.2% to 93.1%), 5 left consequential and none entered; kappa 0.398.
+- **Same original group, both sittings:** the shuffled `lg-v0.3` originals agree in 16 of 27 in the first sitting and 19 of 23 in the second. The second sitting holds only shuffled originals (23 `lg-v0.3`, 9 `lg-v0.6`), because the batches follow publication order, so sitting and post order are not fully separable.
+- **Class stays low at either pace.** 57 class changes, 23 of them `TECHNICAL_EXTENSION` to `CONVERSATIONAL`; 14 of 55 original extensions stayed extensions. Both classes default to `QUEUE`.
+
+**Evidence:** the report above; `afterword.label_records` (counts only).
+
+**Workaround:** None.
+
+**Consequence:** `EVALUATION.md` v20; C-001 and C-011 entries (2026-10-23, later).
+
+**Follow-up:** Decisions below.
+
+### 2026-10-23 19:40 - lg-v0.7, the first 150 recalibrated, no second cycle
+
+**Platform:** Project
+
+**Type:** SURPRISE
+
+**Class:** PROJECT
+
+**Task:** Apply the author's three decisions.
+
+**Expectation:** Documentation, a version constant, and an ID file.
+
+**Observation:**
+- **`lg-v0.7`.** Grade 2 needs a named consequence ("If I saw this two weeks late, ..."), with a list of what does not make a 2 on its own (substance, relevance, a courtesy reply, hindsight), and eight synthetic worked examples on an imagined caching post. A reuse test separates `TECHNICAL_EXTENSION` from `CONVERSATIONAL`: strike opinion, agreement, praise, and general experience; if something technical another reader could use remains, it is an extension. It applies `tax-v0.2` and changes no class. One draft example ("did something similar with an in-memory cache and saw the same speedup") failed its own test, since it names what was done and what happened, like the taxonomy's own extension example; it was rewritten before the guide was saved.
+- **`LABELING-FIELD-GUIDE.md` v5:** the named-consequence check, "substance is not consequence", the reuse test, and a fatigue bullet with the pace evidence (take a real break between batches).
+- **The tools record `lg-v0.7`:** `LABEL_GUIDE_VERSION` in `src/afterword/labeling.py`, and the test that pins a label record.
+- **Calibration list:** `reports/eval/calibration-first150-lg-v0.7.txt` (git-ignored), 150 IDs written from the label records: every analysis label made in publication order, all `lg-v0.2` initial labels, none calibrated yet. It is the same set as the 2026-10-18 list.
+- **No second cycle:** recorded in `EVALUATION.md` with the author's reason. The guide sets no numeric bar, so the record says the judgment is the author's, and that the calibration labels enter analysis without a self-agreement check of their own.
+- **Runbook and roadmap:** `PREREGISTRATION.md` v4 adds Step 1a with the command; `ROADMAP.md` v13 marks the check done and freezes `lg-v0.7` instead of `lg-v0.6`. `LABELING-GUIDE.md` records how its poor-agreement rule was applied on `dev` (a calibration pass in the same directory, not a new corpus version).
+
+**Evidence:** the files named.
+
+**Workaround:** None.
+
+**Consequence:** After the pass, the analysis labels span `lg-v0.7` (150), `lg-v0.3` (152), and `lg-v0.6` (176), and every `dev` result is recomputed. 50 of the 150 were read in today's check, so they get a third reading within days.
+
+**Follow-up:** The author labels the 150; then a session recomputes the `dev` results.
+
+### 2026-10-23 19:45 - Session summary, part B
+
+**Goal:** Record the completed self-agreement check and apply the author's decisions.
+
+**Completed:** `EVALUATION.md` v20; `LABELING-GUIDE.md` `lg-v0.7`; `LABELING-FIELD-GUIDE.md` v5; `PREREGISTRATION.md` v4; `ROADMAP.md` v13; C-001 and C-011 entries; `LABEL_GUIDE_VERSION` bumped, with its test; the calibration ID list. Check list: ruff, format, mypy, pydoclint clean; 769 tests pass on 3.14 and on 3.12 (isolated). Not committed.
+
+**Friction discovered:** A worked example contradicted the test it illustrated; caught by checking it against the taxonomy's own example.
+
+**Delight discovered:** Holding the original group fixed (`lg-v0.3` in both sittings) gave a pace comparison the confounded sitting split could not.
+
+**Claims affected:** C-001, C-011.
+
+**ADRs affected:** None.
+
+**Scope pressure:** The label tools' `h` help shows `TAXONOMY.md` definitions only, so the reuse test and the named-consequence test are not on screen while labeling; adding them is a tool change, not made. `CLAUDE.md`'s "Current stage" still says the calibration pass is dropped; left for the author.
+
+**Next smallest useful step:** The calibration pass on the 150 (`PREREGISTRATION.md`, Step 1a).

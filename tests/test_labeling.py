@@ -190,7 +190,7 @@ def test_labels_are_recorded_per_schema(tmp_path, fake_dev):
         "corpus_version": "unfrozen",
         "corpus_set": "dev",
         "sample_kind": "researcher",
-        "label_guide_version": "lg-v0.6",
+        "label_guide_version": "lg-v0.7",
         "taxonomy_version": "tax-v0.2",
         "normalization_version": "display-v0.1",
         "primary_class": "TECHNICAL_QUESTION",

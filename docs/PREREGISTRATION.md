@@ -1,6 +1,6 @@
 # Preregistration Runbook
 
-**Version:** 3 (2026-10-18). v3 adds the exclusion of posts about Afterword from the test set (`excluded_posts` in the record, `afterword preregistration posts` and `exclude-post`), after ADR-010's amendment of 2026-10-18, which also makes the recorded `registered_at` the boundary. v2 matched the commands built in session 12 (`self-agreement`, `label --set test`, `shadow`, `corpus`), adds the preregistration record (`registry/preregistration.json`) and the non-revealing `shadow status`, and says which files to commit each week. v1 was the author's draft, written before those commands existed.
+**Version:** 4 (2026-10-23). v4 records the self-agreement result and the author's decisions (`EVALUATION.md` v20) and adds Step 1a, the calibration pass on the 150 publication-order labels under `lg-v0.7`. v3 adds the exclusion of posts about Afterword from the test set (`excluded_posts` in the record, `afterword preregistration posts` and `exclude-post`), after ADR-010's amendment of 2026-10-18, which also makes the recorded `registered_at` the boundary. v2 matched the commands built in session 12 (`self-agreement`, `label --set test`, `shadow`, `corpus`), adds the preregistration record (`registry/preregistration.json`) and the non-revealing `shadow status`, and says which files to commit each week. v1 was the author's draft, written before those commands existed.
 
 A step-by-step checklist for getting Afterword from "dev labeling done" to "test period running," then through the test period to the result. Work through it top to bottom. Each step says who does it and what "done" looks like.
 
@@ -67,6 +67,23 @@ Checks that your labels are consistent enough to serve as ground truth.
 **Done when:** the report shows agreement on class (kappa) and on the consequential split.
 
 **If agreement is poor:** stop here and bring the report to a Claude Code session. The labeling guide requires fixing it (likely a relabel of the affected part) before anything is frozen. Only then is the dropped calibration pass reconsidered.
+
+**Result (2026-10-23):** 80 of 112 on the consequential split (the first sitting 53 of 80, the second 27 of 32), class kappa 0.358. Decided: the guide is revised to `lg-v0.7`, the calibration pass below is reinstated for the 150 publication-order labels, and no second self-agreement cycle runs before preregistration (`EVALUATION.md` v20).
+
+### Step 1a. Calibration pass on the first 150 (you, under `lg-v0.7`)
+
+Relabels the 150 publication-order `dev` labels from scratch under `lg-v0.7`. Read `LABELING-GUIDE.md` ("Grade 2 versus grade 1", "Technical extension versus conversational") and `LABELING-FIELD-GUIDE.md` v5 first.
+
+```powershell
+uv run afterword label-ui --run 20261018T173927Z --pass calibration --ids reports/eval/calibration-first150-lg-v0.7.txt
+```
+
+- Four batches (40, 40, 40, 30); the page offers the next batch, or run the command again to resume. Take a real break between batches.
+- The earlier label is never shown; do not look it up.
+- The tools warn when the run is more than 7 days old (from 2026-10-25 for `20261018T173927Z`). If you label after that, run a fresh full probe and ingest first, and use the new run ID.
+- Check progress with `uv run afterword label status --run <run-id>` (counts only).
+
+**Done when:** all 150 have a calibration label. Then bring it to a Claude Code session to recompute the `dev` results (label summary, oracle ceilings, B1 and B2 scores, the accrual estimate).
 
 ### Step 2. Pick the preregistration date (you)
 
