@@ -21,6 +21,7 @@ When evidence changes a claim, append the result and date. Do not rewrite the or
 - 2026-10-02: Measurement linked to labeler self-agreement (`LABELING-GUIDE.md`) and `UNCERTAIN` rate. No evidence yet.
 - 2026-10-08: Provisional, from 302 `dev` labels. The categories are usable (1 `UNCERTAIN` in 302), but class is a weak proxy for consequence: 49 of the 84 comments graded 2 or 3 are `TECHNICAL_EXTENSION`, a `QUEUE` class, and 22 of the 46 `TECHNICAL_QUESTION` comments, a `SURFACE` class, are graded 1 (`EVALUATION.md`, "Class is a weak proxy for consequence"). The claim says categories help decide what to inspect next; on this evidence they decide whether to inspect, not well what to inspect first. The claim text is unchanged.
 - 2026-10-18: Provisional, from all 478 `dev` labels. 2 `UNCERTAIN` in 478. The weak-proxy reading holds: 65 of the 129 comments graded 2 or 3 are `TECHNICAL_EXTENSION` (a `QUEUE` class), and 25 of the 66 `TECHNICAL_QUESTION` comments (a `SURFACE` class) are graded below 2. The claim text is unchanged.
+- 2026-10-23: Weakened, provisionally, from the `dev` self-agreement check (80 of the 112 drawn comments relabeled 16 to 20 days after their originals, in one sitting; the sample oversamples comments graded 2 or 3). Agreement on primary class is 38 of 80, Cohen's kappa 0.344. Of 42 class changes, 18 are `TECHNICAL_EXTENSION` to `CONVERSATIONAL` and 30 start from `TECHNICAL_EXTENSION` (40 originals, 8 kept); `TECHNICAL_QUESTION` kept 18 of 21. The categories stay usable, but the labeler does not place the boundary between extension and conversation consistently over two to three weeks, so for that boundary the evidence needed ("useful agreement and manageable ambiguity") is not met. The 32 drawn comments not yet relabeled are all shuffled-order labels, and `lg-v0.6` labels are nearly unmeasured (3). Diagnosis: `docs/friction-log/session-13.md`. The claim text is unchanged.
 
 ## C-002: Prioritization can reduce review workload
 
@@ -167,6 +168,8 @@ Claims below were added on 2026-10-03 (session 5).
 **Would weaken/falsify:** Long-term agreement matches 14-day agreement.
 
 **Status:** UNTESTED
+
+- 2026-10-23: The 14-day baseline exists, from `dev` (80 of 112 drawn; originals 2026-10-03 to 2026-10-09, relabeled 2026-10-23 in one sitting). Consequential binary 53 of 80 (66.3%, Wilson 55.4% to 75.7%); 26 comments left consequential (2->1 21, 3->1 3, 2->0 1, 3->0 1) and 1 entered (1->2); 40 of 66 originally graded 2 or 3 were kept. Class kappa 0.344. The change runs in one direction: over 16 to 20 days either the labeler's threshold moved or the two reads differ in care (the relabel was faster, median 25 s against 42 s, and within each original cohort its later half downgraded more: 4 of 19 then 10 of 20, and 4 of 12 then 7 of 13). This is not evidence for or against C-011, which compares months with this baseline. But a baseline this low leaves less room for long-term agreement to fall below it, so the falsifier is easier to meet by default. If `dev` is relabeled, the baseline should be measured again on the new labels before it anchors C-011. Diagnosis: `docs/friction-log/session-13.md`.
 
 ---
 
