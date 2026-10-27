@@ -1,6 +1,8 @@
 # Commands
 
-**Version:** 5 (2026-10-18)
+**Version:** 6 (2026-10-26)
+
+v6 adds `preregistration write`, which writes the preregistration record on seal day (`PREREGISTRATION.md`, Step 5).
 
 v5 adds `preregistration posts` and `preregistration exclude-post` (posts about Afterword are excluded from the test set; ADR-010, amended 2026-10-18).
 
@@ -82,6 +84,7 @@ uv run afterword bench --synthetic --model <ollama-model>
 ```text
 uv run afterword self-agreement draw --seed 20261018
 uv run afterword self-agreement report
+uv run afterword preregistration write
 uv run afterword preregistration posts
 uv run afterword preregistration exclude-post --post <post-id>
 uv run afterword corpus export --version v1
@@ -96,6 +99,7 @@ uv run afterword shadow score
 - `self-agreement draw --seed N` draws the self-agreement sample by the rule in `LABELING-GUIDE.md`: every analysis label at least 14 days old is pooled; the sample is every pooled comment graded 2 or 3 plus 25 drawn at random from the pool with the seed. The IDs go to `reports/eval/self-agreement-<date>-s<seed>.txt` (git-ignored), with a JSON record of the draw beside it; one draw per day and seed. Label them with `--pass self_agreement --ids <file>`. Options: `--set`, `--corpus-version`.
 - `self-agreement report` compares each self-agreement label with the comment's analysis label: Cohen's kappa on class, agreement on the consequential split (2 or 3 against 0 or 1) with its interval and the direction of each change, agreement on the grade, and relabels made less than 14 days after the original. Counts only on the console; the comment IDs of every disagreement, with what differs, go to a git-ignored file under `reports/eval/`.
 - `corpus export --version v1` freezes one corpus set (`--set`, default `dev`): its records, with normalized text, to `fixtures/corpus/v1/<set>.jsonl` (git-ignored), and its manifest, IDs and hashes only, to `registry/corpus-v1-<set>.json`, to commit. A version is written once. `corpus verify` checks the file against the manifest and reports matched, withdrawn (ADR-009), changed, missing, and extra records; it exits 1 unless nothing changed beyond withdrawals. Each `ingest` withdraws comments deleted upstream from every frozen corpus file: text removed, ID kept, logged in `reports/redactions.jsonl`.
+- `preregistration write` writes `registry/preregistration.json`, once: `registered_at` is the current UTC time, to the second; the conditions are the registered ones (B1 `hb-v0.2`; B2 Ollama `llama3.1:8b-instruct-q4_K_M` with the application's pinned digest and context size; the current policy version), and `excluded_posts` starts empty. It prints `registered_at` and the conditions, and refuses, changing nothing, if the record already exists. Run it on seal day only: every tool reads the record as soon as it exists.
 - `preregistration posts` lists the posts published after `registered_at`, newest first: post ID, publication date, `test` or `excluded`, the count of comments from others, and the title (the author's own text; nothing from a commenter). `preregistration exclude-post --post <id>` appends an exclusion to `registry/preregistration.json` with the time it was recorded (`--reason`, default "post about Afterword"), to commit. It refuses an unknown post, a post published before preregistration, a post already excluded, and a post whose test comments are already labeled unless `--after-labeling`, which records the exclusion as late. Comments on an excluded post belong to neither set: no labeling tool, `classify`, shadow run, export, count, or score includes them.
 - `shadow run` (needs `registry/preregistration.json`) classifies the test comments not yet sealed with the registered B1 and B2, applies the registered policy, and seals one record per comment and condition (classifier, versions, class, flags, outcome, tier, rule; no text or explanation) in a new git-ignored file under `reports/shadow/`. It prints the file, its SHA-256, and counts, never an output, and appends the hash to `registry/shadow-ledger.jsonl`, to commit that week. It refuses if the record's digest, context size, policy, or heuristic does not match the application, if a sealed file no longer matches the ledger, or after the reveal. A comment whose B2 output failed is held back and retried next run, unless `--seal-failed`. Option: `--ollama-host`.
 - `shadow status` prints weeks elapsed, test comments labeled, whether each stopping-rule target is met, and the ledger's state. It never shows outputs or the number of test comments graded 2 or 3.

@@ -2955,6 +2955,48 @@ def list_test_period_posts(root: Path, *, connection_id: str | None = None) -> l
     )
 
 
+# The registered conditions, frozen at preregistration (EVALUATION.md v22, "Frozen
+# versions"). The digest and context size come from the application's own pins, so
+# the record written always passes shadow mode's checks.
+REGISTERED_B1_HEURISTIC: str = "hb-v0.2"
+REGISTERED_B2_PROVIDER: str = ollama.PROVIDER
+REGISTERED_B2_MODEL: str = "llama3.1:8b-instruct-q4_K_M"
+
+
+def write_preregistration(
+    root: Path, *, now: Callable[[], datetime] = lambda: datetime.now(UTC)
+) -> preregistration.Preregistration:
+    """Write the preregistration record with ``registered_at`` set to now, once.
+
+    The record names the registered conditions (:data:`REGISTERED_B1_HEURISTIC`,
+    :data:`REGISTERED_B2_MODEL` with its pinned digest and context size, the
+    current policy version) and starts with no excluded posts. It is written
+    shortly before the preregistration commit seals it (``PREREGISTRATION.md``).
+
+    :param root: Repository root.
+    :param now: Wall clock: the record's ``registered_at``, to the second.
+    :returns: The record as written.
+    :raises ServiceError: If a record already exists (it is never rewritten).
+    """
+    try:
+        preregistration.write_record(
+            root,
+            {
+                "registered_at": domain.utc(now()).replace(microsecond=0),
+                "b1_heuristic": REGISTERED_B1_HEURISTIC,
+                "b2_provider": REGISTERED_B2_PROVIDER,
+                "b2_model": REGISTERED_B2_MODEL,
+                "b2_model_digest": ollama.PINNED_DIGESTS[REGISTERED_B2_MODEL],
+                "policy_version": policy.POLICY_VERSION,
+                "num_ctx": ollama.NUM_CTX,
+                "excluded_posts": [],
+            },
+        )
+    except preregistration.PreregistrationError as exc:
+        raise ServiceError(str(exc), code=2) from None
+    return _registered(root)
+
+
 @dataclass(frozen=True)
 class Exclusion:
     """What recording an exclusion did. Counts and the post's ID only."""

@@ -2,6 +2,8 @@
 
 **Status:** Accepted for V1, amended 2026-10-02 and 2026-10-18
 
+**Note (2026-10-26, no change to the decision):** the Context below expects Part 1 to be published before preregistration. The author decided to seal first and publish Part 1 after, so Part 1 is a test-period post and is excluded under decision 3 by a recorded amendment, like Parts 2 and 3 (`EVALUATION.md` v22).
+
 The original decision split the historical corpus by post into a development set and sealed test sets. The 2026-10-02 amendment replaced that with a prospective test set, after the volume baseline showed the historical pool cannot support a development set and two post-disjoint test sets. Evidence and the options compared are in `docs/proposals/accepted/2026-10-02-corpus-targets.md`.
 
 The 2026-10-18 amendment makes two changes, both before preregistration (`docs/friction-log/session-12.md`):

@@ -186,6 +186,38 @@ def load(root: Path) -> Preregistration | None:
     return parse(data)
 
 
+def write_record(root: Path, data: dict[str, Any]) -> Preregistration:
+    """Write the preregistration record, once: an existing record is never replaced.
+
+    :param root: Repository root.
+    :param data: The record's fields, with ``registered_at`` as a UTC ``datetime``.
+    :returns: The record as written.
+    :raises PreregistrationError: If a record already exists, ``registered_at`` is
+        not a UTC time, or any field is invalid. Nothing is written then.
+    :raises OSError: If writing fails partway; the partly written file is removed.
+    """
+    when = data.get("registered_at")
+    offset = when.utcoffset() if isinstance(when, datetime) else None
+    if not isinstance(when, datetime) or offset is None or offset.total_seconds() != 0:
+        raise PreregistrationError("registered_at must be a UTC time")
+    out = data | {"registered_at": when.isoformat().replace("+00:00", "Z")}
+    record = parse(out)
+    text = json.dumps(out, indent=2) + "\n"
+    path = root / RECORD_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # Mode "x" creates the file or fails, so a record is never overwritten.
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+    except FileExistsError:
+        raise PreregistrationError(f"{RECORD_PATH} already exists; it is never rewritten") from None
+    except OSError:
+        # This call created the file, so a partly written record is its own to remove.
+        path.unlink(missing_ok=True)
+        raise
+    return record
+
+
 def add_exclusion(
     root: Path,
     *,

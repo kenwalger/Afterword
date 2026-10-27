@@ -381,3 +381,66 @@ def test_a_sealed_comment_on_a_post_excluded_later_drops_out_of_the_counts(
     reveal = service.shadow_reveal(tmp_path, now=lambda: datetime(2026, 12, 31, tzinfo=UTC))
     assert reveal["sealed_comments"] == 0 and reveal["sealed_no_longer_in_test_set"] == 1
     assert reveal["excluded_posts"] == 1
+
+
+# Writing the record (`afterword preregistration write`) ------------------------------
+# covers: R1, R2, R3 (the session 15 construction ledger)
+
+
+def test_write_creates_the_registered_record_at_the_current_time(tmp_path):
+    when = datetime(2026, 11, 1, 18, 0, tzinfo=UTC)
+    made = service.write_preregistration(tmp_path, now=lambda: when)
+    saved = json.loads((tmp_path / preregistration.RECORD_PATH).read_text(encoding="utf-8"))
+    assert saved == record(registered_at="2026-11-01T18:00:00Z") | {"excluded_posts": []}
+    assert made.registered_at == when
+    assert service._registered(tmp_path) == made
+
+
+def test_write_refuses_when_a_record_exists_and_leaves_it_unchanged(tmp_path):
+    path = write_record(tmp_path)
+    before = path.read_bytes()
+    with pytest.raises(service.ServiceError, match="already exists"):
+        service.write_preregistration(tmp_path)
+    assert path.read_bytes() == before
+
+
+def test_the_record_writer_refuses_a_time_that_is_not_utc(tmp_path):
+    with pytest.raises(PreregistrationError, match="UTC"):
+        preregistration.write_record(tmp_path, record() | {"registered_at": datetime(2026, 11, 1)})
+    assert not (tmp_path / preregistration.RECORD_PATH).exists()
+
+
+def test_preregistration_write_command(tmp_path, capsys):
+    assert cli.main(["--root", str(tmp_path), "preregistration", "write"]) == 0
+    out = capsys.readouterr().out
+    loaded = preregistration.load(tmp_path)
+    assert loaded is not None and loaded.registered_at.isoformat() in out.replace("Z", "+00:00")
+    assert "registry/preregistration.json" in out
+    assert cli.main(["--root", str(tmp_path), "preregistration", "write"]) != 0
+    assert "already exists" in capsys.readouterr().err
+
+
+def test_a_record_that_fails_partway_is_not_left_behind(tmp_path, monkeypatch):
+    real_open = Path.open
+
+    class Failing:
+        def __init__(self, handle: Any) -> None:
+            self.handle = handle
+
+        def __enter__(self) -> Failing:
+            return self
+
+        def __exit__(self, *exc: object) -> bool:
+            self.handle.close()
+            return False
+
+        def write(self, text: str) -> int:
+            self.handle.write(text[:10])
+            raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "open", lambda self, *a, **k: Failing(real_open(self, *a, **k)))
+    with pytest.raises(OSError, match="disk full"):
+        service.write_preregistration(tmp_path)
+    monkeypatch.undo()
+    assert not (tmp_path / preregistration.RECORD_PATH).exists()
+    assert service.write_preregistration(tmp_path).b2_model == LLAMA

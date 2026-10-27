@@ -11,9 +11,17 @@ Afterword is an experiment in comment triage for writers. It copies the comments
 
 ## What it has found so far
 
-So far it has been tested on the project author's own DEV history: all 478 past comments from others, each labeled by hand for whether it mattered (129 did). A simple rule-based sorter and a small AI model running locally both kept almost every comment that mattered (125 and all 129), but both put more than 40% of all comments in the "review first" group, where sorting that matched the writer's own judgment would put about 18% there, and the model's four extra catches came at the cost of setting about half as many routine comments aside. Even perfect sorting by comment type would leave more than half of the comments that mattered in the ordinary queue rather than at the top: the type of a comment says little about how much it matters. These are early numbers on old comments, with every caveat spelled out in [the evaluation](docs/EVALUATION.md) and the [first write-up](docs/benchmarks/2026-10-08-dev-set-evaluation.md). The real test runs on new comments as they arrive, with the local model as the assistant under test, the rule-based sorter as the baseline, and both judged against that ceiling.
+So far it has been tested on the project author's own DEV history: all 494 past comments from others, each labeled by hand for whether it mattered (158 did). A simple rule-based sorter and a small AI model running locally both kept almost every comment that mattered (155 and 157 of 158), but both put more than 40% of all comments in the "review first" group, where sorting that matched the writer's own judgment would put about 22% there, and the model's two extra catches came at the cost of setting about half as many routine comments aside (39 against 79). Even perfect sorting by comment type would leave more than four in ten of the comments that mattered (69 of 158) in the ordinary queue rather than at the top: the type of a comment says only part of how much it matters. These are early numbers on old comments, labeled with hindsight and partly relabeled under a revised guide, with every caveat spelled out in [the evaluation](docs/EVALUATION.md); the [first write-up](docs/benchmarks/2026-10-08-dev-set-evaluation.md) has the earlier figures. The real test runs on new comments as they arrive, with the local model as the assistant under test, the rule-based sorter as the baseline, and both judged against that ceiling.
 
 The article: _link to come._
+
+## Where this is headed
+
+- **Now:** the rules of the real test are written down before any test result exists: what is measured, what counts as success, and every version of the code, model, and labeling guide (the evaluation's "Registered thresholds"). They are sealed with a pushed git commit and the tag `prereg-v1`, and do not change afterwards.
+- **Next, the test period:** comments on posts published after the seal are labeled by hand each week, before any sorter's output for them is seen. Both sorters run in the background, and their outputs are locked away with a published hash until the test ends. Posts about Afterword itself, including the write-ups, are left out of the test.
+- **When:** the test ends once 100 new comments, at least 20 of them ones that mattered, have been labeled, or 16 weeks after the seal, whichever comes first. At the recent pace of comments that is about five weeks (three to seven in a replay of recent weeks), if the author keeps publishing. The result is published whatever it is.
+
+The stages and what each one needs are in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Try it on your own account
 

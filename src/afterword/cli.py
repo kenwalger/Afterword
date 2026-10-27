@@ -22,7 +22,17 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from afterword import baseline, bench, heuristic, label_ui, labeling, policy, service, shadow
+from afterword import (
+    baseline,
+    bench,
+    heuristic,
+    label_ui,
+    labeling,
+    policy,
+    preregistration,
+    service,
+    shadow,
+)
 from afterword.progress import StatusLine
 from afterword.providers import ollama
 
@@ -848,6 +858,28 @@ def cmd_preregistration_posts(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_preregistration_write(args: argparse.Namespace) -> int:
+    """Write the preregistration record with ``registered_at`` set to now, once.
+
+    :param args: Parsed arguments.
+    :returns: Process exit status.
+    """
+    try:
+        made = service.write_preregistration(Path(args.root))
+    except service.ServiceError as exc:
+        return _fail(exc)
+    print(f"registered_at {made.registered_at.isoformat().replace('+00:00', 'Z')}")
+    print(
+        f"B1 {made.b1_heuristic}; B2 {made.b2_provider} {made.b2_model} "
+        f"({made.b2_model_digest[:12]}), num_ctx {made.num_ctx}; policy {made.policy_version}"
+    )
+    print(
+        f"wrote {preregistration.RECORD_PATH.as_posix()}: commit it in the preregistration commit"
+    )
+    print("publish nothing until that commit is pushed")
+    return 0
+
+
 def cmd_preregistration_exclude(args: argparse.Namespace) -> int:
     """Exclude a post from the test set by a recorded amendment.
 
@@ -1164,6 +1196,10 @@ def build_parser() -> argparse.ArgumentParser:
     prereg_sub = prereg.add_subparsers(dest="preregistration_command", required=True)
     posts = prereg_sub.add_parser("posts", help="list posts published after preregistration")
     posts.set_defaults(func=cmd_preregistration_posts)
+    write = prereg_sub.add_parser(
+        "write", help="write the preregistration record, registered now (refuses if it exists)"
+    )
+    write.set_defaults(func=cmd_preregistration_write)
     exclude = prereg_sub.add_parser(
         "exclude-post", help="exclude a post from the test set (a recorded amendment)"
     )

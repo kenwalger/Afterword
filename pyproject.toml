@@ -1,6 +1,6 @@
 [project]
 name = "afterword"
-version = "0.1.0"
+version = "0.2.0"
 description = "Assisted comment triage for technical publishing. A scoped experiment, not a product."
 authors = [
     { name = "Ken W. Alger", email = "kenalger@comcast.net" }

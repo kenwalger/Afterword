@@ -1,6 +1,10 @@
 # Roadmap
 
-**Version:** 13 (2026-10-23)
+**Version:** 15 (2026-10-26)
+
+v15 records the author's threshold decisions (`EVALUATION.md` v22): thresholds relative to the oracle on the test set, the frozen versions with the application at `0.2.0`, and `afterword preregistration write`. What remains is seal day (`PREREGISTRATION.md`, Step 5).
+
+v14 records session 15: the calibration pass is done and every `dev` result is recomputed on 494 labels (`EVALUATION.md` v21); the accrual estimate and volume-split median are recomputed from run `20261026T181641Z`; draft thresholds and the freeze list wait for the author's decisions (`docs/proposals/accepted/2026-10-26-registered-thresholds.md`).
 
 v13 records session 13: the `dev` self-agreement check is done (80 of 112 on the consequential split, class kappa 0.358; `EVALUATION.md` v20); the guide is revised to `lg-v0.7`; the 150 publication-order labels are relabeled under it with the calibration pass; no second self-agreement cycle before preregistration.
 
@@ -144,14 +148,14 @@ Decided (2026-10-18, `EVALUATION.md` v18): pre-check gaps registered as known li
 What remains before preregistration:
 
 1. ~~Self-agreement check.~~ Done 2026-10-23: 80 of 112 on the consequential split, class kappa 0.358 (`EVALUATION.md` v20). Decided the same day: guide revised to `lg-v0.7`; no second cycle before preregistration.
-   - **Next: the calibration pass on the 150 publication-order labels under `lg-v0.7`** (the author): `label-ui --pass calibration --ids reports/eval/calibration-first150-lg-v0.7.txt` (`PREREGISTRATION.md`, Step 1a). Every `dev` result is recomputed after it.
+   - ~~The calibration pass on the 150 publication-order labels under `lg-v0.7`.~~ Done 2026-10-26: 30 entered consequential and 11 left it; every `dev` result recomputed on 494 labels (`EVALUATION.md` v21).
 2. ~~ADR-010 and the recorded time.~~ Decided 2026-10-18: ADR-010 amended to define test posts by the recorded `registered_at`, sealed by the commit (the runbook keeps the rule to publish nothing in between), and to exclude posts about Afterword itself (`excluded_posts`; `afterword preregistration exclude-post`).
 3. **Bring `dev` up to date** just before the date: probe, ingest, label any new comments, classify them with B1 and B2.
-4. **Accrual estimate and volume-split median,** recomputed from that last full run, recorded with its run ID.
-5. **Registered thresholds,** numeric, for all five measures relative to the oracle under `pp-v0.2`, and the rule for B2 beating B1 meaningfully, written into `EVALUATION.md` with the accrual procedure and stopping rule.
-6. **Freeze and record every version** (`tax-v0.2`, `lg-v0.7`, `norm-v0.1`, `pc-v0.1`, `pp-v0.2`, `hb-v0.2`, `pr-v0.2`, Llama's digest and options, the application version), and write `registry/preregistration.json`.
-7. **Freeze `dev`:** `afterword corpus export --version v1`, then `corpus verify`.
-8. **The preregistration commit,** which starts accrual. Optional before it: the label UI's read-only accrual panel (the runbook's Step 4 prompt).
+4. **Accrual estimate and volume-split median,** recomputed from that last full run, recorded with its run ID. (2026-10-26: from run `20261026T181641Z`, about 5 weeks, median 19 per week; registered as is, decided 2026-10-27: the seal-day probe does not replace them.)
+5. **Registered thresholds,** numeric, for all five measures relative to the oracle under `pp-v0.2`, and the rule for B2 beating B1 meaningfully, written into `EVALUATION.md` with the accrual procedure and stopping rule. (Decided 2026-10-26 and written into `EVALUATION.md` v22, "Registered thresholds"; registered by the preregistration commit.)
+6. **Freeze and record every version** (`tax-v0.2`, `lg-v0.7`, `norm-v0.1`, `pc-v0.1`, `pp-v0.2`, `hb-v0.2`, `pr-v0.2`, Llama's digest and options, the application version), and write `registry/preregistration.json`. (Versions decided 2026-10-26, `EVALUATION.md` v22, application `0.2.0`; the record is written on seal day by `afterword preregistration write`, `PREREGISTRATION.md` Step 5.)
+7. **Freeze `dev`:** `afterword corpus export --version v1`, then `corpus verify`. (Seal day, Step 5.)
+8. **The preregistration commit,** which starts accrual. (Seal day, Step 5; Part 1 is published after it and excluded by amendment.) Optional before it: the label UI's read-only accrual panel (the runbook's Step 4 prompt).
 
 ### 3c: Accrual and measurement
 

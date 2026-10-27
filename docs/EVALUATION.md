@@ -1,6 +1,10 @@
 # Evaluation Plan
 
-**Version:** 20 (2026-10-23)
+**Version:** 22 (2026-10-26)
+
+v22 (2026-10-26, later in session 15) records the author's decisions on the registered thresholds (`docs/proposals/accepted/2026-10-26-registered-thresholds.md`): thresholds are relative to the oracle computed on the test set, the five thresholds and the rule for B2 meaningfully beating B1 are written under "Registered thresholds", and the frozen versions under "Frozen versions", with the application at `0.2.0`. Part 1 is published after the seal and excluded by amendment. They are registered when the preregistration commit seals them. Decided 2026-10-27 (the author): the accrual estimate and the volume-split median (19) from run `20261026T181641Z` are the registered values; the seal-day probe does not replace them.
+
+v21 (2026-10-26, session 15) records the calibration pass on the 150 publication-order labels under `lg-v0.7` (complete) and every `dev` result recomputed on all 494 labels of run `20261026T181641Z`: the label summary, the oracle ceiling, B1 and Llama under `pp-v0.2`, and the accrual estimate and volume-split median. Draft thresholds are in `docs/proposals/accepted/2026-10-26-registered-thresholds.md`, for the author's decision. Nothing is registered yet.
 
 v20 (2026-10-23, session 13) records the `dev` self-agreement check (all 112 drawn; consequential agreement 80 of 112, class kappa 0.358) with its pace evidence, and the author's decisions: the guide is revised to `lg-v0.7`, the 150 publication-order labels are relabeled under it with the calibration pass, and no second self-agreement cycle runs before preregistration. Nothing is registered yet.
 
@@ -130,6 +134,22 @@ Once `dev` labeling is complete, recompute this estimate with the observed conse
 - **Which basis to register** is a preregistration decision: the volume of the trailing 13 weeks before the preregistration commit, from the last full probe run, recorded with its run ID.
 - **Still provisional:** prospective grades of historical comments, made with hindsight available (286 of 478, 59.8%, after the author's reply existed: 108 of 150 in publication order, 178 of 328 shuffled). The test period is the first prospective volume.
 
+**2026-10-26, after the calibration pass (494 of 494 eligible in run `20261026T181641Z`; the registered basis, decided 2026-10-27).**
+
+| Labels | Graded 2 or 3 | Share (Wilson 95%) | Comments needed for 20 consequential (at the interval's low end) |
+| --- | --- | --- | --- |
+| All 494 | 158 | 32.0% (28.0% to 36.2%) | 63 (72) |
+| Publication order (150, all calibration labels, `lg-v0.7`) | 58 | 38.7% (31.2% to 46.7%) | 52 (65) |
+| Shuffled posts (344, seed 20261004) | 100 | 29.1% (24.5% to 34.1%) | 69 (82) |
+| Labeled under `lg-v0.7` (the 150 and 17 new shuffled) | 69 of 167 | 41.3% (34.1% to 48.9%) | 49 (59) |
+
+- **The 100-comment target binds** at every share in the table, including every interval's low end. The test set is labeled under `lg-v0.7`, whose share is the highest in the table; that only strengthens it.
+- **Volume basis (run `20261026T181641Z`, report `reports/baseline-20261026T181641Z.json`).** Trailing 13 complete weeks, 2026-07-27 to 2026-10-25: 307 comments from others, mean 23.62, median 19, minimum 1, maximum 60 per week. At the mean, 100 comments take about 5 weeks; at the median, about 6.
+- **Replay** of those 13 weeks (start at each week in turn, wrap around, stop when both targets are met at the share): 3 to 7 weeks, median 5, the same at every share in the table, since the 100-comment target binds. All inside the 16-week cap.
+- **Volume-split median (C-012): 19** comments from others per week, the trailing-13-week median of run `20261026T181641Z`. This is the registered value (decided by the author 2026-10-27), frozen with the other versions; the seal-day probe and any other probe before the commit do not replace it.
+- **Arrival:** 442 of 494 comments from others (89.5%) arrived within 7 days of their post; 282 of 307 (91.9%) in the trailing 13 weeks.
+- **Posts about Afterword** count toward neither target once excluded. Part 1 is published after the seal (decided 2026-10-26) and is excluded by amendment, as are Parts 2 and 3. The estimate above does not subtract them.
+
 ### Risks to accrual
 
 - **Publishing cadence.** About 91% of comments arrive within a week of a post. Accrual therefore depends on the author's DEV publishing cadence during the test period. A quiet stretch (July 2026: 11 posts, 7 comments from others) can end accrual at the 16-week cap with one or both targets unmet.
@@ -199,7 +219,7 @@ Each is reported as a count first ("30 of 55"), then a percentage with a Wilson 
 
 The oracle ceiling (the policy applied to the labels themselves) is reported beside every condition, because the policy's class defaults bound all three: under `pp-v0.1`, on the 302 `dev` labels, perfect classes and flags give SURFACE size 55, precision 30 of 55, and capture 30 of 84 (below, "Class is a weak proxy for consequence"). B1 gives 126, 50 of 126, and 50 of 84.
 
-When registered thresholds are set, a threshold for SURFACE size, precision, or capture is registered with the others, relative to the oracle on `dev`, or the registration states explicitly that none is set.
+When registered thresholds are set, a threshold for SURFACE size, precision, or capture is registered with the others, relative to the oracle on `dev`, or the registration states explicitly that none is set. **Changed 2026-10-26, before registration (the author):** the thresholds are relative to the oracle computed on the test set's own labels under the registered policy, at scoring time, not to the oracle on `dev`; the `dev` ratios are the expectation, not the bar ("Registered thresholds" below). Reason: the oracle on `dev` mixes three guide versions whose consequential shares differ (2026-10-26 entry above), while the test set is labeled under `lg-v0.7` alone.
 
 ### Consequential miss review
 
@@ -233,7 +253,7 @@ On a seeded set where some suggested classes are deliberately wrong, does the ex
 - Prospective versus retrospective agreement (C-010), separately for `dev` (hindsight available when labeled) and `test` (labeled at first read).
 - Grades given after replying versus before (`replied_before_labeling`).
 - Labeler self-agreement (see `LABELING-GUIDE.md`). **On `dev` (decided 2026-10-18):** the check runs on or after 2026-10-22, by the guide's rule: the pool is the analysis labels at least 14 days old when the list is drawn, and the sample is every pooled comment graded 2 or 3 plus 25 at random (seed 20261018). On 2026-10-22 that is about 104 comments, covering the first 150 and the first 152 shuffled labels. **The calibration pass on the first 150 is dropped** unless this check shows a problem: under `pp-v0.2` no first-150 label's tier depends on the judgment flags the pass was meant to correct (none, against 1 under `pp-v0.1`), and the C-010 outlier is the first 152 shuffled labels, not the first 150 (`docs/proposals/accepted/2026-10-18-relabeling-scope.md`). **Done 2026-10-23,** with the result and the decisions that follow in "Labeler self-agreement on `dev`" below: the calibration pass on the first 150 is reinstated, under `lg-v0.7`.
-- **Volume split (C-012).** Review reduction, consequential recall, and, where weeks are timed, review time per week, reported separately for test-period weeks above the trailing-13-week median volume of comments from others and for weeks at or below it. The median is computed from the last full probe run before preregistration, recorded with the run ID, and frozen with the other versions; weeks are Monday to Sunday, UTC, as in the C-009 baseline. Each group reports its number of weeks and comments. With at most 16 weeks the groups are small, so the split is indicative and reported in counts.
+- **Volume split (C-012).** Review reduction, consequential recall, and, where weeks are timed, review time per week, reported separately for test-period weeks above the trailing-13-week median volume of comments from others and for weeks at or below it. The median is computed from the last full probe run before preregistration, recorded with the run ID, and frozen with the other versions (**changed 2026-10-27, before registration, by the author:** the median is the one from run `20261026T181641Z`, 19 comments from others per week, not one from the seal-day probe, so the registered value is fixed before seal day); weeks are Monday to Sunday, UTC, as in the C-009 baseline. Each group reports its number of weeks and comments. With at most 16 weeks the groups are small, so the split is indicative and reported in counts.
 
 ## Provisional observations on `dev`
 
@@ -435,6 +455,73 @@ By the guide's rule (`LABELING-GUIDE.md`, "Self-agreement check"), drawn 2026-10
 2. **The 150 publication-order labels are relabeled under `lg-v0.7`** with the existing calibration pass (ID list `reports/eval/calibration-first150-lg-v0.7.txt`, git-ignored; the same 150 as the 2026-10-18 list). Analysis uses the latest label from any pass other than `self_agreement`, as documented, so the calibration labels replace those 150 in analysis while the originals stay on disk. Afterwards the analysis labels span three guide versions (150 `lg-v0.7`, 152 `lg-v0.3`, 176 `lg-v0.6`), and every result says how many are calibration labels. 50 of the 150 were read in the self-agreement check on 2026-10-23, so for them the calibration label is a third reading within days. The shuffled `lg-v0.3` labels are not relabeled. Everything computed from `dev` labels (label summary, oracle ceilings, B1 and B2 scores, the accrual estimate, and the thresholds still to be registered) is recomputed after the pass.
 3. **No second 14-day self-agreement cycle before preregistration.** The author's reason: the careful sitting met the bar (27 of 32) and the rushed one did not (53 of 80), and the C-011 relabel at the end of accrual remains the long-term check. The guide sets no numeric bar; the judgment is the author's. Consequence: the `lg-v0.7` calibration labels enter analysis without a self-agreement check of their own.
 
+### Calibration pass under `lg-v0.7`, and `dev` recomputed on 494 labels (2026-10-26)
+
+**The calibration pass is complete:** all 150 publication-order comments have a calibration label under `lg-v0.7`, each made after its original, so each replaces its original in analysis. Counts from `afterword.label_records` (`calibration_differences`, `summarize`, `oracle_ceiling`) and `afterword evaluate`, printed as counts only.
+
+**How the 150 calibration labels differ from their originals** (originals `lg-v0.2`, 2026-10-03 to 2026-10-04):
+
+| | Count |
+| --- | --- |
+| Same consequential split | 109 of 150 (72.7%; 65.0% to 79.2%) |
+| Entered consequential / left it | 30 / 11 |
+| Graded 2 or 3, original against calibration | 39 against 58 |
+| Same prospective grade | 77 |
+| Same class; Cohen's kappa | 75; 0.392 |
+| Same labeler-set flags | 53 |
+
+- **Direction: upward, the reverse of the self-agreement check.** Grade transitions, original to calibration: 0 to 0: 34, 0 to 1: 14, 0 to 2: 4, 0 to 3: 1, 1 to 0: 4, 1 to 1: 29, 1 to 2: 15, 1 to 3: 10, 2 to 0: 1, 2 to 1: 9, 2 to 2: 13, 2 to 3: 11, 3 to 1: 1, 3 to 2: 3, 3 to 3: 1. Grade 3 went from 5 to 23. Of the 39 originally graded 2 or 3, 28 stayed (71.8%); of the 111 graded 0 or 1, 30 rose (27.0%; 19.6% to 36.0%).
+- **Against the self-agreement reading.** 50 of the 150 were also in the self-agreement draw (all 39 originally consequential, and 11 others). On those 50 the three readings give 39 (original), 26 (self-agreement, 2026-10-23), and 30 (calibration) graded 2 or 3; calibration agrees with the self-agreement reading on the split in 40 of 50 and with the original in 37. The other 100, all originally graded 0 or 1 and never drawn, gained 28. The self-agreement check sampled the originally consequential comments and could not see the upward move.
+- **Class.** 75 changed. The largest moves: `TECHNICAL_EXTENSION` to `CONVERSATIONAL` 15, `CONVERSATIONAL` to `LIGHTWEIGHT_ACKNOWLEDGMENT` 12, `TECHNICAL_EXTENSION` to `CHALLENGE_OR_COUNTEREXAMPLE` 8, to `TECHNICAL_QUESTION` 7, to `LIGHTWEIGHT_ACKNOWLEDGMENT` 5; `DIRECT_QUESTION` to `TECHNICAL_QUESTION` 4; `TECHNICAL_QUESTION` to `CHALLENGE_OR_COUNTEREXAMPLE` 4. Totals before and after: `TECHNICAL_EXTENSION` 49 to 16, `CHALLENGE_OR_COUNTEREXAMPLE` 2 to 16, `LIGHTWEIGHT_ACKNOWLEDGMENT` 19 to 34, `TECHNICAL_QUESTION` 23 to 29, `CONVERSATIONAL` 42 to 42, `LIKELY_SPAM_OR_NOISE` 8 to 11, `DIRECT_QUESTION` 5 to 1, `CORRECTION` 2 to 1. The reuse test emptied `TECHNICAL_EXTENSION` in both directions: toward `CONVERSATIONAL`, and toward the `SURFACE` classes.
+- **Sittings and pace.** Four batches on two days, against originals made 2026-10-03 (27) and 2026-10-04 (123) at a median of 35.3 seconds per comment. 2026-10-23, the evening of the self-agreement check and of `lg-v0.7`: 39 comments (20:49 to 21:07 UTC, median 21.1 s) and 40 (21:41 to 21:57, 24.4 s), together 19 up and 3 down. 2026-10-26: 40 (16:18 to 17:01, 38.0 s) and 31 (17:40 to 18:11, 33.3 s), 11 up and 8 down. The batches follow publication order, so the first day held fewer originally consequential comments (13 of 79 against 26 of 71). Conditioned on the original, the rates are close: 19 of 66 originally below 2 rose on the first day (28.8%) and 11 of 45 on the second (24.4%); 3 of 13 and 8 of 26 fell. The upward move does not sit in the fast sittings. 19 of the 50 comments also in the self-agreement draw were calibrated the same evening as their self-agreement read, a few hours apart.
+- **Hindsight is unchanged in kind:** 108 of 150 had been replied to before either label; 149 calibration labels carry a retrospective grade.
+- **Not measured:** which reading is right. The calibration labels have no self-agreement check of their own (decision 3 above).
+
+**The analysis labels now** (494; every eligible comment in run `20261026T181641Z`; one labeled comment deleted upstream and purged since is not counted): 150 calibration labels (`lg-v0.7`), and 344 shuffled initial labels: 151 `lg-v0.3`, 176 `lg-v0.6`, and 17 `lg-v0.7` made since 2026-10-19 on comments new since run `20261018T173927Z`.
+
+| Labels | Total | Graded 2 or 3 | Share (Wilson 95%) |
+| --- | --- | --- | --- |
+| All | 494 | 158 | 32.0% (28.0% to 36.2%) |
+| Publication order, `lg-v0.7` calibration | 150 | 58 | 38.7% (31.2% to 46.7%) |
+| Shuffled, `lg-v0.3` | 151 | 44 | 29.1% (22.5% to 36.8%) |
+| Shuffled, `lg-v0.6` | 176 | 45 | 25.6% (19.7% to 32.5%) |
+| Shuffled, `lg-v0.7` (new comments) | 17 | 11 | 64.7% (41.3% to 82.7%) |
+
+The share depends on the guide version: `lg-v0.7` grades more comments consequential than the guides before it, on the same 150 comments (38.7% against 26.0%). The test set is labeled under `lg-v0.7`.
+
+| Primary class (all 494) | Grade 0 | 1 | 2 | 3 | Total | Default tier |
+| --- | --- | --- | --- | --- | --- | --- |
+| `CORRECTION` | 0 | 1 | 0 | 1 | 2 | `SURFACE` |
+| `CHALLENGE_OR_COUNTEREXAMPLE` | 0 | 2 | 13 | 11 | 26 | `SURFACE` |
+| `TECHNICAL_QUESTION` | 0 | 17 | 38 | 24 | 79 | `SURFACE` |
+| `OPPORTUNITY` | 0 | 0 | 0 | 1 | 1 | `SURFACE` |
+| `DIRECT_QUESTION` | 0 | 1 | 1 | 0 | 2 | `QUEUE` |
+| `TECHNICAL_EXTENSION` | 4 | 38 | 46 | 13 | 101 | `QUEUE` |
+| `CONVERSATIONAL` | 39 | 101 | 7 | 2 | 149 | `QUEUE` |
+| `LIGHTWEIGHT_ACKNOWLEDGMENT` | 57 | 30 | 1 | 0 | 88 | `COLLAPSED` |
+| `LIKELY_SPAM_OR_NOISE` | 44 | 0 | 0 | 0 | 44 | `COLLAPSED` |
+| `UNCERTAIN` | 1 | 1 | 0 | 0 | 2 | `SURFACE` |
+
+**Prospective against retrospective (C-010),** where both grades exist: 481; same grade 353; same consequential split 432 (89.8%); consequential only in hindsight 1; consequential only prospectively 48 (publication order 0 and 16 of 149; shuffled 1 and 32 of 332). `replied_before_labeling`: 298 of 494.
+
+**The five primary measures under `pp-v0.2`** (all 494; development evidence, labels made with hindsight, the policy and B1's threshold tuned on this set):
+
+| | B1 `hb-v0.2` | Llama (B2) | Oracle (class and flags) |
+| --- | --- | --- | --- |
+| Consequential recall | 155 of 158 (98.1%; 94.6% to 99.4%) | 157 of 158 (99.4%; 96.5% to 99.9%) | 157 of 158 |
+| Review reduction | 79 (16.0%; 13.0% to 19.5%) | 39 (7.9%; 5.8% to 10.6%) | 118 (23.9%; 20.3% to 27.8%) |
+| SURFACE size | 210 (42.5%) | 229 (46.4%) | 110 (22.3%) |
+| SURFACE precision | 95 of 210 (45.2%; 38.7% to 52.0%) | 105 of 229 (45.9%; 39.5% to 52.3%) | 88 of 110 (80.0%; 71.6% to 86.4%) |
+| SURFACE capture | 95 of 158 (60.1%; 52.3% to 67.4%) | 105 of 158 (66.5%; 58.8% to 73.3%) | 88 of 158 (55.7%; 47.9% to 63.2%) |
+
+- **The oracle collapses a consequential comment for the first time:** one labeled `LIGHTWEIGHT_ACKNOWLEDGMENT` and graded 2 (a calibration label). Perfect classification under `pp-v0.2` therefore cannot reach 158 of 158. Under `pp-v0.1` the oracle collapses 112, with the same `SURFACE` and the same miss.
+- **Where the oracle puts the 158:** `SURFACE` 88, `QUEUE` 69, `COLLAPSED` 1. Capture rose from 54 of 129 to 88 of 158 because the calibration moved consequential comments into `SURFACE` classes: in the 150, the oracle's `SURFACE` holds 43 of the 58 consequential (16 of 39 before).
+- **Misses:** B1 3 (2 publication order, 1 shuffled), Llama 1 (publication order, graded 3), oracle 1; the five are different comments. Llama classified all 494 `OK`; class agreement with the labels 156 of 494 (B1 142).
+- **`SURFACE`, B1 against Llama:** of the consequential comments, 67 at `SURFACE` under both, 38 under Llama only, 28 under B1 only. Llama's model-set flags caused 5 raises, all graded 0 or 1.
+- **By post order:** B1 publication order 56 of 58, 25 of 150 collapsed, `SURFACE` 63 (39 consequential); shuffled 99 of 100, 54 of 344, 147 (56). Llama publication order 57 of 58, 17 collapsed, 71 (43); shuffled 100 of 100, 22, 158 (62). Oracle publication order 57 of 58, 35, 46 (43); shuffled 100 of 100, 83, 64 (45).
+- **Against the 2026-10-18 figures (478 labels, before the pass):** B1 recall 125 of 129 to 155 of 158, Llama 129 of 129 to 157 of 158; collapses unchanged for both (79 and 39; the classifiers did not change, neither collapsed any of the 17 new comments, and neither had collapsed the comment purged since); the oracle's collapses rose from 103 to 118 and its `SURFACE` from 84 to 110. The relabel moved the ceiling more than either condition.
+- **Llama's "challenge" calls on extensions** (the 2026-10-08 observation): of the 101 comments labeled `TECHNICAL_EXTENSION`, Llama called 41 `CHALLENGE_OR_COUNTEREXAMPLE`; 27 of those 41 are graded 2 or 3 (65.9%; 50.5% to 78.4%), against 32 of the other 60 (53.3%; 40.9% to 65.4%). The direction holds; the intervals still overlap.
+
 ## Adversarial set
 
 Reported separately, never blended into natural-rate metrics. Includes:
@@ -545,6 +632,59 @@ Every pre-check pattern is English, so instruction-like text in another language
 ## Registered thresholds
 
 *Not yet set. To be filled at the end of Stage 3a.* Decided 2026-10-18: thresholds for SURFACE size, precision, and capture are set relative to the oracle under `pp-v0.2` on `dev`, as above.
+
+**2026-10-26:** draft thresholds for all five measures and the rule for B2 meaningfully beating B1 are in `docs/proposals/accepted/2026-10-26-registered-thresholds.md`, for the author's decision. Nothing here changes until the author decides.
+
+### Thresholds (decided by the author 2026-10-26; registered by the preregistration commit)
+
+Evidence and the alternatives considered: `docs/proposals/accepted/2026-10-26-registered-thresholds.md`.
+
+**Reference.** Every threshold is relative to the **oracle on the test set**: the registered policy (`pp-v0.2`) applied to the test labels' own class and flags (class and labeled flags, code and link flags deterministic), computed at scoring time from the same labels the conditions are scored against. Consequential means prospective grade 2 or 3.
+
+**B2 meets the registered result (C-002) when it meets all five.** B1 is reported against the same thresholds. Every measure is reported as counts first, with Wilson 95% intervals, met or not; a measure resting on fewer than 20 consequential or 100 test comments is indicative (stopping rule).
+
+| Measure | Threshold | `dev` expectation (all 494 / the 167 `lg-v0.7` labels) |
+| --- | --- | --- |
+| Consequential recall | Consequential comments collapsed at most the larger of 1 and the number of consequential test comments divided by 20, rounded down (20 to 39 consequential: at most 1; 40 to 59: at most 2) | B1 3 / 2 missed, Llama 1 / 1: both meet |
+| Review reduction | Comments collapsed at least 0.50 times the oracle's collapsed count | B1 0.67 / 0.68 meets; Llama 0.33 / 0.46 does not |
+| SURFACE size | At most 2.0 times the oracle's `SURFACE` size, **and** at most half of all test comments | B1 1.91 and 42.5% / 1.36 and 44.9% meets; Llama 2.08 and 46.4% / 1.55 and 50.9% does not |
+| SURFACE precision | At least 0.50 times the oracle's SURFACE precision, **and** at least 1.25 times the test set's consequential share (lift) | B1 0.57 and 1.41 / 0.66 and 1.48, Llama 0.57 and 1.43 / 0.69 and 1.54: both meet |
+| SURFACE capture | At least 1.0 times the oracle's SURFACE capture | B1 1.08 / 0.90 (meets / does not); Llama 1.19 / 1.06 meets |
+
+**B2 meaningfully beats B1 (C-008)** if either:
+
+- **(a) Recall:** B2 collapses at least 3 fewer consequential comments than B1, and B2's collapsed count is no more than 5% of test comments below B1's; or
+- **(b) Reduction:** B2 collapses more comments than B1 by at least 5% of test comments, and B2 collapses no more consequential comments than B1.
+
+Otherwise B1 and B2 are reported as not meaningfully different on the claim's terms, with all five measures for both. On `dev` neither (a) nor (b) holds. 3 is the smallest difference outside the claim's falsifier ("within one or two consequential comments").
+
+**Reported descriptively, not registered:** the SURFACE comparison the proposal called option (c) (how many more consequential comments B2 places at `SURFACE` than B1, against how much larger its `SURFACE` is), and the paired counts of consequential comments one condition surfaces and the other collapses, each way.
+
+**Posts about Afterword.** Excluded from the test set (ADR-010). None is published as of run `20261026T181641Z`, so `excluded_posts` starts empty. Part 1 is published after the seal (scheduled 2026-11-10; the seal is in early November) and excluded by a recorded amendment before any of its comments is labeled; Parts 2 and 3 likewise.
+
+**Accrual procedure and stopping rule:** as above ("Accrual procedure", "Stopping rule"), unchanged. Accrual estimate and volume-split median: the 2026-10-26 entry above (run `20261026T181641Z`; median 19 per week). These are the registered values; the seal-day probe does not replace them (decided 2026-10-27).
+
+### Frozen versions (decided 2026-10-26; registered by the preregistration commit)
+
+| Item | Frozen as |
+| --- | --- |
+| Taxonomy | `tax-v0.2` |
+| Labeling guide | `lg-v0.7` (`LABELING-FIELD-GUIDE.md` v5) |
+| Normalization | `norm-v0.1` |
+| Pre-check | `pc-v0.1`; adv-109 and adv-110 registered as known limitations |
+| Priority policy | `pp-v0.2` |
+| B1 heuristic | `hb-v0.2` (length threshold 281 prose characters) |
+| B2 prompt | `pr-v0.2` |
+| B2 model | Ollama, `llama3.1:8b-instruct-q4_K_M`, digest `46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e` |
+| B2 options | `num_ctx=4096;num_predict=200;seed=20261003;temperature=0` |
+| Duplicate-flag rule | strict (`MALFORMED`, surfaced) |
+| Ingestion | `dev-sync-0.1` |
+| Application | `0.2.0` (bumped in the preparation commit before the seal), at the commit tagged `prereg-v1` |
+| Dependencies | `uv.lock` at that commit |
+| Corpus | `v1` (`dev`), manifest `registry/corpus-v1-dev.json` |
+| Ollama server | not pinned; its version (`ollama --version`) is noted at the seal and in each week's shadow commit message |
+
+The preregistration record (`registry/preregistration.json`) names the registered conditions and `registered_at`; it is written by `afterword preregistration write` on seal day (`PREREGISTRATION.md`, Step 5).
 
 Design preference stands: tolerate extra false positives before accepting consequential false negatives.
 
