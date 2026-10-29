@@ -294,6 +294,26 @@ All numbers come from `afterword evaluate` and scratch scripts over `afterword.l
 
 **Consequence:** Seal day needs no baseline step and no edit to `EVALUATION.md`; the registered median is in the preparation commit.
 
+### 2026-10-27 - The 3.12 suite passes once the leftover processes are gone
+
+**Platform:** Project
+
+**Type:** FRICTION
+
+**Class:** ENVIRONMENT
+
+**Task:** Rerun check 6 after the stalls recorded above.
+
+**Expectation:** The same stall at the pre-commit hook test.
+
+**Observation:** With no Python, pytest, or uv process left from the stalled runs, `uv run --isolated --python 3.12 pytest` passed, 776 tests in 4:02, run alone in the foreground. Consistent with the stalls coming from overlapping runs contending in uv, not from the code; the cause was not isolated further.
+
+**Evidence:** one foreground 3.12 run; the process list empty beforehand.
+
+**Workaround:** Run the two suites one after the other, never two at once.
+
+**Consequence:** Check 6 is verified for this change. This corrects the entry "The 3.12 test run hangs at the pre-commit hook test", which stands as written.
+
 ### Part B summary
 
 **Completed:** thresholds and frozen versions in `EVALUATION.md` v22; the proposal accepted and moved; `preregistration write` with tests; application `0.2.0` (`pyproject.toml`, `afterword.__version__`, `uv.lock`); the seal-day sequence in `PREREGISTRATION.md` v6, Step 5; `COMMANDS.md` v6; `DATA-MODEL.md`; the ADR-010 note; the README's findings paragraph and "Where this is headed"; session 14 in the friction-log index; dated entries on C-002 and C-008.
