@@ -109,3 +109,166 @@ def test_the_commands_print_counts_and_paths_only(runs, tmp_path, capsys):
     assert "verified" in capsys.readouterr().out
     code = cli.main(["--root", str(tmp_path), "corpus", "verify", "--version", "v2"])
     assert code == 2
+
+
+# Findings of the pre-seal deep audit (aud_R4f7isAJvl, session 16) ----------------------
+# covers: R1, R2, R3, R4, R5, R6
+
+
+def synthetic_records(text: str = "synthetic") -> list[dict]:
+    base = {
+        "source_object_id": "",
+        "content_id": "p1",
+        "corpus_set": "dev",
+        "parent_comment_id": None,
+        "context_as_of": "2026-08-03T14:00:00+00:00",
+        "provenance": corpus.PROVENANCE,
+        "normalization_version": "norm-v0.1",
+    }
+    return [
+        base | {"comment_id": "a", "source_object_id": "a", "body_text": f"{text} one"},
+        base | {"comment_id": "b", "source_object_id": "b", "body_text": f"{text} two"},
+    ]
+
+
+def frozen(tmp_path, records):
+    made = corpus.manifest(
+        records,
+        version="v1",
+        corpus_set="dev",
+        created_at="x",
+        store_as_of=None,
+        registered_at=None,
+    )
+    path = tmp_path / "dev.jsonl"
+    path.write_bytes(corpus.file_bytes(records))
+    return made, path
+
+
+def checked(made, path):
+    return corpus.check(made["comments"], made["file_sha256"], path)
+
+
+def test_verify_refuses_a_duplicated_record(tmp_path):
+    records = synthetic_records()
+    made, path = frozen(tmp_path, records)
+    path.write_bytes(corpus.file_bytes(records) + corpus.file_bytes(records[:1]))
+    result = checked(made, path)
+    assert result.duplicates == 1 and not result.ok
+
+
+def test_verify_refuses_a_file_whose_hash_differs_without_a_withdrawal(tmp_path):
+    records = synthetic_records()
+    made, path = frozen(tmp_path, records)
+    path.write_bytes(b"".join(reversed(corpus.file_bytes(records).splitlines(keepends=True))))
+    result = checked(made, path)
+    assert result.matched == 2 and not result.file_matches and not result.ok
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        {"body_text": "other synthetic text"},
+        {"content_id": "p2"},
+        {"corpus_set": "test"},
+        {"withdrawn_on": None},
+    ],
+)
+def test_a_record_marked_withdrawn_must_be_a_real_withdrawal(tmp_path, tamper):
+    records = synthetic_records()
+    made, path = frozen(tmp_path, records)
+    corpus.withdraw(path, {"a"}, on=NOW.date())
+    assert checked(made, path).ok
+    edited = [r | tamper if r["comment_id"] == "a" else r for r in corpus.read_records(path)]
+    path.write_bytes(corpus.file_bytes(edited))
+    result = checked(made, path)
+    assert (result.withdrawn, result.changed) == (0, 1) and not result.ok
+
+
+def test_line_separators_in_text_stay_inside_their_record(tmp_path):
+    records = synthetic_records(text=f"code a{chr(0x2028)}b{chr(0x2029)}c")
+    made, path = frozen(tmp_path, records)
+    assert [r["comment_id"] for r in corpus.read_records(path)] == ["a", "b"]
+    assert checked(made, path).ok
+    assert corpus.withdraw(path, {"b"}, on=NOW.date()) == ["b"]
+    assert checked(made, path).ok
+
+
+def test_a_withdrawal_that_fails_leaves_the_corpus_file_as_it_was(tmp_path, monkeypatch):
+    _made, path = frozen(tmp_path, synthetic_records())
+    before = path.read_bytes()
+
+    def fail(*args: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(corpus.os, "replace", fail)
+    with pytest.raises(OSError, match="disk full"):
+        corpus.withdraw(path, {"a"}, on=NOW.date())
+    assert path.read_bytes() == before
+    assert [p.name for p in tmp_path.iterdir()] == ["dev.jsonl"]
+
+
+def test_an_export_that_fails_partway_leaves_nothing_and_can_be_rerun(runs, tmp_path, monkeypatch):
+    real = corpus.write_once
+
+    def fail_on_manifest(path, data):
+        if path.suffix == ".json":
+            raise OSError("disk full")
+        real(path, data)
+
+    monkeypatch.setattr(corpus, "write_once", fail_on_manifest)
+    with pytest.raises(OSError, match="disk full"):
+        export(tmp_path)
+    assert not (tmp_path / corpus.data_path("v1", "dev")).exists()
+    monkeypatch.undo()
+    assert export(tmp_path).records == 4
+
+
+def test_export_never_replaces_a_file_that_appears_after_its_check(runs, tmp_path, monkeypatch):
+    data = tmp_path / corpus.data_path("v1", "dev")
+    real = corpus.file_bytes
+
+    def racing(records):
+        data.parent.mkdir(parents=True, exist_ok=True)
+        data.write_bytes(b"first export\n")
+        return real(records)
+
+    monkeypatch.setattr(corpus, "file_bytes", racing)
+    with pytest.raises(service.ServiceError, match="frozen"):
+        export(tmp_path)
+    assert data.read_bytes() == b"first export\n"
+    assert not (tmp_path / corpus.manifest_path("v1", "dev")).exists()
+
+
+def test_the_manifest_is_written_with_lf_line_endings(runs, tmp_path):
+    made = export(tmp_path)
+    raw = (tmp_path / made.manifest_file).read_bytes()
+    assert b"\r\n" not in raw and raw.endswith(b"}\n")
+
+
+# Session 16b: the manifest's registered_at must equal the record's ---------------------
+# covers: R11
+
+
+def test_verify_refuses_a_manifest_whose_registered_at_differs_from_the_record(
+    runs, tmp_path, capsys
+):
+    path = write_record(tmp_path)
+    export(tmp_path)
+    assert service.verify_corpus(tmp_path, version="v1").ok
+    record = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(
+        json.dumps(record | {"registered_at": "2026-08-11T00:00:00Z"}), encoding="utf-8"
+    )
+    result = service.verify_corpus(tmp_path, version="v1")
+    assert result.matched == 2 and not result.registered_at_matches and not result.ok
+    assert cli.main(["--root", str(tmp_path), "corpus", "verify", "--version", "v1"]) == 1
+    assert "registered_at differs" in capsys.readouterr().out
+
+
+def test_verify_refuses_a_corpus_exported_before_the_record(runs, tmp_path):
+    export(tmp_path)
+    assert service.verify_corpus(tmp_path, version="v1").ok
+    write_record(tmp_path)
+    result = service.verify_corpus(tmp_path, version="v1")
+    assert not result.registered_at_matches and not result.ok

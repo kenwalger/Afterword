@@ -80,7 +80,8 @@ def read_ledger(root: Path) -> list[dict[str, Any]]:
     path = root / LEDGER_PATH
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    # LF only: splitlines would also split at U+2028 and U+2029 inside text.
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line]
 
 
 def append_ledger(root: Path, entry: dict[str, Any]) -> None:
@@ -101,7 +102,8 @@ def read_sealed(path: Path) -> list[dict[str, Any]]:
     :param path: A sealed file.
     :returns: Its records.
     """
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    # LF only: splitlines would also split at U+2028 and U+2029 inside text.
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line]
 
 
 @dataclass(frozen=True)

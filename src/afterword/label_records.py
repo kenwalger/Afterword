@@ -61,8 +61,9 @@ def label_dir(root: Path, corpus_version: str) -> Path:
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
+    # LF only: splitlines would also split at U+2028 and U+2029 inside text.
     return [
-        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+        json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line.strip()
     ]
 
 

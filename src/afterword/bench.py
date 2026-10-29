@@ -80,7 +80,8 @@ def load_cases(root: Path, sets: list[str]) -> list[dict[str, Any]]:
         raw = (root / CORPUS_DIR / SETS[name]).read_bytes()
         if hashlib.sha256(raw).hexdigest() != entry["sha"]:
             raise BenchRefused(f"{SETS[name]} does not match its manifest hash")
-        records = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line]
+        # LF only: splitlines would also split at U+2028 and U+2029 inside text.
+        records = [json.loads(line) for line in raw.decode("utf-8").split("\n") if line]
         if len(records) != int(entry["n"]):
             raise BenchRefused(
                 f"{SETS[name]} has {len(records)} records, manifest says {entry['n']}"

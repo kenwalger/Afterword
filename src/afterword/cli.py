@@ -831,6 +831,15 @@ def cmd_corpus_verify(args: argparse.Namespace) -> int:
         f"missing {result.missing}, extra {result.extra}; file hash "
         f"{'matches' if result.file_matches else 'differs'}"
     )
+    if result.duplicates:
+        print(f"repeated records: {result.duplicates}")
+    if result.registered_at_matches:
+        print("registered_at matches the preregistration record")
+    else:
+        print(
+            f"registered_at differs from {preregistration.RECORD_PATH.as_posix()}: "
+            "frozen before it, or against another record"
+        )
     print("verified" if result.ok else "NOT verified")
     return 0 if result.ok else 1
 

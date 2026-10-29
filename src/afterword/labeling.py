@@ -202,7 +202,8 @@ def _labeled_ids(path: Path) -> set[str]:
     if not path.exists():
         return set()
     ids = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
+    # LF only: splitlines would also split at U+2028 and U+2029 inside text.
+    for line in path.read_text(encoding="utf-8").split("\n"):
         if line.strip():
             ids.add(str(json.loads(line)["comment_id"]))
     return ids
@@ -211,9 +212,10 @@ def _labeled_ids(path: Path) -> set[str]:
 def _batch_ids(path: Path) -> set[str]:
     if not path.exists():
         return set()
+    # LF only: splitlines would also split at U+2028 and U+2029 inside text.
     return {
         str(json.loads(line).get("batch_id"))
-        for line in path.read_text(encoding="utf-8").splitlines()
+        for line in path.read_text(encoding="utf-8").split("\n")
         if line.strip()
     }
 

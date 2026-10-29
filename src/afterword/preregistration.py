@@ -26,6 +26,8 @@ the time it was recorded, never edited in, and committed like the record.
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -186,15 +188,23 @@ def load(root: Path) -> Preregistration | None:
     return parse(data)
 
 
-def write_record(root: Path, data: dict[str, Any]) -> Preregistration:
+def write_record(
+    root: Path,
+    data: dict[str, Any],
+    *,
+    check: Callable[[Preregistration], None] | None = None,
+) -> Preregistration:
     """Write the preregistration record, once: an existing record is never replaced.
 
     :param root: Repository root.
     :param data: The record's fields, with ``registered_at`` as a UTC ``datetime``.
+    :param check: Called with the parsed record before anything is written; it
+        raises to refuse the record.
     :returns: The record as written.
     :raises PreregistrationError: If a record already exists, ``registered_at`` is
-        not a UTC time, or any field is invalid. Nothing is written then.
-    :raises OSError: If writing fails partway; the partly written file is removed.
+        not a UTC time, or any field is invalid. Nothing is written then. If
+        writing fails partway, the partly written file is removed and the
+        ``OSError`` raised.
     """
     when = data.get("registered_at")
     offset = when.utcoffset() if isinstance(when, datetime) else None
@@ -202,19 +212,27 @@ def write_record(root: Path, data: dict[str, Any]) -> Preregistration:
         raise PreregistrationError("registered_at must be a UTC time")
     out = data | {"registered_at": when.isoformat().replace("+00:00", "Z")}
     record = parse(out)
+    if check is not None:
+        check(record)
     text = json.dumps(out, indent=2) + "\n"
     path = root / RECORD_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         # Mode "x" creates the file or fails, so a record is never overwritten.
-        with path.open("x", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
+        handle = path.open("x", encoding="utf-8", newline="\n")
     except FileExistsError:
         raise PreregistrationError(f"{RECORD_PATH} already exists; it is never rewritten") from None
-    except OSError:
-        # This call created the file, so a partly written record is its own to remove.
-        path.unlink(missing_ok=True)
-        raise
+    written = False
+    try:
+        with handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        written = True
+    finally:
+        if not written:
+            # Created by the open above, so a partly written record is this call's to remove.
+            path.unlink(missing_ok=True)
     return record
 
 
@@ -257,7 +275,14 @@ def add_exclusion(
     data["excluded_posts"] = [*data.get("excluded_posts", []), entry]
     parse(data)
     path = root / RECORD_PATH
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
+    # Written beside the record, then swapped in, so an interrupted write never
+    # leaves a truncated record.
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
     return _excluded([entry])[0]
 
 

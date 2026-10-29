@@ -10,14 +10,22 @@ version.
 A comment deleted upstream after the freeze is withdrawn from the corpus file
 at the next ingest (ADR-009): its text goes, its ID stays, and the record says
 it was withdrawn. Verification reports withdrawn records apart from records
-that changed for any other reason.
+that changed for any other reason. A record counts as withdrawn only when its
+text is gone and everything else in it still matches the manifest's hash of the
+record without its text.
+
+Each file is written once, and rewritten only by a withdrawal, which writes
+beside the file and swaps it in, so an interrupted write never truncates the
+only frozen copy of the text.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -27,6 +35,8 @@ CORPUS_ROOT: Path = Path("fixtures/corpus")
 MANIFEST_ROOT: Path = Path("registry")
 PROVENANCE: str = "public-real"
 _VERSION: re.Pattern[str] = re.compile(r"^v[1-9][0-9]*$")
+# Added to a record by an ADR-009 withdrawal, with ``body_text`` set to null.
+WITHDRAWAL_FIELDS: tuple[str, ...] = ("withdrawn", "withdrawn_on")
 RECORD_FIELDS: tuple[str, ...] = (
     "comment_id",
     "source_object_id",
@@ -100,6 +110,18 @@ def record_hash(record: dict[str, Any]) -> str:
     return hashlib.sha256(line_of(record).encode("utf-8")).hexdigest()
 
 
+def metadata_hash(record: dict[str, Any]) -> str:
+    """Return the SHA-256 of a record without its text or withdrawal fields.
+
+    A withdrawal changes only those fields, so this hash is the same before and after it.
+
+    :param record: A corpus record, withdrawn or not.
+    :returns: Lower-case hex digest.
+    """
+    dropped = {"body_text", *WITHDRAWAL_FIELDS}
+    return record_hash({k: v for k, v in record.items() if k not in dropped})
+
+
 def file_bytes(records: list[dict[str, Any]]) -> bytes:
     """Serialize a corpus file: records sorted by comment ID, one per line, LF.
 
@@ -146,6 +168,7 @@ def manifest(
                 "comment_id": r["comment_id"],
                 "content_id": r["content_id"],
                 "record_sha256": record_hash(r),
+                "metadata_sha256": metadata_hash(r),
             }
             for r in sorted(records, key=lambda r: str(r["comment_id"]))
         ],
@@ -155,10 +178,47 @@ def manifest(
 def read_records(path: Path) -> list[dict[str, Any]]:
     """Read a corpus file.
 
+    Lines end at LF only: ``str.splitlines`` would also split at U+2028, U+2029,
+    and U+0085, which the serialization leaves unescaped inside text.
+
     :param path: A corpus file.
     :returns: Its records.
     """
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line]
+
+
+def write_once(path: Path, data: bytes) -> None:
+    """Create a file with these bytes; never replace one.
+
+    An existing file is left as it was (``FileExistsError``). If writing fails,
+    the partly written file is removed and the error raised.
+
+    :param path: The file to create; its parent directory is created if needed.
+    :param data: Its content.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open("xb")
+    written = False
+    try:
+        with handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        written = True
+    finally:
+        if not written:
+            # Created by the open above, so a partial file is this call's to remove.
+            path.unlink(missing_ok=True)
+
+
+def _replace(path: Path, data: bytes) -> None:
+    # Written beside the file, then swapped in (as adapters/dev/redact.py does).
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -172,14 +232,36 @@ class CorpusCheck:
     missing: int
     extra: int
     file_matches: bool
+    duplicates: int = 0
+    # Whether the manifest's registered_at equals the preregistration record's
+    # (both absent counts as equal); set by the caller, which reads the record.
+    registered_at_matches: bool = True
 
     @property
     def ok(self) -> bool:
         """Report whether every record matches its manifest entry or was withdrawn under ADR-009.
 
-        :returns: ``True`` when nothing changed, went missing, or was added.
+        Without a withdrawal the file must also match the manifest's file hash;
+        a withdrawal changes that hash, so it is checked record by record then.
+        The manifest's ``registered_at`` must equal the record's.
+
+        :returns: ``True`` when nothing changed, went missing, was added, or was
+            repeated, the file hash matches unless a record was withdrawn, and
+            ``registered_at`` matches.
         """
-        return not (self.changed or self.missing or self.extra)
+        records_ok = not (self.changed or self.missing or self.extra or self.duplicates)
+        file_ok = self.file_matches or self.withdrawn > 0
+        return records_ok and file_ok and self.registered_at_matches
+
+
+def _withdrawn(record: dict[str, Any], entry: dict[str, Any]) -> bool:
+    """Report whether a record is its frozen self with only an ADR-009 withdrawal applied."""
+    return (
+        record.get("withdrawn") is True
+        and record.get("body_text", "") is None
+        and isinstance(record.get("withdrawn_on"), str)
+        and metadata_hash(record) == entry.get("metadata_sha256")
+    )
 
 
 def check(entries: list[dict[str, Any]], file_sha256: str, path: Path) -> CorpusCheck:
@@ -188,18 +270,21 @@ def check(entries: list[dict[str, Any]], file_sha256: str, path: Path) -> Corpus
     :param entries: The manifest's ``comments``.
     :param file_sha256: The manifest's ``file_sha256``.
     :param path: The corpus file.
-    :returns: Counts of matched, withdrawn, changed, missing, and extra records.
+    :returns: Counts of matched, withdrawn, changed, missing, extra, and repeated
+        records, and whether the file hash matches.
     """
-    records = {str(r["comment_id"]): r for r in read_records(path)} if path.exists() else {}
-    expected = {str(e["comment_id"]): str(e["record_sha256"]) for e in entries}
+    lines = read_records(path) if path.exists() else []
+    ids = Counter(str(r["comment_id"]) for r in lines)
+    records = {str(r["comment_id"]): r for r in lines}
+    expected = {str(e["comment_id"]): e for e in entries}
     matched = withdrawn = changed = 0
-    for comment_id, digest in expected.items():
+    for comment_id, entry in expected.items():
         record = records.get(comment_id)
         if record is None:
             continue
-        if record_hash(record) == digest:
+        if record_hash(record) == entry["record_sha256"]:
             matched += 1
-        elif record.get("withdrawn") is True:
+        elif _withdrawn(record, entry):
             withdrawn += 1
         else:
             changed += 1
@@ -212,6 +297,7 @@ def check(entries: list[dict[str, Any]], file_sha256: str, path: Path) -> Corpus
         missing=sum(1 for c in expected if c not in records),
         extra=sum(1 for c in records if c not in expected),
         file_matches=actual == file_sha256,
+        duplicates=sum(n - 1 for n in ids.values()),
     )
 
 
@@ -232,5 +318,5 @@ def withdraw(path: Path, withdrawn: set[str], *, on: date) -> list[str]:
             record["withdrawn_on"] = on.isoformat()
             done.append(str(record["comment_id"]))
     if done:
-        path.write_bytes(file_bytes(records))
+        _replace(path, file_bytes(records))
     return done

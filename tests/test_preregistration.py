@@ -444,3 +444,82 @@ def test_a_record_that_fails_partway_is_not_left_behind(tmp_path, monkeypatch):
     monkeypatch.undo()
     assert not (tmp_path / preregistration.RECORD_PATH).exists()
     assert service.write_preregistration(tmp_path).b2_model == LLAMA
+
+
+# Findings of the pre-seal deep audit (aud_R4f7isAJvl, session 16) ----------------------
+# covers: R7, R8, R9, R10
+
+
+def test_write_checks_the_conditions_before_writing(tmp_path, monkeypatch):
+    monkeypatch.setattr(service, "REGISTERED_B1_HEURISTIC", "hb-v9.9")
+    with pytest.raises(service.ServiceError, match=r"heuristic hb-v9\.9 is unknown"):
+        service.write_preregistration(tmp_path)
+    assert not (tmp_path / preregistration.RECORD_PATH).exists()
+
+
+def test_the_record_writer_never_removes_a_file_it_did_not_create(tmp_path, monkeypatch):
+    path = write_record(tmp_path)
+    before = path.read_bytes()
+    real_open = Path.open
+
+    def denied(self: Path, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
+        if mode == "x":
+            raise PermissionError("access denied")
+        return real_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", denied)
+    with pytest.raises(PermissionError):
+        preregistration.write_record(tmp_path, record() | {"registered_at": NOW})
+    monkeypatch.undo()
+    assert path.read_bytes() == before
+
+
+def test_an_amendment_that_fails_leaves_the_record_as_it_was(tmp_path, monkeypatch):
+    path = write_record(tmp_path)
+    before = path.read_bytes()
+
+    def fail(*args: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(preregistration.os, "replace", fail)
+    with pytest.raises(OSError, match="disk full"):
+        preregistration.add_exclusion(
+            tmp_path, post_id="9000002", reason="post about Afterword", recorded_at=NOW
+        )
+    assert path.read_bytes() == before
+    assert sorted(p.name for p in path.parent.iterdir()) == ["preregistration.json"]
+
+
+def test_a_labeled_comment_deleted_upstream_still_makes_an_exclusion_late(
+    tmp_path, fake_dev, capsys
+):
+    from tests.test_redact import make_placeholder
+    from tests.test_store import Runs
+
+    class OnTestPost(Runs):
+        @property
+        def thread(self) -> list[dict[str, Any]]:
+            return self.fake.comments[9000002]
+
+    runs = OnTestPost(tmp_path, fake_dev)
+    runs.ingest()
+    write_record(tmp_path)
+    out = label_records.label_dir(tmp_path, "unfrozen")
+    out.mkdir(parents=True)
+    label = {
+        "comment_id": "4821",
+        "pass": "initial",
+        "corpus_set": "test",
+        "labeled_at": "2026-08-19T10:00:00Z",
+        "primary_class": "CONVERSATIONAL",
+        "consequential_prospective": 1,
+    }
+    (out / "initial.jsonl").write_text(json.dumps(label) + "\n", encoding="utf-8")
+    make_placeholder(runs, "4821")
+    runs.ingest()
+    with pytest.raises(service.ServiceError, match="--after-labeling"):
+        service.exclude_post(tmp_path, post_id="9000002", reason="post about Afterword")
+    made = service.exclude_post(
+        tmp_path, post_id="9000002", reason="post about Afterword", after_labeling=True
+    )
+    assert made.after_labeling and made.test_labels_on_post == 1

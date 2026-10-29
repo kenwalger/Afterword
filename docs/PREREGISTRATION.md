@@ -1,6 +1,6 @@
 # Preregistration Runbook
 
-**Version:** 6 (2026-10-26). v6 records the author's threshold decisions (`EVALUATION.md` v22), adds `afterword preregistration write`, and makes Step 5 the full seal-day sequence; Part 1 is published after the seal and excluded by amendment. The thresholds, freeze table, command, and version `0.2.0` land first in a preparation commit; the seal commit holds the record and the corpus manifest, with its message in the git-ignored `seal-commit-message.txt`. v5 records the result of Step 1a (`EVALUATION.md` v21). v4 records the self-agreement result and the author's decisions (`EVALUATION.md` v20) and adds Step 1a, the calibration pass on the 150 publication-order labels under `lg-v0.7`. v3 adds the exclusion of posts about Afterword from the test set (`excluded_posts` in the record, `afterword preregistration posts` and `exclude-post`), after ADR-010's amendment of 2026-10-18, which also makes the recorded `registered_at` the boundary. v2 matched the commands built in session 12 (`self-agreement`, `label --set test`, `shadow`, `corpus`), adds the preregistration record (`registry/preregistration.json`) and the non-revealing `shadow status`, and says which files to commit each week. v1 was the author's draft, written before those commands existed.
+**Version:** 7 (2026-10-29). v7 adds "Known limitations" (a test-period comment with an unknown creation time) and says that `corpus verify` also checks the manifest's `registered_at` against the record (session 16b). v6 records the author's threshold decisions (`EVALUATION.md` v22), adds `afterword preregistration write`, and makes Step 5 the full seal-day sequence; Part 1 is published after the seal and excluded by amendment. The thresholds, freeze table, command, and version `0.2.0` land first in a preparation commit; the seal commit holds the record and the corpus manifest, with its message in the git-ignored `seal-commit-message.txt`. v5 records the result of Step 1a (`EVALUATION.md` v21). v4 records the self-agreement result and the author's decisions (`EVALUATION.md` v20) and adds Step 1a, the calibration pass on the 150 publication-order labels under `lg-v0.7`. v3 adds the exclusion of posts about Afterword from the test set (`excluded_posts` in the record, `afterword preregistration posts` and `exclude-post`), after ADR-010's amendment of 2026-10-18, which also makes the recorded `registered_at` the boundary. v2 matched the commands built in session 12 (`self-agreement`, `label --set test`, `shadow`, `corpus`), adds the preregistration record (`registry/preregistration.json`) and the non-revealing `shadow status`, and says which files to commit each week. v1 was the author's draft, written before those commands existed.
 
 A step-by-step checklist for getting Afterword from "dev labeling done" to "test period running," then through the test period to the result. Work through it top to bottom. Each step says who does it and what "done" looks like.
 
@@ -249,7 +249,7 @@ Then, in order:
    uv run afterword corpus verify --version v1
    ```
 
-   It must print `verified`. If not, stop and bring it to a Claude Code session.
+   It must print `verified`. It also checks that the manifest's `registered_at` equals the record's, so a corpus exported before step 6 fails here. If not, stop and bring it to a Claude Code session.
 9. **Fill in the seal commit message,** starting with the Ollama version:
 
    ```powershell
@@ -406,6 +406,12 @@ When `shadow status` says the stopping rule is met:
 6. Write Part 3.
 
 The score is computed once. Rerunning, retuning, or rescoring after the reveal turns a test result back into development evidence, and the write-up has to say so.
+
+---
+
+## Known limitations
+
+- **A comment with an unknown creation time.** Under ADR-010 a comment belongs to a set by its post's publication time and its own creation time. The tools (`corpus_set_of`) put a comment whose creation time is unknown in neither set once the record exists, even on a post published after `registered_at`, so it is counted but never labeled, sealed, or scored. In practice this does not arise: DEV supplies `created_at` on every comment, deletion placeholders included (707 of 707 in the capability probe, `API-CAPABILITY-MATRIX.md`), and `label status` reports any undated comment in its `undated` count.
 
 ---
 

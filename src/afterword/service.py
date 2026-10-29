@@ -2211,6 +2211,12 @@ def _registered(root: Path) -> preregistration.Preregistration:
         raise ServiceError(
             f"shadow mode needs the preregistration record ({preregistration.RECORD_PATH})", code=2
         )
+    _check_registered(record)
+    return record
+
+
+def _check_registered(record: preregistration.Preregistration) -> None:
+    """Refuse registered conditions the application cannot run as registered."""
     if record.policy_version not in policy.POLICY_VERSIONS:
         raise ServiceError(f"registered policy {record.policy_version} is unknown", code=2)
     if record.b1_heuristic not in heuristic.HEURISTIC_VERSIONS:
@@ -2229,7 +2235,6 @@ def _registered(root: Path) -> preregistration.Preregistration:
                 f"{ollama.NUM_CTX}",
                 code=2,
             )
-    return record
 
 
 def _identities(
@@ -2829,10 +2834,23 @@ def export_corpus(
         store_as_of=latest.sync_run_id if latest else None,
         registered_at=record.registered_at.isoformat() if record else None,
     )
-    (root / data_rel).parent.mkdir(parents=True, exist_ok=True)
-    (root / data_rel).write_bytes(data)
-    (root / manifest_rel).parent.mkdir(parents=True, exist_ok=True)
-    (root / manifest_rel).write_text(json.dumps(made, indent=2) + "\n", encoding="utf-8")
+    # Both files are created exclusively; if the manifest cannot be written, the
+    # data file this call created is removed, so the version is not left half-frozen.
+    try:
+        corpus.write_once(root / data_rel, data)
+        written = False
+        try:
+            corpus.write_once(root / manifest_rel, (json.dumps(made, indent=2) + "\n").encode())
+            written = True
+        finally:
+            if not written:
+                (root / data_rel).unlink(missing_ok=True)
+    except FileExistsError:
+        raise ServiceError(
+            f"corpus {version} ({corpus_set}) appeared while it was exported: it is frozen; "
+            "use a new version",
+            code=2,
+        ) from None
     return CorpusExport(
         version=version,
         corpus_set=corpus_set,
@@ -2852,8 +2870,12 @@ def verify_corpus(
     :param root: Repository root.
     :param version: Corpus version.
     :param corpus_set: ``dev`` or ``test``.
-    :returns: Matched, withdrawn (ADR-009), changed, missing, and extra records.
-    :raises ServiceError: For a bad version or set, or no manifest.
+    :returns: Matched, withdrawn (ADR-009), changed, missing, and extra records,
+        and whether the manifest's ``registered_at`` equals the preregistration
+        record's (a corpus frozen before the record, or against another record,
+        does not).
+    :raises ServiceError: For a bad version or set, no manifest, or an invalid
+        preregistration record.
     """
     try:
         corpus.check_version(version)
@@ -2864,8 +2886,15 @@ def verify_corpus(
     if not path.exists():
         raise ServiceError(f"no manifest for corpus {version} ({corpus_set})", code=2)
     made = json.loads(path.read_text(encoding="utf-8"))
-    return corpus.check(
+    record = load_preregistration(root)
+    frozen_at = made.get("registered_at")
+    manifest_time = datetime.fromisoformat(frozen_at) if isinstance(frozen_at, str) else None
+    result = corpus.check(
         made["comments"], str(made["file_sha256"]), root / corpus.data_path(version, corpus_set)
+    )
+    return replace(
+        result,
+        registered_at_matches=manifest_time == (record.registered_at if record else None),
     )
 
 
@@ -2976,7 +3005,8 @@ def write_preregistration(
     :param root: Repository root.
     :param now: Wall clock: the record's ``registered_at``, to the second.
     :returns: The record as written.
-    :raises ServiceError: If a record already exists (it is never rewritten).
+    :raises ServiceError: If a record already exists (it is never rewritten), or
+        if shadow mode would refuse the conditions; nothing is written then.
     """
     try:
         preregistration.write_record(
@@ -2991,6 +3021,7 @@ def write_preregistration(
                 "num_ctx": ollama.NUM_CTX,
                 "excluded_posts": [],
             },
+            check=_check_registered,
         )
     except preregistration.PreregistrationError as exc:
         raise ServiceError(str(exc), code=2) from None
@@ -3045,7 +3076,7 @@ def exclude_post(
     try:
         cid = _pick_connection(repo, connection_id)
         contents = {c.source_object_id: c for c in repo.contents(cid).values()}
-        subjects = _subjects(repo, cid)
+        comments = repo.comments(cid)
     finally:
         repo.close()
     content = contents.get(post_id)
@@ -3055,7 +3086,9 @@ def exclude_post(
         raise ServiceError(
             f"post {post_id} was published before preregistration: it is not a test post", code=2
         )
-    on_post = {s.comment.comment_id for s in subjects if s.comment.content_id == content.content_id}
+    # Every comment the store has on the post, deleted ones included: a label made
+    # before a comment was deleted upstream still makes the exclusion late.
+    on_post = {c.comment_id for c in comments.values() if c.content_id == content.content_id}
     labeled = {
         str(r["comment_id"])
         for r in label_records.of_set(
