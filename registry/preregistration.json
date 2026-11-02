@@ -1,0 +1,10 @@
+{
+  "registered_at": "2026-11-02T17:38:08Z",
+  "b1_heuristic": "hb-v0.2",
+  "b2_provider": "ollama",
+  "b2_model": "llama3.1:8b-instruct-q4_K_M",
+  "b2_model_digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+  "policy_version": "pp-v0.2",
+  "num_ctx": 4096,
+  "excluded_posts": []
+}
