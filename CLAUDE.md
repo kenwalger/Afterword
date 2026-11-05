@@ -108,3 +108,7 @@ Do not add AI attribution anywhere: no `Co-Authored-By` trailers, "Generated wit
 ## Git Workflow
 
 Never commit. Write the message to `commit-message.txt` and stop.
+
+## Audit Policy
+
+Audit policy: never, unless I ask in the session. When I do, send code and synthetic data only; never real comments, labels, names, or anything under reports/, data/, fixtures/labels/, or fixtures/dev-api/source/real/.
